@@ -1,0 +1,6 @@
+(library
+ (name test_mocks)
+ (libraries yojson unix)
+ (modules mock_systemd)
+ (instrumentation
+  (backend bisect_ppx)))

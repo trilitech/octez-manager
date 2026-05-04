@@ -1,0 +1,27 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
+(*                                                                            *)
+(******************************************************************************)
+
+(** Accuser installation form using field bundles *)
+
+(** Page identifier for registration *)
+val name : string
+
+(** The page module implementing accuser installation *)
+val page : Miaou.Core.Registry.page
+
+(** Register the accuser installation page in the Miaou registry *)
+val register : unit -> unit
+
+(** The page module for direct TUI initialization (used in tests) *)
+module Page : Miaou.Core.Tui_page.PAGE_SIG
+
+module For_tests : sig
+  val initial_base_dir : string
+
+  (** Test helper: simulate setting instance name and return resulting base_dir *)
+  val base_dir_after_set_instance_name : instance_name:string -> string
+end

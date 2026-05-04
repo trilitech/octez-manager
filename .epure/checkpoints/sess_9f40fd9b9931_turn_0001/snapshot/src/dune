@@ -1,0 +1,112 @@
+(include_subdirs unqualified)
+
+(library
+ (name octez_manager_lib)
+ (public_name octez-manager.lib)
+ (modules
+  history_mode
+  system_user
+  logging_mode
+  log_viewer
+  log_export
+  node_env
+  systemd
+  systemd_unit_template
+  systemd_dropin
+  binary_registry
+  binary_downloader
+  signatory_downloader
+  octez_index_downloader
+  version_checker
+  signer_types
+  group
+  group_registry
+  sandbox_config
+  sandbox_config_registry
+  service
+  service_registry
+  base_dir_registry
+  directory_registry
+  help_parser
+  keys_reader
+  yes_wallet
+  yes_wallet_io
+  sandbox
+  installer
+  helpers
+  snapshot
+  config
+  node
+  dal_node
+  baker
+  accuser
+  signatory
+  signatory_config
+  index
+  lifecycle
+  removal
+  import
+  import_cascade
+  teztnets
+  snapshots
+  settings
+  service_backend
+  installer_types
+  signatory_validation
+  signer_validation
+  manager_interfaces
+  capabilities
+  rpc_addr
+  port_validation
+  external_service
+  execstart_parser
+  env_file_parser
+  process_scanner
+  external_service_detector
+  self_update_checker
+  version_utils
+  check_prefs
+  eio_process
+  tzkt_aliases
+  transfer_mru
+  key_aliases)
+ (libraries
+  octez_manager_common
+  rresult
+  yojson
+  yaml
+  bos
+  str
+  unix
+  cohttp-eio
+  tls-eio
+  tls
+  ca-certs
+  domain-name
+  mirage-crypto-rng.unix
+  uri
+  eio_main
+  eio_posix
+  eio
+  miaou-core.lib)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name main)
+ (public_name octez-manager)
+ (modules main)
+ (libraries
+  octez_manager_lib
+  octez_manager_cli
+  octez-manager.ui
+  dune-build-info
+  cmdliner
+  rresult
+  yojson
+  linenoise)
+ (ocamlopt_flags
+  (:standard
+   (:include %{project_root}/static_flags.sexp)))
+ (instrumentation
+  (backend bisect_ppx)))

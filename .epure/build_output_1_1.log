@@ -1,0 +1,3051 @@
+Testing `ocaml_lint_hook'.
+This run has ID `G3WTD0YB'.
+
+  [OK]          pre-build hook          0   dune fmt --check is invoked (AC-1).
+  [OK]          pre-build hook          1   dune build is invoked (AC-2).
+  [OK]          pre-build hook          2   fmt failure blocks build (AC-3).
+  [OK]          pre-build hook          3   build failure is an error (AC-4).
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/ocaml_lint_hook'.
+Test Successful in 0.000s. 4 tests run.
+Testing `indexer'.
+This run has ID `0O10JHAW'.
+
+  [OK]          tzkt_base_url          0   mainnet.
+  [OK]          tzkt_base_url          1   testnet.
+  [OK]          tzkt_base_url          2   full_url.
+  [OK]          tzkt_base_url          3   mainnet_url.
+  [OK]          register               0   register_clear_roundtrip.
+  [OK]          fetch_routing          0   preferred_base_wins.
+  [OK]          fetch_routing          1   local_before_tzkt.
+  [OK]          fetch_routing          2   fallback_on_local_error.
+  [OK]          fetch_routing          3   fallback_on_empty_body.
+  [OK]          fetch_routing          4   all_fail.
+  [OK]          fetch_routing          5   round_robin_two_locals.
+  [OK]          fetch_routing          6   dedup_preferred_equals_local.
+  [OK]          debug_mode             0   debug_logs_divergence.
+  [OK]          debug_mode             1   debug_silent_on_match.
+  [OK]          query_all              0   returns_all_sources.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/indexer'.
+Test Successful in 0.001s. 15 tests run.
+Testing `payout_continual'.
+This run has ID `Y2GLILBI'.
+
+  [OK]          is_trigger_cycle                0   interval=1 always triggers.
+  [OK]          is_trigger_cycle                1   interval=2 offset=0 (even).
+  [OK]          is_trigger_cycle                2   interval=2 offset=1 (odd).
+  [OK]          is_trigger_cycle                3   interval=3 offset=0.
+  [OK]          is_trigger_cycle                4   interval=3 offset=2.
+  [OK]          collect_due_cycles              0   all unpaid.
+  [OK]          collect_due_cycles              1   all paid.
+  [OK]          collect_due_cycles              2   some paid.
+  [OK]          collect_due_cycles              3   small window.
+  [OK]          collect_due_cycles              4   large window.
+  [OK]          cycles_due_integration          0   all unpaid.
+  [OK]          cycles_due_integration          1   interval=2 trigger.
+  [OK]          cycles_due_integration          2   interval=2 no trigger.
+  [OK]          cycles_due_integration          3   interval=1 always triggers.
+  [OK]          cycles_due_integration          4   large cycle window.
+  [OK]          cycles_due_integration          5   large interval.
+  [OK]          cycles_due_integration          6   current excluded.
+  [OK]          cycles_due_integration          7   zero current.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/payout_continual'.
+Test Successful in 0.001s. 18 tests run.
+Testing `payout_config'.
+This run has ID `3UROYHS8'.
+
+  [OK]          defaults                0   default values.
+  [OK]          defaults                1   default validates.
+  [OK]          baker_fee               0   valid range.
+  [OK]          baker_fee               1   invalid range.
+  [OK]          min_amounts             0   min_payout nonneg.
+  [OK]          min_amounts             1   min_balance nonneg.
+  [OK]          buffers                 0   positive buffers.
+  [OK]          addresses               0   whitelist validation.
+  [OK]          addresses               1   blacklist validation.
+  [OK]          income_shares           0   bond recipients sum.
+  [OK]          income_shares           1   fee recipients sum.
+  [OK]          json                    0   roundtrip.
+  [OK]          json                    1   roundtrip with overrides.
+  [OK]          pkh_validators          0   is_valid_tz_address.
+  [OK]          pkh_validators          1   is_valid_baker_pkh accepted.
+  [OK]          pkh_validators          2   is_valid_baker_pkh rejected.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/payout_config'.
+Test Successful in 0.001s. 16 tests run.
+Testing `HJSON_parser'.
+This run has ID `F7DWGM4G'.
+
+  [OK]          comments                   0   line comments.
+  [OK]          comments                   1   block comments.
+  [OK]          comments                   2   multiline block comments.
+  [OK]          comments                   3   hash comments.
+  [OK]          comments                   4   comment in string preserved.
+  [OK]          unquoted_keys              0   unquoted keys.
+  [OK]          unquoted_keys              1   mixed quoting.
+  [OK]          trailing_commas            0   trailing comma object.
+  [OK]          trailing_commas            1   trailing comma array.
+  [OK]          multiline_strings          0   triple-quoted string.
+  [OK]          nested_objects             0   nested objects.
+  [OK]          edge_cases                 0   empty object.
+  [OK]          edge_cases                 1   only comments.
+  [OK]          edge_cases                 2   boolean values.
+  [OK]          edge_cases                 3   real config snippet.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/HJSON_parser'.
+Test Successful in 0.001s. 15 tests run.
+Testing `payout_report'.
+This run has ID `THF2L23K'.
+
+  [OK]          summary_json             0   roundtrip.
+  [OK]          summary_json             1   all fields.
+  [OK]          csv                      0   payouts write.
+  [OK]          csv                      1   invalid write.
+  [OK]          csv                      2   standard columns.
+  [OK]          csv                      3   reader recovers multi-line quote...
+  [OK]          csv                      4   writer sanitizes note newlines.
+  [OK]          cycle_detection          0   cycle_is_paid.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/payout_report'.
+Test Successful in 0.001s. 8 tests run.
+Testing `reward_calculator'.
+This run has ID `DZIH8ZDC'.
+
+  [OK]          proportional_shares          0   single delegator.
+  [OK]          proportional_shares          1   two delegators.
+  [OK]          fees                         0   global fee.
+  [OK]          fees                         1   per-delegator override.
+  [OK]          overdelegation               0   cap at 9x.
+  [OK]          overdelegation               1   disabled.
+  [OK]          eligibility                  0   min balance.
+  [OK]          eligibility                  1   min payout.
+  [OK]          eligibility                  2   blacklist.
+  [OK]          eligibility                  3   whitelist.
+  [OK]          eligibility                  4   ignore contracts.
+  [OK]          below_min                    0   redistribute.
+  [OK]          below_min                    1   baker keeps.
+  [OK]          edge_cases                   0   zero delegators.
+  [OK]          edge_cases                   1   zero rewards.
+  [OK]          overrides                    0   redirect.
+  [OK]          baker_income                 0   income and fees.
+  [OK]          baker_income                 1   bond/fee recipients.
+  [OK]          baker_income                 2   estimated tx fees.
+  [OK]          buckets                      0   pure delegator only delegate...
+  [OK]          buckets                      1   pure external staker gets zero.
+  [OK]          buckets                      2   mixed delegator/staker.
+  [OK]          buckets                      3   VDF and nonce excluded from ...
+  [OK]          buckets                      4   block fees in pool.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/reward_calculator'.
+Test Successful in 0.001s. 24 tests run.
+Testing `payout_executor'.
+This run has ID `LLIC4IB0'.
+
+  [OK]          collect_payouts          0   eligible only.
+  [OK]          collect_payouts          1   with redirect.
+  [OK]          collect_payouts          2   with bonds and fees.
+  [OK]          collect_payouts          3   zero amounts excluded.
+  [OK]          merge_payouts            0   single cycle.
+  [OK]          merge_payouts            1   two cycles same delegators.
+  [OK]          merge_payouts            2   two cycles different delegators.
+  [OK]          merge_payouts            3   two cycles overlapping.
+  [OK]          merge_payouts            4   empty input.
+  [OK]          merge_payouts            5   with redirect.
+  [OK]          merge_payouts            6   different recipients same delega...
+  [OK]          extract_op_hash          0   finds op hash in output.
+  [OK]          extract_op_hash          1   returns None when no op hash.
+  [OK]          extract_op_hash          2   finds bare op hash on line.
+  [OK]          extract_op_hash          3   extracts hash with non-oo prefix.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/payout_executor'.
+Test Successful in 0.001s. 15 tests run.
+Testing `Yes_wallet'.
+This run has ID `R6FMRCQI'.
+
+  [OK]          curve_detection          0   tz1 -> Ed25519.
+  [OK]          curve_detection          1   tz2 -> Secp256k1.
+  [OK]          curve_detection          2   tz3 -> P256.
+  [OK]          curve_detection          3   tz4 -> BLS.
+  [OK]          curve_detection          4   KT1 -> None.
+  [OK]          curve_detection          5   short -> None.
+  [OK]          test_keys                0   keys match curve prefixes.
+  [OK]          wallet_json              0   structure.
+  [OK]          wallet_json              1   pkh values.
+  [OK]          wallet_json              2   sk values.
+  [OK]          wallet_json              3   pk values.
+  [OK]          wallet_json              4   duplicate handling.
+  [OK]          wallet_json              5   empty delegates.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Yes_wallet'.
+Test Successful in 0.001s. 13 tests run.
+Testing `Execstart_parser'.
+This run has ID `LT2NCI77'.
+
+  [OK]          extract_binary_path          0   extract direct path.
+  [OK]          extract_binary_path          1   extract with env var.
+  [OK]          extract_binary_path          2   extract from shell.
+  [OK]          extract_binary_path          3   extract baker path.
+  [OK]          extract_binary_path          4   no binary found.
+  [OK]          is_shell_script              0   detects bash.
+  [OK]          is_shell_script              1   detects sh.
+  [OK]          is_shell_script              2   detects sh -lc.
+  [OK]          is_shell_script              3   direct binary not shell.
+  [OK]          is_shell_script              4   empty not shell.
+  [OK]          unwrap_shell                 0   unwrap sh -c.
+  [OK]          unwrap_shell                 1   unwrap bash -c.
+  [OK]          unwrap_shell                 2   no unwrap if not shell.
+  [OK]          parse_basic                  0   parse simple node.
+  [OK]          parse_basic                  1   parse with rpc-addr.
+  [OK]          parse_basic                  2   parse with net-addr.
+  [OK]          parse_basic                  3   parse with history-mode.
+  [OK]          parse_basic                  4   parse baker command.
+  [OK]          parse_basic                  5   parse baker remotely.
+  [OK]          parse_basic                  6   parse accuser command.
+  [OK]          parse_basic                  7   parse dal node.
+  [OK]          parse_shell                  0   parse shell wrapped.
+  [OK]          parse_shell                  1   parse shell double quotes.
+  [OK]          parse_env_var                0   parse env var data-dir.
+  [OK]          parse_env_var                1   parse env var in binary.
+  [OK]          parse_env_var                2   parse multiple env vars.
+  [OK]          parse_edge_cases             0   parse empty command.
+  [OK]          parse_edge_cases             1   parse malformed.
+  [OK]          parse_edge_cases             2   parse quoted args.
+  [OK]          parse_edge_cases             3   parse equals sign.
+  [OK]          parse_edge_cases             4   parse extra args.
+  [OK]          parse_edge_cases             5   parse very long.
+  [OK]          parse_binary_types           0   parse tezos prefix.
+  [OK]          parse_binary_types           1   parse protocol baker.
+  [OK]          parse_warnings               0   warnings for complex shell.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Execstart_parser'.
+Test Successful in 0.003s. 35 tests run.
+Testing `Version_checker'.
+This run has ID `2R6ECZFA'.
+
+  [OK]          comparison          0   compare equal.
+  [OK]          comparison          1   compare greater.
+  [OK]          comparison          2   compare less.
+  [OK]          comparison          3   compare major version.
+  [OK]          comparison          4   compare three parts.
+  [OK]          comparison          5   compare different lengths.
+  [OK]          comparison          6   compare with v prefix.
+  [OK]          comparison          7   compare mixed prefix.
+  [OK]          comparison          8   compare large numbers.
+  [OK]          comparison          9   compare zero versions.
+  [OK]          parsing             0   parse simple version.
+  [OK]          parsing             1   parse three part.
+  [OK]          parsing             2   parse with v prefix.
+  [OK]          parsing             3   parse empty.
+  [OK]          parsing             4   parse invalid.
+  [OK]          state               0   is check enabled.
+  [OK]          state               1   get current version.
+  [OK]          edge_cases          0   compare minor versions.
+  [OK]          edge_cases          1   compare rc versions.
+  [OK]          edge_cases          2   compare single number.
+  [OK]          edge_cases          3   compare whitespace.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Version_checker'.
+Test Successful in 0.001s. 21 tests run.
+Testing `System_user'.
+This run has ID `GKGMTNN2'.
+
+  [OK]          validation          0   validate existing user.
+  [OK]          validation          1   validate missing user.
+  [OK]          validation          2   validate root user.
+  [OK]          ensure              0   ensure creates if missing.
+  [OK]          ensure              1   ensure skips if exists.
+  [OK]          remove              0   remove calls userdel.
+  [OK]          remove              1   remove nonexistent.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/System_user'.
+Test Successful in 0.002s. 7 tests run.
+Testing `Common_utils'.
+This run has ID `YB7WCFL7'.
+
+  [OK]          sh_quote                    0   quote simple.
+  [OK]          sh_quote                    1   quote spaces.
+  [OK]          sh_quote                    2   quote single quote.
+  [OK]          sh_quote                    3   quote empty.
+  [OK]          sh_quote                    4   quote dollar.
+  [OK]          sh_quote                    5   quote backtick.
+  [OK]          sh_quote                    6   quote semicolon.
+  [OK]          sh_quote                    7   quote path.
+  [OK]          make_absolute_path          0   absolute unchanged.
+  [OK]          make_absolute_path          1   relative converted.
+  [OK]          make_absolute_path          2   dot converted.
+  [OK]          make_absolute_path          3   dotdot converted.
+  [OK]          make_absolute_path          4   empty fails.
+  [OK]          make_absolute_path          5   whitespace fails.
+  [OK]          make_absolute_path          6   tilde handled.
+  [OK]          path_utils                  0   default data dir.
+  [OK]          path_utils                  1   default role dir.
+  [OK]          path_utils                  2   cmd to string.
+  [OK]          path_utils                  3   cmd with spaces.
+  [OK]          unquote                     0   double quotes.
+  [OK]          unquote                     1   single quotes.
+  [OK]          unquote                     2   backslash-escaped.
+  [OK]          unquote                     3   no quotes.
+  [OK]          unquote                     4   empty string.
+  [OK]          unquote                     5   empty double quotes.
+  [OK]          unquote                     6   empty single quotes.
+  [OK]          unquote                     7   mismatched quotes.
+  [OK]          unquote                     8   single char.
+  [OK]          edge_cases                  0   quote newline.
+  [OK]          edge_cases                  1   quote special chars.
+  [OK]          edge_cases                  2   absolute with spaces.
+  [OK]          edge_cases                  3   absolute very long.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Common_utils'.
+Test Successful in 0.002s. 32 tests run.
+Testing `Binary_downloader_extended'.
+This run has ID `1DVEM7JD'.
+
+  [OK]          architecture              0   arch_to_string x86_64.
+  [OK]          architecture              1   arch_to_string arm64.
+  [OK]          url_construction          0   binary_url node.
+  [OK]          url_construction          1   binary_url arm64.
+  [OK]          url_construction          2   binary_url rc version.
+  [OK]          url_construction          3   checksums_url.
+  [OK]          url_construction          4   checksums_url arm64.
+  [OK]          version_parsing           0   parse simple version.
+  [OK]          version_parsing           1   parse rc version.
+  [OK]          version_parsing           2   parse with date.
+  [OK]          version_parsing           3   parse multiple versions.
+  [OK]          version_parsing           4   parse wrapped versions.
+  [OK]          version_parsing           5   parse invalid JSON.
+  [OK]          version_parsing           6   parse missing fields.
+  [OK]          version_parsing           7   parse empty list.
+  [OK]          size_formatting           0   format bytes.
+  [OK]          size_formatting           1   format kilobytes.
+  [OK]          size_formatting           2   format megabytes.
+  [OK]          size_formatting           3   format gigabytes.
+  [OK]          size_formatting           4   format zero.
+  [OK]          size_formatting           5   format 1KB boundary.
+  [OK]          size_formatting           6   format 1MB boundary.
+  [OK]          size_formatting           7   format 1GB boundary.
+  [OK]          binaries                  0   binaries for stable version.
+  [OK]          binaries                  1   binaries for rc version.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Binary_downloader_extended'.
+Test Successful in 0.001s. 25 tests run.
+Testing `custom_baker_registry'.
+This run has ID `KL5RCGRH'.
+
+  [OK]          round_trip                        0   add/list/remove.
+  [OK]          collision                         0   rejects duplicate custo...
+  [OK]          collision                         1   rejects OM_TEST_BAKER c...
+  [OK]          build_instance_handle             0   valid tz1 mainnet.
+  [OK]          build_instance_handle             1   KT1 rejected.
+  [OK]          build_instance_handle             2   network with slash reje...
+  [OK]          build_instance_handle             3   network with space reje...
+  [OK]          build_instance_handle             4   empty network rejected.
+  [OK]          validate_endpoint                 0   hostname:port accepted.
+  [OK]          validate_endpoint                 1   ip:port accepted.
+  [OK]          validate_endpoint                 2   empty host rejected.
+  [OK]          validate_endpoint                 3   port 0 rejected.
+  [OK]          validate_endpoint                 4   port 99999 rejected.
+  [OK]          validate_endpoint                 5   no port rejected.
+  [OK]          validate_endpoint                 6   empty string rejected.
+  [OK]          resolve_octez_client_bin          0   failure path returns Er...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/custom_baker_registry'.
+Test Successful in 0.007s. 16 tests run.
+Testing `Snapshots'.
+This run has ID `2GH75BVZ'.
+
+  [OK]          slug_of_network          0   slug mainnet.
+  [OK]          slug_of_network          1   slug shadownet.
+  [OK]          slug_of_network          2   slug parisnet.
+  [OK]          slug_of_network          3   slug unknown network.
+  [OK]          slug_of_network          4   slug empty string.
+  [OK]          slug_of_network          5   slug URL format.
+  [OK]          sanitize_kind            0   sanitize rolling.
+  [OK]          sanitize_kind            1   sanitize full.
+  [OK]          sanitize_kind            2   sanitize archive.
+  [OK]          sanitize_kind            3   sanitize full with number.
+  [OK]          sanitize_kind            4   sanitize rolling with number.
+  [OK]          sanitize_kind            5   sanitize empty.
+  [OK]          sanitize_kind            6   sanitize invalid.
+  [OK]          fetch_entry              0   fetch entry success.
+  [OK]          fetch_entry              1   fetch entry 404.
+  [OK]          fetch_entry              2   fetch entry network error.
+  [OK]          fetch_entry              3   fetch entry 500 error.
+  [OK]          list                     0   list success.
+  [OK]          list                     1   list empty.
+  [OK]          list                     2   list network error.
+  [OK]          edge_cases               0   sanitize case insensitive.
+  [OK]          edge_cases               1   sanitize whitespace.
+  [OK]          edge_cases               2   slug special characters.
+  [OK]          edge_cases               3   slug weeklynet dated URL.
+  [OK]          edge_cases               4   slug weeklynet undated URL.
+  [OK]          edge_cases               5   slug weeklynet bare alias.
+  [OK]          edge_cases               6   slug mainnet no strip.
+  [OK]          edge_cases               7   slug shadownet no strip.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Snapshots'.
+Test Successful in 0.001s. 28 tests run.
+Testing `Systemd_extended'.
+This run has ID `XZFEWCH6'.
+
+  [OK]          role_binary          0   role_binary node.
+  [OK]          role_binary          1   role_binary baker.
+  [OK]          role_binary          2   role_binary accuser.
+  [OK]          role_binary          3   role_binary dal.
+  [OK]          role_binary          4   role_binary dal-node.
+  [OK]          role_binary          5   role_binary uppercase.
+  [OK]          role_binary          6   role_binary mixed case.
+  [OK]          role_binary          7   role_binary unknown.
+  [OK]          unit_name            0   unit_name basic.
+  [OK]          unit_name            1   unit_name with hyphen.
+  [OK]          unit_name            2   unit_name numeric instance.
+  [OK]          unit_name            3   unit_name empty instance.
+  [OK]          unit_path            0   system_unit_path node.
+  [OK]          unit_path            1   system_unit_path baker.
+  [OK]          unit_path            2   system_unit_path dal.
+  [OK]          dropin               0   dropin_dir contains role.
+  [OK]          dropin               1   dropin_dir different instances.
+  [OK]          dropin               2   dropin_path contains override.
+  [OK]          dropin               3   dropin_path in dropin_dir.
+  [OK]          systemctl            0   systemctl_cmd.
+  [OK]          env_file             0   env_file_template user mode.
+  [OK]          env_file             1   env_file_template system mode.
+  [OK]          env_file             2   env_file_template different modes.
+  [OK]          prestart             0   prestart_hooks_dir.
+  [OK]          prestart             1   prestart_script_path.
+  [OK]          prestart             2   prestart_script_path different roles.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Systemd_extended'.
+Test Successful in 0.001s. 26 tests run.
+Testing `External_service_detector_extended'.
+This run has ID `5IYK57VK'.
+
+  [OK]          string_contains            0   contains basic.
+  [OK]          string_contains            1   contains not found.
+  [OK]          string_contains            2   contains empty needle.
+  [OK]          string_contains            3   contains empty haystack.
+  [OK]          string_contains            4   contains at start.
+  [OK]          string_contains            5   contains at end.
+  [OK]          string_contains            6   contains exact match.
+  [OK]          unit_name_pattern          0   managed unit name valid.
+  [OK]          unit_name_pattern          1   managed unit name baker.
+  [OK]          unit_name_pattern          2   managed unit name dal.
+  [OK]          unit_name_pattern          3   managed unit name wrong prefix.
+  [OK]          unit_name_pattern          4   managed unit name no @.
+  [OK]          unit_name_pattern          5   managed unit name multiple @.
+  [OK]          unit_name_pattern          6   managed unit name missing suffix.
+  [OK]          unit_name_pattern          7   managed unit name wrong suffix.
+  [OK]          extract_command            0   extract structured format.
+  [OK]          extract_command            1   extract with arguments.
+  [OK]          extract_command            2   extract no argv.
+  [OK]          extract_command            3   extract malformed.
+  [OK]          extract_command            4   extract empty.
+  [OK]          chain_id_mapping           0   chain id mainnet.
+  [OK]          chain_id_mapping           1   chain id shadownet.
+  [OK]          chain_id_mapping           2   chain id tallinnnet.
+  [OK]          chain_id_mapping           3   chain id unknown.
+  [OK]          chain_id_mapping           4   chain id empty.
+  [OK]          chain_id_mapping           5   chain id case sensitive.
+  [OK]          systemctl                  0   systemctl_cmd.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/External_service_detector_extended'.
+Test Successful in 0.001s. 27 tests run.
+Testing `Directory_registry'.
+This run has ID `DRGL1B9A'.
+
+  [OK]          dir_type JSON                 0   to_yojson node_data_dir.
+  [OK]          dir_type JSON                 1   to_yojson client_base_dir.
+  [OK]          dir_type JSON                 2   to_yojson app_bin_dir.
+  [OK]          dir_type JSON                 3   of_yojson node_data_dir.
+  [OK]          dir_type JSON                 4   of_yojson client_base_dir.
+  [OK]          dir_type JSON                 5   of_yojson app_bin_dir.
+  [OK]          dir_type JSON                 6   of_yojson invalid.
+  [OK]          directory_entry JSON          0   to_yojson.
+  [OK]          directory_entry JSON          1   of_yojson.
+  [OK]          directory_entry JSON          2   of_yojson backward compat.
+  [OK]          directory_entry JSON          3   of_yojson missing path.
+  [OK]          directory_entry JSON          4   of_yojson invalid dir_type.
+  [OK]          directory_entry JSON          5   roundtrip.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Directory_registry'.
+Test Successful in 0.001s. 13 tests run.
+Testing `Common_extended'.
+This run has ID `3E466TUX'.
+
+  [OK]          xdg_directories          0   xdg_config_home from env.
+  [OK]          xdg_directories          1   xdg_config_home fallback.
+  [OK]          xdg_directories          2   xdg_data_home from env.
+  [OK]          xdg_directories          3   xdg_data_home fallback.
+  [OK]          xdg_directories          4   xdg_state_home from env.
+  [OK]          xdg_directories          5   xdg_state_home fallback.
+  [OK]          exit_codes               0   exit code 0.
+  [OK]          exit_codes               1   exit code 126.
+  [OK]          exit_codes               2   exit code 127.
+  [OK]          exit_codes               3   exit code 128.
+  [OK]          exit_codes               4   exit code 254.
+  [OK]          exit_codes               5   exit code 255.
+  [OK]          exit_codes               6   exit code 1-125 range.
+  [OK]          exit_codes               7   exit code 129-253 range.
+  [OK]          exit_codes               8   exit code unknown.
+  [OK]          editor                   0   get_editor from VISUAL.
+  [OK]          editor                   1   get_editor from EDITOR.
+  [OK]          editor                   2   get_editor fallback.
+  [OK]          filesystem               0   get_filesystem_id existing.
+  [OK]          filesystem               1   get_filesystem_id nonexistent.
+  [OK]          filesystem               2   same_filesystem same path.
+  [OK]          filesystem               3   same_filesystem different paths.
+  [OK]          filesystem               4   same_filesystem nonexistent.
+  [OK]          filesystem               5   remove_path nonexistent.
+  [OK]          role_dir                 0   default_role_dir basic.
+  [OK]          role_dir                 1   default_role_dir uppercase.
+  [OK]          role_dir                 2   default_role_dir special chars.
+  [OK]          role_dir                 3   default_role_dir already prefixed.
+  [OK]          role_dir                 4   default_role_dir empty role.
+  [OK]          role_dir                 5   default_role_dir whitespace.
+  [OK]          misc                     0   current_user_group_names.
+  [OK]          misc                     1   env_instances_base_dir.
+  [OK]          misc                     2   default_log_dir.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Common_extended'.
+Test Successful in 0.003s. 33 tests run.
+Testing `Simple_modules'.
+This run has ID `J7YWJJ5I'.
+
+  [OK]          history_mode             0   to_string rolling.
+  [OK]          history_mode             1   to_string full.
+  [OK]          history_mode             2   to_string archive.
+  [OK]          history_mode             3   of_string rolling.
+  [OK]          history_mode             4   of_string full.
+  [OK]          history_mode             5   of_string archive.
+  [OK]          history_mode             6   of_string uppercase.
+  [OK]          history_mode             7   of_string mixed case.
+  [OK]          history_mode             8   of_string with whitespace.
+  [OK]          history_mode             9   of_string invalid.
+  [OK]          history_mode            10   of_string empty.
+  [OK]          history_mode            11   default.
+  [OK]          logging_mode             0   to_string.
+  [OK]          logging_mode             1   default.
+  [OK]          logging_mode             2   to_yojson.
+  [OK]          logging_mode             3   of_yojson journald.
+  [OK]          logging_mode             4   of_yojson file legacy.
+  [OK]          logging_mode             5   of_yojson invalid.
+  [OK]          logging_mode             6   of_yojson missing type.
+  [OK]          env_file_parser          0   parse empty.
+  [OK]          env_file_parser          1   parse simple pair.
+  [OK]          env_file_parser          2   parse multiple pairs.
+  [OK]          env_file_parser          3   parse with quotes.
+  [OK]          env_file_parser          4   parse with single quotes.
+  [OK]          env_file_parser          5   parse equals in value.
+  [OK]          env_file_parser          6   parse comments.
+  [OK]          env_file_parser          7   parse blank lines.
+  [OK]          env_file_parser          8   parse key without value.
+  [OK]          env_file_parser          9   parse whitespace around =.
+  [OK]          env_file_parser         10   expand no vars.
+  [OK]          env_file_parser         11   expand simple.
+  [OK]          env_file_parser         12   expand braced.
+  [OK]          env_file_parser         13   expand multiple.
+  [OK]          env_file_parser         14   expand undefined.
+  [OK]          env_file_parser         15   expand undefined braced.
+  [OK]          env_file_parser         16   expand empty value.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Simple_modules'.
+Test Successful in 0.002s. 36 tests run.
+Testing `Keys_reader'.
+This run has ID `79YXFCNO'.
+
+  [OK]          key_info_parsing             0   parse valid key_info.
+  [OK]          key_info_parsing             1   parse tz2 address.
+  [OK]          key_info_parsing             2   parse tz3 address.
+  [OK]          key_info_parsing             3   parse tz4 address.
+  [OK]          key_info_parsing             4   reject missing name.
+  [OK]          key_info_parsing             5   reject missing value.
+  [OK]          key_info_parsing             6   reject wrong type.
+  [OK]          key_info_parsing             7   reject non-object.
+  [OK]          key_info_parsing             8   reject empty object.
+  [OK]          key_kind_of_locator          0   unencrypted locator.
+  [OK]          key_kind_of_locator          1   encrypted locator.
+  [OK]          key_kind_of_locator          2   ledger locator.
+  [OK]          key_kind_of_locator          3   ledger triple-slash.
+  [OK]          key_kind_of_locator          4   remote locator.
+  [OK]          key_kind_of_locator          5   empty locator.
+  [OK]          key_kind_of_locator          6   unknown scheme.
+  [OK]          read_keys_full               0   basic key with all files.
+  [OK]          read_keys_full               1   encrypted key.
+  [OK]          read_keys_full               2   ledger key.
+  [OK]          read_keys_full               3   watch-only key.
+  [OK]          read_keys_full               4   empty directory.
+  [OK]          read_keys_full               5   multiple keys mixed.
+  [OK]          read_keys_full               6   remote signer key.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Keys_reader'.
+Test Successful in 0.002s. 23 tests run.
+Testing `Binary_registry'.
+This run has ID `3JRYOBXI'.
+
+  [OK]          bin_source_to_string                       0   managed version.
+  [OK]          bin_source_to_string                       1   registered alias.
+  [OK]          bin_source_to_string                       2   raw path.
+  [OK]          bin_source JSON serialization              0   to_yojson mana...
+  [OK]          bin_source JSON serialization              1   to_yojson regi...
+  [OK]          bin_source JSON serialization              2   to_yojson raw.
+  [OK]          bin_source JSON serialization              3   of_yojson mana...
+  [OK]          bin_source JSON serialization              4   of_yojson regi...
+  [OK]          bin_source JSON serialization              5   of_yojson raw.
+  [OK]          bin_source JSON serialization              6   of_yojson back...
+  [OK]          bin_source JSON serialization              7   of_yojson inva...
+  [OK]          bin_source JSON serialization              8   of_yojson inva...
+  [OK]          bin_source JSON serialization              9   of_legacy.
+  [OK]          registered_dir JSON serialization          0   to_yojson.
+  [OK]          registered_dir JSON serialization          1   of_yojson.
+  [OK]          registered_dir JSON serialization          2   of_yojson_miss...
+  [OK]          registered_dir JSON serialization          3   list to_yojson.
+  [OK]          registered_dir JSON serialization          4   list of_yojson.
+  [OK]          registered_dir JSON serialization          5   list of_yojson...
+  [OK]          registered_dir JSON serialization          6   list of_yojson...
+  [OK]          compare_versions                           0   equal versions.
+  [OK]          compare_versions                           1   greater version.
+  [OK]          compare_versions                           2   less version.
+  [OK]          compare_versions                           3   multi-part ver...
+  [OK]          compare_versions                           4   different leng...
+  [OK]          compare_versions                           5   different leng...
+  [OK]          compare_versions                           6   non-numeric pa...
+  [OK]          compare_versions                           7   RC vs release.
+  [OK]          compare_versions                           8   release vs RC.
+  [OK]          compare_versions                           9   RC ordering.
+  [OK]          compare_versions                          10   v-prefix.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Binary_registry'.
+Test Successful in 0.001s. 31 tests run.
+Testing `Help_parser'.
+This run has ID `QL2ZNLQ7'.
+
+  [OK]          helpers                 0   contains found.
+  [OK]          helpers                 1   contains not found.
+  [OK]          helpers                 2   contains empty needle.
+  [OK]          helpers                 3   trim nonempty with spaces.
+  [OK]          helpers                 4   trim nonempty empty.
+  [OK]          helpers                 5   primary name prefers long.
+  [OK]          helpers                 6   primary name first if no long.
+  [OK]          helpers                 7   display names filters long.
+  [OK]          classification          0   classify toggle.
+  [OK]          classification          1   classify addr:port.
+  [OK]          classification          2   classify port.
+  [OK]          classification          3   classify file.
+  [OK]          classification          4   classify dir.
+  [OK]          classification          5   classify number.
+  [OK]          classification          6   classify text fallback.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Help_parser'.
+Test Successful in 0.001s. 15 tests run.
+Testing `Installer Snapshot'.
+This run has ID `ABRFQ4UR'.
+
+  [OK]          History Mode Matching          0   rolling exact match.
+  [OK]          History Mode Matching          1   full exact match.
+  [OK]          History Mode Matching          2   case insensitive.
+  [OK]          History Mode Matching          3   whitespace trimming.
+  [OK]          History Mode Matching          4   mode mismatch.
+  [OK]          History Mode Matching          5   archive mode.
+  [OK]          History Mode Matching          6   invalid modes.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Installer Snapshot'.
+Test Successful in 0.000s. 7 tests run.
+Testing `Self Update Checker'.
+This run has ID `XXGOOEGO'.
+
+  [OK]          Version Comparison          0   compare versions.
+  [OK]          Version Comparison          1   detect major updates.
+  [OK]          Version Comparison          2   current version format.
+  [OK]          URL Generation              0   URL constants.
+  [OK]          Installation                0   install method detection.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Self Update Checker'.
+Test Successful in 0.002s. 5 tests run.
+Testing `Import_cascade'.
+This run has ID `VA2G9MF4'.
+
+  [OK]          topological_sort              0   single node.
+  [OK]          topological_sort              1   linear chain.
+  [OK]          topological_sort              2   diamond.
+  [OK]          topological_sort              3   independent.
+  [OK]          analyze_dependencies          0   simple chain.
+  [OK]          analyze_dependencies          1   external dependents.
+  [OK]          analyze_dependencies          2   no external when all imported.
+  [OK]          validate_cascade              0   clone ok.
+  [OK]          validate_cascade              1   takeover all ok.
+  [OK]          validate_cascade              2   takeover external deps fails.
+  [OK]          validate_cascade              3   clone allows external deps.
+  [OK]          validate_cascade              4   missing dependencies.
+  [OK]          get_dependency_chain          0   node has no deps.
+  [OK]          get_dependency_chain          1   baker includes node.
+  [OK]          get_dependency_chain          2   diamond.
+  [OK]          get_full_cascade              0   from node.
+  [OK]          get_full_cascade              1   from baker.
+  [OK]          get_full_cascade              2   independent excluded.
+  [OK]          list_drop                     0   drop zero.
+  [OK]          list_drop                     1   drop some.
+  [OK]          list_drop                     2   drop all.
+  [OK]          list_drop                     3   drop empty.
+  [OK]          pretty_printing               0   pp cycle error.
+  [OK]          pretty_printing               1   pp external deps error.
+  [OK]          pretty_printing               2   pp analysis.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Import_cascade'.
+Test Successful in 0.002s. 25 tests run.
+Testing `Process_scanner'.
+This run has ID `QQG0IA1Z'.
+
+  [OK]          extract_binary_path          0   simple path.
+  [OK]          extract_binary_path          1   bare binary.
+  [OK]          extract_binary_path          2   with many args.
+  [OK]          extract_binary_path          3   empty string.
+  [OK]          extract_binary_path          4   starts with dash.
+  [OK]          extract_binary_path          5   whitespace only.
+  [OK]          is_octez_binary              0   octez-node.
+  [OK]          is_octez_binary              1   full path.
+  [OK]          is_octez_binary              2   octez-baker.
+  [OK]          is_octez_binary              3   octez-accuser.
+  [OK]          is_octez_binary              4   octez-dal-node.
+  [OK]          is_octez_binary              5   legacy tezos-node.
+  [OK]          is_octez_binary              6   legacy tezos-baker.
+  [OK]          is_octez_binary              7   legacy tezos-accuser.
+  [OK]          is_octez_binary              8   not validator.
+  [OK]          is_octez_binary              9   not validator-hypervisor.
+  [OK]          is_octez_binary             10   not random binary.
+  [OK]          is_octez_binary             11   not grep.
+  [OK]          is_octez_binary             12   not empty.
+  [OK]          is_octez_binary             13   not octez-manager.
+  [OK]          is_octez_binary             14   not octez-client.
+  [OK]          contains_substring           0   present.
+  [OK]          contains_substring           1   absent.
+  [OK]          contains_substring           2   empty needle.
+  [OK]          contains_substring           3   exact match.
+  [OK]          contains_substring           4   cgroup path.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Process_scanner'.
+Test Successful in 0.001s. 26 tests run.
+Testing `Self_update_checker'.
+This run has ID `VY2F5YP2'.
+
+  [OK]          parse_version              0   simple.
+  [OK]          parse_version              1   two parts.
+  [OK]          parse_version              2   leading v.
+  [OK]          parse_version              3   rc suffix.
+  [OK]          parse_version              4   empty.
+  [OK]          parse_version              5   garbage.
+  [OK]          parse_version              6   single.
+  [OK]          is_rc                      0   true.
+  [OK]          is_rc                      1   false.
+  [OK]          is_rc                      2   double dash.
+  [OK]          extract_rc_number          0   rc1.
+  [OK]          extract_rc_number          1   rc42.
+  [OK]          extract_rc_number          2   not rc.
+  [OK]          extract_rc_number          3   beta.
+  [OK]          compare_versions           0   equal.
+  [OK]          compare_versions           1   less.
+  [OK]          compare_versions           2   greater.
+  [OK]          compare_versions           3   minor.
+  [OK]          compare_versions           4   patch.
+  [OK]          compare_versions           5   trailing zero.
+  [OK]          compare_versions           6   rc vs release.
+  [OK]          compare_versions           7   release vs rc.
+  [OK]          compare_versions           8   rc1 vs rc2.
+  [OK]          compare_versions           9   leading v.
+  [OK]          is_major_update            0   true.
+  [OK]          is_major_update            1   false minor.
+  [OK]          is_major_update            2   false patch.
+  [OK]          is_major_update            3   same.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Self_update_checker'.
+Test Successful in 0.001s. 28 tests run.
+Testing `Settings'.
+This run has ID `QVGD95CY'.
+
+  [OK]          roundtrip                0   default.
+  [OK]          roundtrip                1   with bin dir.
+  [OK]          roundtrip                2   with history mode.
+  [OK]          roundtrip                3   with logging mode.
+  [OK]          deserialization          0   empty object.
+  [OK]          deserialization          1   null fields.
+  [OK]          deserialization          2   extra fields.
+  [OK]          deserialization          3   invalid history.
+  [OK]          serialization            0   structure.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Settings'.
+Test Successful in 0.001s. 9 tests run.
+Testing `Import_fields'.
+This run has ID `N5VEQUOF'.
+
+  [OK]          extract_baker_fields          0   empty args.
+  [OK]          extract_baker_fields          1   tz1 address.
+  [OK]          extract_baker_fields          2   tz2 address.
+  [OK]          extract_baker_fields          3   tz3 address.
+  [OK]          extract_baker_fields          4   KT1 address.
+  [OK]          extract_baker_fields          5   alias.
+  [OK]          extract_baker_fields          6   multiple delegates.
+  [OK]          extract_baker_fields          7   LB vote pass.
+  [OK]          extract_baker_fields          8   LB vote on.
+  [OK]          extract_baker_fields          9   mixed flags and delegates.
+  [OK]          extract_baker_fields         10   flags only.
+  [OK]          extract_baker_fields         11   dashes not delegates.
+  [OK]          extract_baker_fields         12   path not delegate.
+  [OK]          resolve_field                 0   override wins.
+  [OK]          resolve_field                 1   detected fallback.
+  [OK]          resolve_field                 2   missing error.
+  [OK]          resolve_field                 3   override with unknown.
+  [OK]          resolve_rpc_addr              0   override.
+  [OK]          resolve_rpc_addr              1   detected.
+  [OK]          resolve_rpc_addr              2   default.
+  [OK]          resolve_net_addr              0   override.
+  [OK]          resolve_net_addr              1   detected.
+  [OK]          resolve_net_addr              2   default.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Import_fields'.
+Test Successful in 0.001s. 23 tests run.
+Testing `Systemd_templates'.
+This run has ID `ZXHF7YVS'.
+
+  [OK]          role_binary                      0   node.
+  [OK]          role_binary                      1   baker.
+  [OK]          role_binary                      2   accuser.
+  [OK]          role_binary                      3   dal.
+  [OK]          role_binary                      4   dal-node.
+  [OK]          role_binary                      5   unknown.
+  [OK]          role_binary                      6   case insensitive.
+  [OK]          unit_name                        0   format.
+  [OK]          exec_line                        0   node.
+  [OK]          exec_line                        1   baker.
+  [OK]          exec_line                        2   accuser.
+  [OK]          exec_line                        3   dal-node.
+  [OK]          exec_line                        4   dal-node conditional flags.
+  [OK]          exec_line                        5   unknown.
+  [OK]          unit_template                    0   node.
+  [OK]          unit_template                    1   baker.
+  [OK]          unit_template                    2   with prestart.
+  [OK]          unit_template                    3   empty bin dir.
+  [OK]          parse_unit_state_output          0   active.
+  [OK]          parse_unit_state_output          1   inactive.
+  [OK]          parse_unit_state_output          2   failed.
+  [OK]          parse_unit_state_output          3   empty.
+  [OK]          parse_unit_state_output          4   partial.
+  [OK]          render_logging_lines             0   journald.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Systemd_templates'.
+Test Successful in 0.002s. 24 tests run.
+Testing `Group Tests'.
+This run has ID `SNXOETT5'.
+
+  [OK]          group.type                   0   roundtrip JSON.
+  [OK]          group.type                   1   roundtrip raw_path.
+  [OK]          group.type                   2   roundtrip registered_alias.
+  [OK]          group.type                   3   make.
+  [OK]          group.type                   4   invalid JSON.
+  [OK]          group_registry               0   write and find.
+  [OK]          group_registry               1   list empty.
+  [OK]          group_registry               2   list multiple.
+  [OK]          group_registry               3   find missing.
+  [OK]          group_registry               4   remove.
+  [OK]          group_registry               5   remove nonexistent.
+  [OK]          group_registry               6   overwrite.
+  [OK]          service.group_field          0   default None.
+  [OK]          service.group_field          1   roundtrip.
+  [OK]          service.group_field          2   backward compat.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Group Tests'.
+Test Successful in 0.016s. 15 tests run.
+Testing `External_service_detector'.
+This run has ID `YAHEW5TS'.
+
+  [OK]          contains_octez_binary                        0   node.
+  [OK]          contains_octez_binary                        1   baker.
+  [OK]          contains_octez_binary                        2   accuser.
+  [OK]          contains_octez_binary                        3   dal-node.
+  [OK]          contains_octez_binary                        4   tezos-baker.
+  [OK]          contains_octez_binary                        5   tezos-accuser.
+  [OK]          contains_octez_binary                        6   unrelated.
+  [OK]          contains_octez_binary                        7   empty.
+  [OK]          contains_octez_binary                        8   case insensi...
+  [OK]          chain_id_to_network                          0   mainnet.
+  [OK]          chain_id_to_network                          1   unknown.
+  [OK]          extract_command_from_systemd_format          0   simple.
+  [OK]          extract_command_from_systemd_format          1   no argv.
+  [OK]          is_managed_unit_name                         0   node.
+  [OK]          is_managed_unit_name                         1   baker.
+  [OK]          is_managed_unit_name                         2   dal.
+  [OK]          is_managed_unit_name                         3   not managed.
+  [OK]          is_managed_unit_name                         4   no at sign.
+  [OK]          string_contains                              0   found.
+  [OK]          string_contains                              1   not found.
+  [OK]          string_contains                              2   empty needle.
+  [OK]          string_contains                              3   empty haystack.
+  [OK]          probe_network_from_config                    0   mainnet impl...
+  [OK]          probe_network_from_config                    1   shadownet.
+  [OK]          probe_network_from_config                    2   missing config.
+  [OK]          probe_network_from_config                    3   nonexistent ...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/External_service_detector'.
+Test Successful in 0.002s. 26 tests run.
+Testing `Log_export'.
+This run has ID `YWRKYYYU'.
+
+  [OK]          get_instance_details          0   contains instance.
+  [OK]          get_instance_details          1   contains role.
+  [OK]          get_instance_details          2   contains network.
+  [OK]          get_instance_details          3   contains history mode.
+  [OK]          get_instance_details          4   contains data dir.
+  [OK]          get_instance_details          5   contains rpc addr.
+  [OK]          get_instance_details          6   contains service user.
+  [OK]          get_instance_details          7   no depends_on.
+  [OK]          get_instance_details          8   with depends_on.
+  [OK]          get_instance_details          9   no dependents.
+  [OK]          get_instance_details         10   with dependents.
+  [OK]          get_instance_details         11   has header.
+  [OK]          get_instance_details         12   contains created_at.
+  [OK]          format_timestamp              0   epoch.
+  [OK]          format_timestamp              1   nonzero.
+  [OK]          export_filename               0   basic.
+  [OK]          export_filename               1   complex instance.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Log_export'.
+Test Successful in 0.001s. 17 tests run.
+qcheck random seed: 965172057
+Testing `Port_validation_props'.
+This run has ID `15ME3FH1'.
+
+  [OK]          properties          0   parse_host_port never crashes on rand...
+  [OK]          properties          1   parse_port never crashes on random in...
+  [OK]          properties          2   parsed port is always in [1, 65535].
+  [OK]          properties          3   parse_port result is always in [1, 65...
+  [OK]          properties          4   valid host:port strings are always pa...
+  [OK]          properties          5   pp_error never crashes.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Port_validation_props'.
+Test Successful in 0.004s. 6 tests run.
+Testing `Signatory_downloader'.
+This run has ID `TBSKQBSQ'.
+
+  [OK]          Architecture               0   arch_to_string x86_64.
+  [OK]          Architecture               1   arch_to_string arm64.
+  [OK]          URL Construction           0   tarball_url x86_64.
+  [OK]          URL Construction           1   tarball_url arm64.
+  [OK]          URL Construction           2   tarball_url RC version.
+  [OK]          URL Construction           3   checksums_url.
+  [OK]          URL Construction           4   checksums_url RC.
+  [OK]          JSON Parsing               0   parse_release_json simple.
+  [OK]          JSON Parsing               1   parse_release_json multiple.
+  [OK]          JSON Parsing               2   parse_release_json prerelease.
+  [OK]          JSON Parsing               3   parse_release_json no date.
+  [OK]          JSON Parsing               4   parse_release_json no v prefix.
+  [OK]          JSON Parsing               5   parse_release_json empty.
+  [OK]          JSON Parsing               6   parse_release_json invalid.
+  [OK]          Size Formatting            0   format_size bytes.
+  [OK]          Size Formatting            1   format_size KB.
+  [OK]          Size Formatting            2   format_size MB.
+  [OK]          Size Formatting            3   format_size GB.
+  [OK]          Size Formatting            4   format_size zero.
+  [OK]          Path Construction          0   signatory_version_path.
+  [OK]          Path Construction          1   signatory_version_path RC.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Signatory_downloader'.
+Test Successful in 0.001s. 21 tests run.
+qcheck random seed: 777730899
+Testing `Execstart_parser_props'.
+This run has ID `UNKDV5ZX'.
+
+  [OK]          properties          0   parse never crashes on random input.
+  [OK]          properties          1   extract_binary_path never crashes on ...
+  [OK]          properties          2   unwrap_shell never crashes on random ...
+  [OK]          properties          3   is_shell_script never crashes on rand...
+  [OK]          properties          4   unwrap_shell is idempotent.
+  [OK]          properties          5   parse.binary_path consistent with ext...
+  [OK]          properties          6   non-shell input returned unchanged by...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Execstart_parser_props'.
+Test Successful in 0.009s. 7 tests run.
+Testing `Rpc_addr'.
+This run has ID `AX02UHOX'.
+
+  [OK]          to_endpoint          0   without scheme.
+  [OK]          to_endpoint          1   with http:// scheme.
+  [OK]          to_endpoint          2   with https:// scheme.
+  [OK]          to_endpoint          3   with mixed case HTTP://.
+  [OK]          to_endpoint          4   with mixed case HTTPS://.
+  [OK]          to_endpoint          5   empty string.
+  [OK]          to_endpoint          6   whitespace only.
+  [OK]          to_endpoint          7   with path.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Rpc_addr'.
+Test Successful in 0.000s. 8 tests run.
+Testing `Signatory Validation'.
+This run has ID `5TUWPXEX'.
+
+  [OK]          Public Key Hashes          0   valid key hashes.
+  [OK]          Public Key Hashes          1   invalid key hashes.
+  [OK]          Authorized Keys            0   valid authorized keys.
+  [OK]          Authorized Keys            1   empty authorized keys.
+  [OK]          Authorized Keys            2   authorized keys with invalid.
+  [OK]          HTTP Addresses             0   valid HTTP addresses.
+  [OK]          HTTP Addresses             1   invalid HTTP addresses.
+  [OK]          Backends                   0   valid backends.
+  [OK]          Backends                   1   invalid backends.
+  [OK]          Watermarks                 0   valid watermarks.
+  [OK]          Watermarks                 1   invalid watermarks.
+  [OK]          Requests                   0   valid request.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Signatory Validation'.
+Test Successful in 0.001s. 12 tests run.
+qcheck random seed: 802011725
+Testing `Version_checker_props'.
+This run has ID `OYB6P7VJ'.
+
+  [OK]          properties          0   parse_version never crashes on random...
+  [OK]          properties          1   compare_versions never crashes on ran...
+  [OK]          properties          2   compare_versions is reflexive: v = v.
+  [OK]          properties          3   compare_versions is antisymmetric: cm...
+  [OK]          properties          4   compare_versions is transitive: a<=b ...
+  [OK]          properties          5   RC versions are less than their release.
+  [OK]          properties          6   RC1 < RC2 < ... for same base version.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Version_checker_props'.
+Test Successful in 0.006s. 7 tests run.
+Testing `Node_env'.
+This run has ID `60ZMB4CH'.
+
+  [OK]          escape                  0   escape simple value.
+  [OK]          escape                  1   escape value with spaces.
+  [OK]          escape                  2   escape value with dollar.
+  [OK]          escape                  3   escape value with backtick.
+  [OK]          escape                  4   escape value with quotes.
+  [OK]          escape                  5   escape value with newline.
+  [OK]          escape                  6   escape value with semicolon.
+  [OK]          escape                  7   escape value with asterisk.
+  [OK]          escape                  8   escape empty value.
+  [OK]          escape                  9   escape value with equals.
+  [OK]          escape                 10   escape path with spaces.
+  [OK]          escape                 11   escape url.
+  [OK]          write_read              0   write and read simple.
+  [OK]          write_read              1   write with special chars.
+  [OK]          write_read              2   write empty value.
+  [OK]          write_read              3   write very long value.
+  [OK]          write_read              4   write with comments.
+  [OK]          write_read              5   overwrite existing file.
+  [OK]          error_handling          0   read nonexistent file.
+  [OK]          error_handling          1   read invalid format.
+  [OK]          high_level_api          0   write full node env.
+  [OK]          high_level_api          1   write node env with comments.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Node_env'.
+Test Successful in 0.026s. 22 tests run.
+Testing `Instance Actions (Mock Systemd)'.
+This run has ID `D6CFNC6P'.
+
+  [OK]          service_start                   0   start stopped service.
+  [OK]          service_start                   1   start already running ser...
+  [OK]          service_start                   2   start failed service.
+  [OK]          service_stop                    0   stop running service.
+  [OK]          service_stop                    1   stop already stopped serv...
+  [OK]          service_restart                 0   restart running service.
+  [OK]          service_restart                 1   restart stopped service.
+  [OK]          service_enable_disable          0   enable service.
+  [OK]          service_enable_disable          1   disable service.
+  [OK]          error_injection                 0   permission denied error.
+  [OK]          error_injection                 1   start fails mode.
+  [OK]          error_injection                 2   timeout failure.
+  [OK]          multiple_services               0   multiple services.
+  [OK]          multiple_services               1   service not found.
+  [OK]          state_queries                   0   get service info.
+  [OK]          state_queries                   1   list services.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Instance Actions U+0028Mock SystemdU+0029'.
+Test Successful in 0.000s. 16 tests run.
+Testing `Registry Tests'.
+This run has ID `EZK2Y8U9'.
+
+  [OK]          directory_registry          0   add_and_find.
+  [OK]          directory_registry          1   json_roundtrip.
+  [OK]          directory_registry          2   entry_limiting.
+  [OK]          directory_registry          3   remove.
+  [OK]          directory_registry          4   update_registered_services.
+  [OK]          directory_registry          5   list_by_type.
+  [OK]          keys_reader                 0   valid_file.
+  [OK]          keys_reader                 1   missing_file.
+  [OK]          keys_reader                 2   malformed_json.
+  [OK]          keys_reader                 3   empty_array.
+  [OK]          keys_reader                 4   invalid_format.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Registry Tests'.
+Test Successful in 0.051s. 11 tests run.
+qcheck random seed: 269223831
+Testing `External Detector Props'.
+This run has ID `SF9KHAHJ'.
+
+  [OK]          string_contains edges          0   equals.
+  [OK]          string_contains edges          1   at start.
+  [OK]          string_contains edges          2   at end.
+  [OK]          string_contains edges          3   longer.
+  [OK]          string_contains edges          4   both empty.
+  [OK]          string_contains edges          5   single char.
+  [OK]          is_managed edges               0   template.
+  [OK]          is_managed edges               1   double @.
+  [OK]          is_managed edges               2   no .service.
+  [OK]          is_managed edges               3   empty.
+  [OK]          is_managed edges               4   prefix only.
+  [OK]          is_managed edges               5   accuser.
+  [OK]          is_managed edges               6   signer.
+  [OK]          extract_command edges          0   multiple args.
+  [OK]          extract_command edges          1   empty.
+  [OK]          extract_command edges          2   no trailing semicolon.
+  [OK]          extract_command edges          3   just brackets.
+  [OK]          extract_command edges          4   short prefix.
+  [OK]          chain_id edges                 0   shadownet.
+  [OK]          chain_id edges                 1   tallinnnet.
+  [OK]          chain_id edges                 2   empty.
+  [OK]          chain_id edges                 3   partial.
+  [OK]          contains_octez edges           0   full path.
+  [OK]          contains_octez edges           1   mixed case.
+  [OK]          contains_octez edges           2   partial match.
+  [OK]          contains_octez edges           3   tezos-accuser.
+  [OK]          systemctl_cmd                  0   starts with.
+  [OK]          QCheck properties              0   string_contains never cras...
+  [OK]          QCheck properties              1   string_contains is reflexive.
+  [OK]          QCheck properties              2   empty needle always found.
+  [OK]          QCheck properties              3   is_managed_unit_name never...
+  [OK]          QCheck properties              4   managed implies octez- pre...
+  [OK]          QCheck properties              5   extract_command never cras...
+  [OK]          QCheck properties              6   chain_id_to_network never ...
+  [OK]          QCheck properties              7   chain_id returns Some only...
+  [OK]          QCheck properties              8   contains_octez_binary neve...
+  [OK]          QCheck properties              9   contains_octez_binary true...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/External Detector Props'.
+Test Successful in 0.033s. 37 tests run.
+Testing `Teztnets'.
+This run has ID `H8L7H92Q'.
+
+  [OK]          parse                  0   parse valid JSON.
+  [OK]          parse                  1   parse empty array.
+  [OK]          parse                  2   parse invalid JSON.
+  [OK]          parse                  3   parse malformed network.
+  [OK]          parse                  4   parse filters ghostnet.
+  [OK]          list                   0   list with mock.
+  [OK]          list                   1   list fetch error.
+  [OK]          list                   2   list empty response.
+  [OK]          fallback               0   fallback not empty.
+  [OK]          fallback               1   fallback has mainnet.
+  [OK]          fallback               2   fallback has shadownet.
+  [OK]          resolve                0   resolve from chain.
+  [OK]          resolve                1   resolve unknown chain.
+  [OK]          resolve_octez          0   resolve mainnet.
+  [OK]          resolve_octez          1   resolve shadownet.
+  [OK]          resolve_octez          2   resolve unknown.
+  [OK]          edge_cases             0   parse with nulls.
+  [OK]          edge_cases             1   parse missing optional.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Teztnets'.
+Test Successful in 0.104s. 18 tests run.
+Testing `Display Utils'.
+This run has ID `EFZNZBCM'.
+
+  [OK]          strip_ansi             0   strip ANSI codes.
+  [OK]          display_width          0   count display width.
+  [OK]          pad_right              0   pad right.
+  [OK]          pad_left               0   pad left.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Display Utils'.
+Test Successful in 0.001s. 4 tests run.
+Testing `Form Builder'.
+This run has ID `SCM3CKKV'.
+
+  [OK]          Form Spec          0   form spec creation.
+  [OK]          Form Spec          1   dynamic fields.
+  [OK]          Form Spec          2   pre_submit validation.
+  [OK]          Form Spec          3   on_submit handler.
+  [OK]          Form Spec          4   multiple fields.
+  [OK]          Form Spec          5   validated form.
+  [OK]          Form Spec          6   choice field form.
+  [OK]          Form Spec          7   readonly field form.
+  [OK]          Form Spec          8   field with hint.
+  [OK]          Form Spec          9   on_init hook.
+  [OK]          Form Spec         10   on_refresh hook.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Form Builder'.
+Test Successful in 0.001s. 11 tests run.
+Testing `Form Builder Bundles'.
+This run has ID `9RM304KX'.
+
+  [OK]          Core Service Bundle          0   basic fields.
+  [OK]          Core Service Bundle          1   skip_instance_name.
+  [OK]          Core Service Bundle          2   skip_app_bin_dir.
+  [OK]          Core Service Bundle          3   skip_extra_args.
+  [OK]          Core Service Bundle          4   skip_service_fields.
+  [OK]          Core Service Bundle          5   edit_mode.
+  [OK]          Client Bundle                0   basic fields.
+  [OK]          Client Bundle                1   skip_base_dir.
+  [OK]          Node Bundle                  0   basic fields.
+  [OK]          Node Bundle                  1   skip_network.
+  [OK]          Node Bundle                  2   skip_data_dir.
+  [OK]          Node Bundle                  3   skip_addresses.
+  [OK]          Bundle Composition           0   core + node.
+  [OK]          Bundle Composition           1   core + client.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Form Builder Bundles'.
+Test Successful in 0.001s. 14 tests run.
+Testing `Json_highlighter'.
+This run has ID `3ONZIO2O'.
+
+  [OK]          highlight          0   null.
+  [OK]          highlight          1   bool true.
+  [OK]          highlight          2   bool false.
+  [OK]          highlight          3   int.
+  [OK]          highlight          4   float.
+  [OK]          highlight          5   string.
+  [OK]          highlight          6   empty array.
+  [OK]          highlight          7   empty object.
+  [OK]          highlight          8   simple object.
+  [OK]          highlight          9   nested object.
+  [OK]          highlight         10   array of values.
+  [OK]          highlight         11   invalid json.
+  [OK]          colors             0   with colors.
+  [OK]          colors             1   strip colors.
+  [OK]          colors             2   strip complex.
+  [OK]          colors             3   strip no colors.
+  [OK]          options            0   defaults.
+  [OK]          options            1   custom indent.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Json_highlighter'.
+Test Successful in 0.001s. 18 tests run.
+Testing `System Metrics Scheduler'.
+This run has ID `GBVL3Z5P'.
+
+  [OK]          version parsing                    0   parse version with v p...
+  [OK]          version parsing                    1   parse version without ...
+  [OK]          version parsing                    2   parse single number ve...
+  [OK]          version parsing                    3   parse version with patch.
+  [OK]          version parsing                    4   parse empty version.
+  [OK]          version parsing                    5   parse invalid version.
+  [OK]          version parsing                    6   parse version with whi...
+  [OK]          RC/dev detection                   0   detect RC versions.
+  [OK]          RC/dev detection                   1   detect dev versions.
+  [OK]          RC/dev detection                   2   stable versions not RC...
+  [OK]          version status comparison          0   version status latest.
+  [OK]          version status comparison          1   version status minor b...
+  [OK]          version status comparison          2   version status major b...
+  [OK]          version status comparison          3   version status ahead.
+  [OK]          version status comparison          4   version status RC or dev.
+  [OK]          version status comparison          5   version status unknown...
+  [OK]          version status comparison          6   version status unknown...
+  [OK]          version color codes                0   version color codes.
+  [OK]          visibility tracking                0   mark instance visible.
+  [OK]          visibility tracking                1   mark instance hidden.
+  [OK]          visibility tracking                2   clear all visibility.
+  [OK]          visibility tracking                3   effective interval vis...
+  [OK]          visibility tracking                4   effective interval hid...
+  [OK]          metrics access                     0   get version missing.
+  [OK]          metrics access                     1   get disk size missing.
+  [OK]          metrics access                     2   render CPU chart no data.
+  [OK]          metrics access                     3   render memory sparklin...
+  [OK]          invalidation                       0   invalidate_version res...
+  [OK]          invalidation                       1   invalidate_version han...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/System Metrics Scheduler'.
+Test Successful in 0.003s. 29 tests run.
+Testing `System_metrics'.
+This run has ID `XMWAE84G'.
+
+  [OK]          calc_cpu_percent              0   normal.
+  [OK]          calc_cpu_percent              1   zero delta time.
+  [OK]          calc_cpu_percent              2   negative delta.
+  [OK]          calc_cpu_percent              3   no ticks.
+  [OK]          calc_cpu_percent              4   half core.
+  [OK]          calc_cpu_percent              5   multi core.
+  [OK]          calc_cpu_percent              6   small interval.
+  [OK]          format_bytes                  0   zero.
+  [OK]          format_bytes                  1   small.
+  [OK]          format_bytes                  2   KB.
+  [OK]          format_bytes                  3   MB.
+  [OK]          format_bytes                  4   GB.
+  [OK]          format_bytes                  5   TB.
+  [OK]          format_bytes                  6   large GB.
+  [OK]          format_bytes                  7   500MB.
+  [OK]          format_bytes                  8   just under KB.
+  [OK]          format_bytes                  9   exact MB.
+  [OK]          format_bytes                 10   negative.
+  [OK]          empty                         0   empty record.
+  [OK]          parse_version_output          0   simple.
+  [OK]          parse_version_output          1   multiline.
+  [OK]          parse_version_output          2   missing.
+  [OK]          parse_version_output          3   empty.
+  [OK]          parse_version_output          4   partial.
+  [OK]          parse_version_output          5   with extra.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/System_metrics'.
+Test Successful in 0.002s. 25 tests run.
+Testing `Public_nodes_cache'.
+This run has ID `FO41SXZP'.
+
+  [OK]          parse_taquito_json          0   simple list.
+  [OK]          parse_taquito_json          1   rpc_url field.
+  [OK]          parse_taquito_json          2   taquito format.
+  [OK]          parse_taquito_json          3   empty.
+  [OK]          parse_taquito_json          4   invalid json.
+  [OK]          parse_taquito_json          5   missing rpc.
+  [OK]          to_service                  0   basic.
+  [OK]          to_service                  1   no network.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Public_nodes_cache'.
+Test Successful in 0.001s. 8 tests run.
+Testing `Data'.
+This run has ID `FVPK6WV8'.
+
+  [OK]          parse_enabled_response          0   enabled.
+  [OK]          parse_enabled_response          1   disabled.
+  [OK]          parse_enabled_response          2   static.
+  [OK]          parse_enabled_response          3   whitespace.
+  [OK]          parse_enabled_response          4   case insensitive.
+  [OK]          parse_enabled_response          5   unknown.
+  [OK]          parse_enabled_response          6   empty.
+  [OK]          classify_unit_state             0   active.
+  [OK]          classify_unit_state             1   inactive.
+  [OK]          classify_unit_state             2   failed signal.
+  [OK]          classify_unit_state             3   failed exit code.
+  [OK]          classify_unit_state             4   error.
+  [OK]          status_label                    0   running.
+  [OK]          status_label                    1   stopped.
+  [OK]          status_label                    2   unknown.
+  [OK]          summarize                       0   empty.
+  [OK]          summarize                       1   mixed.
+  [OK]          summarize                       2   all running.
+  [OK]          diagnostics_lines               0   empty.
+  [OK]          diagnostics_lines               1   with service.
+  [OK]          activity_lines                  0   empty.
+  [OK]          activity_lines                  1   with service.
+  [OK]          spotlight_lines                 0   empty.
+  [OK]          spotlight_lines                 1   running.
+  [OK]          spotlight_lines                 2   limit.
+  [OK]          formatted_timestamp             0   format.
+  [OK]          force_refresh                   0   requires capability.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Data'.
+Test Successful in 0.002s. 27 tests run.
+Testing `Rpc_describe'.
+This run has ID `ABFMBQ96'.
+
+  [OK]          candidate_paths            0   root path.
+  [OK]          candidate_paths            1   single segment.
+  [OK]          candidate_paths            2   nested path.
+  [OK]          parse_json                 0   get_service.
+  [OK]          parse_json                 1   subdirs suffixes.
+  [OK]          parse_json                 2   dynamic_dispatch.
+  [OK]          parse_json                 3   combined.
+  [OK]          parse_json                 4   empty json.
+  [OK]          parse_json                 5   invalid structure.
+  [OK]          parse_description          0   description present.
+  [OK]          parse_description          1   description missing.
+  [OK]          cache                      0   clear.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Rpc_describe'.
+Test Successful in 0.001s. 12 tests run.
+Testing `Charts'.
+This run has ID `YQSK8C16'.
+
+  [OK]          trim_chart_padding                   0   empty.
+  [OK]          trim_chart_padding                   1   no trailing.
+  [OK]          trim_chart_padding                   2   trailing spaces.
+  [OK]          trim_chart_padding                   3   multiline.
+  [OK]          trim_chart_padding                   4   all spaces.
+  [OK]          render_bg_queue_chart                0   empty.
+  [OK]          render_bg_queue_chart                1   with data.
+  [OK]          render_bg_queue_chart                2   single sample.
+  [OK]          render_service_status_chart          0   empty.
+  [OK]          render_service_status_chart          1   with data.
+  [OK]          render_latency_chart                 0   empty.
+  [OK]          render_latency_chart                 1   all None.
+  [OK]          render_latency_chart                 2   with data.
+  [OK]          render_latency_chart                 3   partial.
+  [OK]          render_key_to_render_chart           0   empty.
+  [OK]          render_key_to_render_chart           1   all None.
+  [OK]          render_key_to_render_chart           2   with data.
+  [OK]          render_summary_bars                  0   empty.
+  [OK]          render_summary_bars                  1   with data.
+  [OK]          render_summary_bars                  2   idle queue.
+  [OK]          render_summary_bars                  3   busy queue.
+  [OK]          render_summary_bars                  4   with render p99.
+  [OK]          render_summary_bars                  5   no render p99.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Charts'.
+Test Successful in 0.002s. 23 tests run.
+Testing `Dal_health'.
+This run has ID `3NOD42EQ'.
+
+  [OK]          status_of_string          0   up.
+  [OK]          status_of_string          1   ok.
+  [OK]          status_of_string          2   down.
+  [OK]          status_of_string          3   ko.
+  [OK]          status_of_string          4   no.
+  [OK]          status_of_string          5   degraded.
+  [OK]          status_of_string          6   unknown.
+  [OK]          status_to_string          0   Up.
+  [OK]          status_to_string          1   Down.
+  [OK]          status_to_string          2   Degraded.
+  [OK]          status_to_string          3   Unknown.
+  [OK]          cache                     0   empty.
+  [OK]          cache                     1   set and get.
+  [OK]          cache                     2   clear instance.
+  [OK]          cache                     3   clear all.
+  [OK]          cache                     4   overwrite.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Dal_health'.
+Test Successful in 0.001s. 16 tests run.
+Testing `Rpc_client'.
+This run has ID `Y20BC5LN'.
+
+  [OK]          url_building               0   endpoint_of raw address.
+  [OK]          url_building               1   endpoint_of http address.
+  [OK]          url_building               2   endpoint_of https address.
+  [OK]          url_building               3   absolutize_url with leading sl...
+  [OK]          url_building               4   absolutize_url without leading...
+  [OK]          url_building               5   absolutize_url empty path.
+  [OK]          url_building               6   absolutize_url https.
+  [OK]          tool_detection             0   curl cached.
+  [OK]          tool_detection             1   wget cached.
+  [OK]          tool_detection             2   at least one tool.
+  [OK]          monitor_handle             0   type exists.
+  [OK]          error_tracking             0   initially none.
+  [OK]          try_fetch_methods          0   no methods.
+  [OK]          try_fetch_methods          1   first succeeds.
+  [OK]          try_fetch_methods          2   fallback.
+  [OK]          try_fetch_methods          3   error then success.
+  [OK]          try_fetch_methods          4   all error.
+  [OK]          try_fetch_methods          5   none then error.
+  [OK]          octez_client_bin           0   custom path.
+  [OK]          octez_client_bin           1   default path.
+  [OK]          with_request_slot          0   basic.
+  [OK]          with_request_slot          1   exception.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Rpc_client'.
+Test Successful in 0.007s. 22 tests run.
+Testing `Delegate_data'.
+This run has ID `A44DSUND'.
+
+  [OK]          parse_participation              0   complete JSON.
+  [OK]          parse_participation              1   empty JSON defaults.
+  [OK]          parse_participation              2   partial JSON.
+  [OK]          parse_participation              3   wrong types.
+  [OK]          parse_dal_participation          0   complete JSON.
+  [OK]          parse_dal_participation          1   empty JSON defaults.
+  [OK]          parse_dal_participation          2   denounced.
+  [OK]          of_json                          0   happy path.
+  [OK]          of_json                          1   deactivated.
+  [OK]          of_json                          2   minimal JSON.
+  [OK]          of_json                          3   malformed.
+  [OK]          of_json                          4   null.
+  [OK]          of_json                          5   missing participation.
+  [OK]          missed_slots_status              0   zero is Good.
+  [OK]          missed_slots_status              1   low is Good.
+  [OK]          missed_slots_status              2   warning.
+  [OK]          missed_slots_status              3   warning boundary.
+  [OK]          missed_slots_status              4   critical.
+  [OK]          missed_slots_status              5   critical exceeded.
+  [OK]          missed_slots_status              6   remaining=0.
+  [OK]          missed_slots_status              7   both zero.
+  [OK]          format_tez                       0   zero.
+  [OK]          format_tez                       1   1 tez.
+  [OK]          format_tez                       2   fractional.
+  [OK]          format_tez                       3   100 tez.
+  [OK]          format_tez                       4   1.5K.
+  [OK]          format_tez                       5   1.0K.
+  [OK]          format_tez                       6   2.0M.
+  [OK]          format_tez                       7   1.5M.
+  [OK]          format_tez                       8   1.0M.
+  [OK]          format_tez                       9   invalid.
+  [OK]          format_tez                      10   empty.
+  [OK]          format_tez                      11   negative.
+  [OK]          cache                            0   set and get.
+  [OK]          cache                            1   get missing.
+  [OK]          cache                            2   get_all.
+  [OK]          cache                            3   clear.
+  [OK]          cache                            4   overwrite.
+  [OK]          cache                            5   is_stale fresh.
+  [OK]          cache                            6   is_stale old.
+  [OK]          cache                            7   is_stale boundary.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Delegate_data'.
+Test Successful in 0.004s. 41 tests run.
+Testing `Foldable_json'.
+This run has ID `YHQSL2FZ'.
+
+  [OK]          of_string                    0   valid object.
+  [OK]          of_string                    1   valid array.
+  [OK]          of_string                    2   empty object.
+  [OK]          of_string                    3   empty array.
+  [OK]          of_string                    4   invalid.
+  [OK]          of_string                    5   scalar.
+  [OK]          of_string                    6   null.
+  [OK]          render                       0   simple object.
+  [OK]          render                       1   nested folded.
+  [OK]          render                       2   empty object.
+  [OK]          render                       3   empty array.
+  [OK]          render                       4   scalar.
+  [OK]          raw                          0   returns json.
+  [OK]          fold/unfold                  0   unfold all.
+  [OK]          fold/unfold                  1   fold all.
+  [OK]          fold/unfold                  2   fold all array.
+  [OK]          line_count                   0   scalar.
+  [OK]          line_count                   1   increases on unfold.
+  [OK]          toggle_fold_at_line          0   toggle.
+  [OK]          toggle_fold_at_line          1   noop.
+  [OK]          is_foldable_line             0   root.
+  [OK]          is_foldable_line             1   out of range.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Foldable_json'.
+Test Successful in 0.002s. 22 tests run.
+Testing `Rpc_openapi'.
+This run has ID `DE1KHBIX'.
+
+  [OK]          paths                             0   openapi_dir.
+  [OK]          paths                             1   openapi_path.
+  [OK]          status                            0   initial.
+  [OK]          needs_download                    0   runs.
+  [OK]          read_spec                         0   when missing.
+  [OK]          extract_placeholders              0   none.
+  [OK]          extract_placeholders              1   one.
+  [OK]          extract_placeholders              2   two.
+  [OK]          extract_placeholders              3   empty path.
+  [OK]          extract_placeholder_name          0   valid.
+  [OK]          extract_placeholder_name          1   invalid.
+  [OK]          extract_placeholder_name          2   partial.
+  [OK]          extract_placeholder_name          3   empty.
+  [OK]          parse_openapi_json                0   simple.
+  [OK]          parse_openapi_json                1   no paths.
+  [OK]          parse_openapi_json                2   invalid json.
+  [OK]          parse_openapi_json                3   empty paths.
+  [OK]          trie                              0   single.
+  [OK]          trie                              1   nonexistent.
+  [OK]          trie                              2   placeholder.
+  [OK]          trie                              3   root.
+  [OK]          trie                              4   deep path.
+  [OK]          with_prefix                       0   basic.
+  [OK]          with_prefix                       1   trailing slash.
+  [OK]          with_prefix                       2   empty template.
+  [OK]          clear_cache                       0   runs.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Rpc_openapi'.
+Test Successful in 0.004s. 26 tests run.
+Testing `Baker_highwatermarks'.
+This run has ID `087UVXA0'.
+
+  [OK]          parse_highwatermark          0   valid.
+  [OK]          parse_highwatermark          1   zero values.
+  [OK]          parse_highwatermark          2   missing round.
+  [OK]          parse_highwatermark          3   missing level.
+  [OK]          parse_highwatermark          4   empty object.
+  [OK]          parse_highwatermark          5   string.
+  [OK]          parse_highwatermark          6   null.
+  [OK]          parse_entry                  0   valid.
+  [OK]          parse_entry                  1   invalid hwm.
+  [OK]          parse_entry                  2   missing delegate.
+  [OK]          parse_entry                  3   non-object.
+  [OK]          parse_entries                0   list.
+  [OK]          parse_entries                1   empty.
+  [OK]          parse_entries                2   not a list.
+  [OK]          parse_entries                3   skips invalid.
+  [OK]          read_file                    0   full file.
+  [OK]          read_file                    1   empty sections.
+  [OK]          read_file                    2   nonexistent.
+  [OK]          read_file                    3   invalid JSON.
+  [OK]          read_file                    4   blocks only.
+  [OK]          max_level                    0   all present.
+  [OK]          max_level                    1   only block.
+  [OK]          max_level                    2   only attestation.
+  [OK]          max_level                    3   all none.
+  [OK]          max_level                    4   block highest.
+  [OK]          max_level                    5   equal levels.
+  [OK]          format_summary               0   empty.
+  [OK]          format_summary               1   single.
+  [OK]          format_summary               2   short delegate.
+  [OK]          format_summary               3   multiple.
+  [OK]          format_summary               4   all no levels.
+  [OK]          format_summary               5   truncation.
+  [OK]          cache                        0   get empty.
+  [OK]          cache                        1   clear.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Baker_highwatermarks'.
+Test Successful in 0.004s. 34 tests run.
+Testing `Modal_helpers'.
+This run has ID `D0XWNHJI'.
+
+  [OK]          first_nonempty_line          0   empty list.
+  [OK]          first_nonempty_line          1   all blank.
+  [OK]          first_nonempty_line          2   first is content.
+  [OK]          first_nonempty_line          3   skip blanks.
+  [OK]          first_nonempty_line          4   whitespace only.
+  [OK]          wrap_text                    0   short line.
+  [OK]          wrap_text                    1   exact width.
+  [OK]          wrap_text                    2   long line.
+  [OK]          wrap_text                    3   preserves newlines.
+  [OK]          wrap_text                    4   empty string.
+  [OK]          wrap_text                    5   breaks at space.
+  [OK]          wrap_text                    6   long word.
+  [OK]          wrap_text                    7   newline and long.
+  [OK]          wrap_text                    8   multiple spaces.
+  [OK]          extract_major                0   simple.
+  [OK]          extract_major                1   three parts.
+  [OK]          extract_major                2   single number.
+  [OK]          extract_major                3   empty.
+  [OK]          extract_major                4   malformed.
+  [OK]          extract_major                5   leading v.
+  [OK]          extract_major                6   zero major.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Modal_helpers'.
+Test Successful in 0.001s. 21 tests run.
+Testing `Binaries_page_pure'.
+This run has ID `NQTXSRSD'.
+
+  [OK]          format_size                             0   zero.
+  [OK]          format_size                             1   small.
+  [OK]          format_size                             2   KB.
+  [OK]          format_size                             3   MB.
+  [OK]          format_size                             4   GB.
+  [OK]          format_size                             5   500MB.
+  [OK]          format_size                             6   integer division.
+  [OK]          build_items                             0   empty.
+  [OK]          build_items                             1   with managed.
+  [OK]          build_items                             2   with registered.
+  [OK]          build_items                             3   with available.
+  [OK]          build_items                             4   expanded major.
+  [OK]          build_items                             5   unexpanded major.
+  [OK]          move_up_down                            0   up from 0.
+  [OK]          move_up_down                            1   up from nonzero.
+  [OK]          move_up_down                            2   down from 0.
+  [OK]          move_up_down                            3   down at end.
+  [OK]          move_up_down                            4   down with versions.
+  [OK]          toggle_major_expansion                  0   expand.
+  [OK]          toggle_major_expansion                  1   collapse.
+  [OK]          toggle_managed_expansion                0   expand.
+  [OK]          toggle_managed_expansion                1   collapse.
+  [OK]          toggle_registered_expansion             0   expand.
+  [OK]          toggle_registered_expansion             1   collapse.
+  [OK]          filter_latest_n_major_versions          0   empty.
+  [OK]          filter_latest_n_major_versions          1   single major.
+  [OK]          filter_latest_n_major_versions          2   two majors keep one.
+  [OK]          filter_latest_n_major_versions          3   two majors keep two.
+  [OK]          filter_latest_n_major_versions          4   n larger than maj...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Binaries_page_pure'.
+Test Successful in 0.002s. 29 tests run.
+qcheck random seed: 936907746
+Testing `Instances_actions (pure)'.
+This run has ID `1FQV4144'.
+
+  [OK]          extract_version_string          0   simple.
+  [OK]          extract_version_string          1   with prefix.
+  [OK]          extract_version_string          2   three part.
+  [OK]          extract_version_string          3   no match.
+  [OK]          extract_version_string          4   empty.
+  [OK]          extract_version_string          5   just number.
+  [OK]          extract_version_string          6   multi line.
+  [OK]          role_to_binary_name             0   node.
+  [OK]          role_to_binary_name             1   baker.
+  [OK]          role_to_binary_name             2   accuser.
+  [OK]          role_to_binary_name             3   dal-node.
+  [OK]          role_to_binary_name             4   dal.
+  [OK]          role_to_binary_name             5   unknown.
+  [OK]          collect_dependents              0   linear chain.
+  [OK]          collect_dependents              1   leaf.
+  [OK]          collect_dependents              2   nonexistent.
+  [OK]          collect_dependents              3   cycle.
+  [OK]          collect_dependents              4   diamond.
+  [OK]          collect_dependents              5   empty graph.
+  [OK]          dedup_services                  0   no duplicates.
+  [OK]          dedup_services                  1   with duplicates.
+  [OK]          dedup_services                  2   empty.
+  [OK]          dedup_services                  3   single.
+  [OK]          dedup_services                  4   all same.
+  [OK]          journalctl_args                 0   contains unit.
+  [OK]          journalctl_args                 1   has no-pager.
+  [OK]          PBT                             0   extract_version_string ne...
+  [OK]          PBT                             1   collect_dependents always...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Instances_actions U+0028pureU+0029'.
+Test Successful in 0.011s. 28 tests run.
+qcheck random seed: 259914851
+Testing `Rpc_scheduler'.
+This run has ID `TOTGKO68'.
+
+  [OK]          poll_interval                    0   default.
+  [OK]          poll_interval                    1   boot pending.
+  [OK]          poll_interval                    2   boot ok.
+  [OK]          poll_interval                    3   boot none.
+  [OK]          poll_interval                    4   values.
+  [OK]          is_due_for_poll                  0   no previous.
+  [OK]          is_due_for_poll                  1   just polled.
+  [OK]          is_due_for_poll                  2   after pending interval.
+  [OK]          is_due_for_poll                  3   after ok interval.
+  [OK]          is_due_for_poll                  4   exact boundary.
+  [OK]          with_now                         0   injects time.
+  [OK]          with_now                         1   restores.
+  [OK]          with_poll_boot                   0   stub.
+  [OK]          get_worker_stats                 0   returns stats.
+  [OK]          reset_state                      0   clears boot state.
+  [OK]          reset_state                      1   clears boot at.
+  [OK]          normalize_endpoint               0   with http.
+  [OK]          normalize_endpoint               1   with https.
+  [OK]          normalize_endpoint               2   bare.
+  [OK]          normalize_endpoint               3   hostname.
+  [OK]          compute_last_block_time          0   head changed.
+  [OK]          compute_last_block_time          1   first head.
+  [OK]          compute_last_block_time          2   head unchanged.
+  [OK]          compute_last_block_time          3   no head.
+  [OK]          compute_last_block_time          4   no head no existing.
+  [OK]          PBT                              0   normalize_endpoint never...
+  [OK]          PBT                              1   normalize_endpoint resul...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Rpc_scheduler'.
+Test Successful in 0.004s. 27 tests run.
+qcheck random seed: 274433196
+Testing `Rpc_browser_render_result'.
+This run has ID `IM6ZHWA8'.
+
+  [OK]          pager_header                0   focused.
+  [OK]          pager_header                1   unfocused.
+  [OK]          pager_header                2   target.
+  [OK]          pager_header                3   empty.
+  [OK]          loading_error               0   loading.
+  [OK]          loading_error               1   error.
+  [OK]          help                        0   single.
+  [OK]          help                        1   multiple.
+  [OK]          hidden_indicator            0   none.
+  [OK]          hidden_indicator            1   left.
+  [OK]          hidden_indicator            2   right.
+  [OK]          hidden_indicator            3   both.
+  [OK]          layout                      0   single.
+  [OK]          layout                      1   horizontal when wide.
+  [OK]          layout                      2   vertical when tall.
+  [OK]          layout                      3   grid.
+  [OK]          visible_pagers              0   all fit.
+  [OK]          visible_pagers              1   overflow.
+  [OK]          pager_tabs                  0   render.
+  [OK]          render                      0   list mode.
+  [OK]          render                      1   result mode.
+  [OK]          render                      2   with error.
+  [OK]          render                      3   multi pager.
+  [OK]          visible_length              0   plain.
+  [OK]          visible_length              1   empty.
+  [OK]          visible_length              2   ANSI.
+  [OK]          visible_length              3   multiple ANSI.
+  [OK]          visible_length              4   UTF-8.
+  [OK]          visible_length              5   emoji.
+  [OK]          visible_length              6   mixed.
+  [OK]          truncate_to_width           0   short.
+  [OK]          truncate_to_width           1   exact.
+  [OK]          truncate_to_width           2   long.
+  [OK]          truncate_to_width           3   ANSI.
+  [OK]          truncate_to_width           4   zero width.
+  [OK]          split_lines_padded          0   exact.
+  [OK]          split_lines_padded          1   too few.
+  [OK]          split_lines_padded          2   too many.
+  [OK]          split_lines_padded          3   empty.
+  [OK]          PBT                         0   visible_length is always non-...
+  [OK]          PBT                         1   truncate_to_width respects wi...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Rpc_browser_render_result'.
+Test Successful in 0.009s. 41 tests run.
+qcheck random seed: 359268920
+Testing `System_metrics_props'.
+This run has ID `3203H010'.
+
+  [OK]          properties          0   format_bytes never crashes on random ...
+  [OK]          properties          1   parse_version_output never crashes on...
+  [OK]          properties          2   format_bytes always returns non-empty...
+  [OK]          properties          3   format_bytes is monotonic for non-neg...
+  [OK]          properties          4   calc_cpu_percent returns non-negative...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/System_metrics_props'.
+Test Successful in 0.005s. 5 tests run.
+Testing `Pkh_validator'.
+This run has ID `KNLB596Z'.
+
+  [OK]          valid_pkh            0   valid tz1.
+  [OK]          valid_pkh            1   valid tz2.
+  [OK]          valid_pkh            2   valid tz3.
+  [OK]          valid_pkh            3   valid tz4.
+  [OK]          valid_pkh            4   valid with whitespace.
+  [OK]          valid_pkh            5   valid with non-breaking space.
+  [OK]          valid_pkh            6   valid with BOM.
+  [OK]          valid_pkh            7   valid with zero-width space.
+  [OK]          valid_pkh            8   valid with mixed unicode.
+  [OK]          invalid_pkh          0   empty string.
+  [OK]          invalid_pkh          1   too short.
+  [OK]          invalid_pkh          2   too long.
+  [OK]          invalid_pkh          3   wrong prefix (KT1).
+  [OK]          invalid_pkh          4   tz0 not valid.
+  [OK]          invalid_pkh          5   tz5 not valid.
+  [OK]          invalid_pkh          6   invalid base58 char 0.
+  [OK]          invalid_pkh          7   invalid base58 char O.
+  [OK]          invalid_pkh          8   invalid base58 char I.
+  [OK]          invalid_pkh          9   invalid base58 char l.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Pkh_validator'.
+Test Successful in 0.001s. 19 tests run.
+qcheck random seed: 449682898
+Testing `Binary_help_explorer'.
+This run has ID `HFOQ9YHX'.
+
+  [OK]          parse_initial_args             0   empty.
+  [OK]          parse_initial_args             1   single flag.
+  [OK]          parse_initial_args             2   flag=value.
+  [OK]          parse_initial_args             3   flag value.
+  [OK]          parse_initial_args             4   multiple flags.
+  [OK]          parse_initial_args             5   short flag.
+  [OK]          parse_initial_args             6   mixed flags.
+  [OK]          parse_initial_args             7   quoted value.
+  [OK]          parse_initial_args             8   consecutive flags.
+  [OK]          arg_kind_to_string             0   toggle.
+  [OK]          arg_kind_to_string             1   port.
+  [OK]          arg_kind_to_string             2   addr.
+  [OK]          arg_kind_to_string             3   file.
+  [OK]          arg_kind_to_string             4   dir.
+  [OK]          arg_kind_to_string             5   number.
+  [OK]          arg_kind_to_string             6   text.
+  [OK]          arg_kind_to_string             7   addr_port.
+  [OK]          truncate                       0   short.
+  [OK]          truncate                       1   exact.
+  [OK]          truncate                       2   long.
+  [OK]          truncate                       3   empty.
+  [OK]          truncate                       4   one char.
+  [OK]          wrap_text                      0   short line.
+  [OK]          wrap_text                      1   long line.
+  [OK]          wrap_text                      2   with newlines.
+  [OK]          wrap_text                      3   empty.
+  [OK]          option_label                   0   single name.
+  [OK]          option_label                   1   multi name.
+  [OK]          render_value                   0   none.
+  [OK]          render_value                   1   some.
+  [OK]          format_tokens                  0   none selected.
+  [OK]          format_tokens                  1   selected toggle.
+  [OK]          format_tokens                  2   selected with value.
+  [OK]          format_tokens                  3   mixed.
+  [OK]          name_matches_excluded          0   exact match.
+  [OK]          name_matches_excluded          1   prefix match.
+  [OK]          name_matches_excluded          2   no match.
+  [OK]          name_matches_excluded          3   short vs long.
+  [OK]          is_excluded_option             0   excluded.
+  [OK]          is_excluded_option             1   not excluded.
+  [OK]          is_excluded_option             2   empty excluded list.
+  [OK]          is_excluded_option             3   in node excluded.
+  [OK]          is_excluded_option             4   not in node excluded.
+  [OK]          PBT                            0   truncate never crashes.
+  [OK]          PBT                            1   wrap_text never crashes.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Binary_help_explorer'.
+Test Successful in 0.009s. 45 tests run.
+Testing `Baker_ops'.
+This run has ID `IRR5NWKP'.
+
+  [OK]          build_command               0   register.
+  [OK]          build_command               1   stake.
+  [OK]          build_command               2   unstake.
+  [OK]          build_command               3   finalize_unstake.
+  [OK]          build_command               4   transfer.
+  [OK]          build_command               5   set_delegate_params.
+  [OK]          build_command               6   update_consensus_key.
+  [OK]          build_command               7   submit_proposals.
+  [OK]          build_command               8   submit_ballot yay.
+  [OK]          build_command               9   submit_ballot nay.
+  [OK]          build_command              10   with base_dir.
+  [OK]          build_command              11   with password_file.
+  [OK]          build_command              12   with base_dir and password_file.
+  [OK]          describe_operation          0   register.
+  [OK]          describe_operation          1   finalize.
+  [OK]          describe_operation          2   unstake everything.
+  [OK]          describe_operation          3   proposals plural.
+  [OK]          describe_operation          4   ballot.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Baker_ops'.
+Test Successful in 0.001s. 18 tests run.
+Testing `Snapshots page (pure)'.
+This run has ID `SBZTHTW5'.
+
+  [OK]          move_selection          0   down.
+  [OK]          move_selection          1   up.
+  [OK]          move_selection          2   clamp bottom.
+  [OK]          move_selection          3   clamp top.
+  [OK]          move_selection          4   empty.
+  [OK]          move_selection          5   single.
+  [OK]          move_selection          6   large delta.
+  [OK]          header                  0   contains network.
+  [OK]          header                  1   different network.
+  [OK]          header                  2   has lines.
+  [OK]          handled_keys            0   has Escape.
+  [OK]          keymap                  0   not empty.
+  [OK]          keymap                  1   has Esc.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Snapshots page U+0028pureU+0029'.
+Test Successful in 0.001s. 13 tests run.
+Testing `Log_viewer_page (pure)'.
+This run has ID `7CYYK9I6'.
+
+  [OK]          source_label          0   journald.
+  [OK]          source_label          1   daily logs.
+  [OK]          name                  0   module name.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Log_viewer_page U+0028pureU+0029'.
+Test Successful in 0.000s. 3 tests run.
+qcheck random seed: 158316579
+Testing `Metrics'.
+This run has ID `NALEBXMS'.
+
+  [OK]          parse_addr              0   host:port.
+  [OK]          parse_addr              1   port only.
+  [OK]          parse_addr              2   port 1.
+  [OK]          parse_addr              3   port 65535.
+  [OK]          parse_addr              4   port 0 rejected.
+  [OK]          parse_addr              5   port 65536 rejected.
+  [OK]          parse_addr              6   negative port.
+  [OK]          parse_addr              7   non-numeric port.
+  [OK]          parse_addr              8   empty string.
+  [OK]          parse_addr              9   multiple colons.
+  [OK]          parse_addr             10   host no port.
+  [OK]          parse_addr             11   with spaces.
+  [OK]          percentile              0   empty.
+  [OK]          percentile              1   single.
+  [OK]          percentile              2   p0.
+  [OK]          percentile              3   p100.
+  [OK]          percentile              4   p50 odd.
+  [OK]          percentile              5   all same.
+  [OK]          percentile              6   unsorted.
+  [OK]          stateful_api            0   bg queue initial.
+  [OK]          stateful_api            1   bg enqueue/dequeue.
+  [OK]          stateful_api            2   service statuses.
+  [OK]          stateful_api            3   service status update.
+  [OK]          stateful_api            4   server info initial.
+  [OK]          stateful_api            5   is_enabled initial.
+  [OK]          stateful_api            6   take_snapshot empty.
+  [OK]          stateful_api            7   take_snapshot with data.
+  [OK]          recording               0   duration.
+  [OK]          recording               1   not active.
+  [OK]          recording               2   clear snapshots.
+  [OK]          recording               3   set duration preserves.
+  [OK]          metrics_text            0   empty state.
+  [OK]          metrics_text            1   with services.
+  [OK]          metrics_text            2   with scheduler.
+  [OK]          metrics_text            3   scheduler snapshots.
+  [OK]          pbt_parse_addr          0   parse_addr never crashes.
+  [OK]          pbt_parse_addr          1   parse_addr valid port in [1,65535].
+  [OK]          pbt_percentile          0   percentile result within [min,max].
+  [OK]          pbt_percentile          1   percentile empty array is None.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Metrics'.
+Test Successful in 0.007s. 39 tests run.
+Testing `Baker_wallet_data'.
+This run has ID `9F0C5SVL'.
+
+  [OK]          parse_spendable                   0   string value.
+  [OK]          parse_spendable                   1   non-string.
+  [OK]          parse_spendable                   2   null.
+  [OK]          parse_staking_parameters          0   complete.
+  [OK]          parse_staking_parameters          1   defaults.
+  [OK]          parse_unstake_requests            0   empty.
+  [OK]          parse_unstake_requests            1   finalizable.
+  [OK]          parse_unstake_requests            2   unfinalizable.
+  [OK]          parse_delegate_aggregate          0   full.
+  [OK]          parse_delegate_aggregate          1   old field names.
+  [OK]          parse_delegate_aggregate          2   deactivated.
+  [OK]          parse_delegate_aggregate          3   minimal.
+  [OK]          parse_voting_info                 0   proposal period.
+  [OK]          parse_voting_info                 1   exploration period.
+  [OK]          parse_voting_info                 2   cooldown period.
+  [OK]          parse_voting_info                 3   promotion period.
+  [OK]          parse_voting_info                 4   adoption period.
+  [OK]          parse_voting_info                 5   unknown kind defaults.
+  [OK]          parse_voting_info                 6   no current proposal.
+  [OK]          format_tez                        0   zero.
+  [OK]          format_tez                        1   one tez.
+  [OK]          format_tez                        2   fractional.
+  [OK]          format_tez                        3   large.
+  [OK]          format_tez                        4   millions.
+  [OK]          format_tez                        5   small fraction.
+  [OK]          format_tez                        6   invalid.
+  [OK]          format_staking_limit              0   zero.
+  [OK]          format_staking_limit              1   five.
+  [OK]          format_staking_limit              2   nine.
+  [OK]          format_baking_edge                0   zero.
+  [OK]          format_baking_edge                1   ten percent.
+  [OK]          format_baking_edge                2   hundred percent.
+  [OK]          cache                             0   set and get.
+  [OK]          cache                             1   get missing.
+  [OK]          cache                             2   get_all.
+  [OK]          cache                             3   clear.
+  [OK]          cache                             4   is_stale fresh.
+  [OK]          cache                             5   is_stale old.
+  [OK]          voting_cache                      0   set and get.
+  [OK]          voting_cache                      1   missing endpoint.
+  [OK]          string_of helpers                 0   ballot_vote.
+  [OK]          string_of helpers                 1   voting_period_kind.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Baker_wallet_data'.
+Test Successful in 0.003s. 42 tests run.
+Testing `Import_wizard (pure)'.
+This run has ID `HXFNLYNQ'.
+
+  [OK]          move_selection           0   down.
+  [OK]          move_selection           1   up.
+  [OK]          move_selection           2   wrap bottom.
+  [OK]          move_selection           3   wrap top.
+  [OK]          move_selection           4   empty.
+  [OK]          move_selection           5   single.
+  [OK]          toggle_strategy          0   takeover to clone.
+  [OK]          toggle_strategy          1   clone to takeover.
+  [OK]          toggle_strategy          2   round trip.
+  [OK]          toggle_cascade           0   off to on.
+  [OK]          toggle_cascade           1   on to off.
+  [OK]          toggle_cascade           2   clears chain when disabled.
+  [OK]          toggle_cascade           3   no selected service.
+  [OK]          header                   0   select step.
+  [OK]          header                   1   configure step.
+  [OK]          header                   2   review step.
+  [OK]          header                   3   importing step.
+  [OK]          handled_keys             0   has Escape.
+  [OK]          handled_keys             1   has Enter.
+  [OK]          handled_keys             2   has arrows.
+  [OK]          keymap                   0   not empty.
+  [OK]          keymap                   1   has Esc.
+  [OK]          keymap                   2   has Enter.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Import_wizard U+0028pureU+0029'.
+Test Successful in 0.002s. 23 tests run.
+qcheck random seed: 139064528
+Testing `Form Builder Pure'.
+This run has ID `3WRG5B6Q'.
+
+  [OK]          parse_host_port                 0   valid standard.
+  [OK]          parse_host_port                 1   valid localhost.
+  [OK]          parse_host_port                 2   valid port 1.
+  [OK]          parse_host_port                 3   valid port 65535.
+  [OK]          parse_host_port                 4   invalid port 0.
+  [OK]          parse_host_port                 5   invalid port 65536.
+  [OK]          parse_host_port                 6   invalid port negative.
+  [OK]          parse_host_port                 7   invalid port alpha.
+  [OK]          parse_host_port                 8   invalid empty host.
+  [OK]          parse_host_port                 9   invalid no colon.
+  [OK]          parse_host_port                10   invalid multiple colons.
+  [OK]          parse_host_port                11   invalid empty string.
+  [OK]          parse_host_port                12   port with spaces.
+  [OK]          parse_host_port QCheck          0   parse_host_port never cra...
+  [OK]          parse_host_port QCheck          1   valid host:port always ac...
+  [OK]          parse_host_port QCheck          2   error messages are non-em...
+  [OK]          endpoint field                  0   empty valid.
+  [OK]          endpoint field                  1   whitespace valid.
+  [OK]          endpoint field                  2   good value.
+  [OK]          endpoint field                  3   bad value.
+  [OK]          endpoint field                  4   bad msg.
+  [OK]          endpoint field                  5   good msg.
+  [OK]          endpoint field                  6   empty msg.
+  [OK]          validated_text                  0   empty fails.
+  [OK]          validated_text                  1   empty msg.
+  [OK]          validated_text                  2   filled passes.
+  [OK]          validated_text                  3   filled msg.
+  [OK]          always-valid fields             0   text.
+  [OK]          always-valid fields             1   toggle.
+  [OK]          always-valid fields             2   readonly.
+  [OK]          field_get_string                0   text.
+  [OK]          field_get_string                1   toggle.
+  [OK]          field_get_string                2   readonly.
+  [OK]          field_label                     0   labels match.
+  [OK]          with_hint                       0   no hint by default.
+  [OK]          with_hint                       1   sets hint.
+  [OK]          with_hint                       2   overwrite.
+  [OK]          service_or_endpoint             0   None valid.
+  [OK]          service_or_endpoint             1   Service valid.
+  [OK]          service_or_endpoint             2   Endpoint valid.
+  [OK]          service_or_endpoint             3   Endpoint invalid.
+  [OK]          service_or_endpoint             4   Endpoint invalid msg.
+  [OK]          service_or_endpoint             5   custom validator.
+  [OK]          string_list display             0   none.
+  [OK]          string_list display             1   one.
+  [OK]          string_list display             2   two.
+  [OK]          string_list display             3   many.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Form Builder Pure'.
+Test Successful in 0.008s. 47 tests run.
+qcheck random seed: 530837088
+Testing `Flows (pure)'.
+This run has ID `8J8KX72X'.
+
+  [OK]          is_valid_instance_char                   0   lowercase.
+  [OK]          is_valid_instance_char                   1   uppercase.
+  [OK]          is_valid_instance_char                   2   digits.
+  [OK]          is_valid_instance_char                   3   special chars.
+  [OK]          is_valid_instance_char                   4   space.
+  [OK]          is_valid_instance_char                   5   invalid special.
+  [OK]          is_valid_instance_char                   6   null byte.
+  [OK]          instance_has_valid_chars                 0   simple valid.
+  [OK]          instance_has_valid_chars                 1   complex valid.
+  [OK]          instance_has_valid_chars                 2   empty string.
+  [OK]          instance_has_valid_chars                 3   single char.
+  [OK]          instance_has_valid_chars                 4   with space.
+  [OK]          instance_has_valid_chars                 5   special char.
+  [OK]          instance_has_valid_chars                 6   unicode.
+  [OK]          strip_node_prefix                        0   present.
+  [OK]          strip_node_prefix                        1   absent.
+  [OK]          strip_node_prefix                        2   empty.
+  [OK]          strip_node_prefix                        3   just prefix.
+  [OK]          strip_node_prefix                        4   no dash.
+  [OK]          strip_node_prefix                        5   nested.
+  [OK]          invalid_instance_name_error_msg          0   not empty.
+  [OK]          invalid_instance_name_error_msg          1   mentions invalid.
+  [OK]          PBT                                      0   instance_has_val...
+  [OK]          PBT                                      1   strip_node_prefi...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Flows U+0028pureU+0029'.
+Test Successful in 0.006s. 24 tests run.
+qcheck random seed: 546087750
+Testing `Rpc_node_selection'.
+This run has ID `U35Q7RJ1'.
+
+  [OK]          parse_taquito_json             0   old format.
+  [OK]          parse_taquito_json             1   old format no name.
+  [OK]          parse_taquito_json             2   old format empty rpc.
+  [OK]          parse_taquito_json             3   old format no network.
+  [OK]          parse_taquito_json             4   taquito format.
+  [OK]          parse_taquito_json             5   taquito unknown provider.
+  [OK]          parse_taquito_json             6   taquito no provider.
+  [OK]          parse_taquito_json             7   taquito no net no provider.
+  [OK]          parse_taquito_json             8   taquito empty url.
+  [OK]          parse_taquito_json             9   taquito no endpoints.
+  [OK]          parse_taquito_json            10   malformed.
+  [OK]          parse_taquito_json            11   empty string.
+  [OK]          parse_taquito_json            12   empty list.
+  [OK]          parse_taquito_json            13   unexpected type.
+  [OK]          parse_taquito_json            14   null.
+  [OK]          parse_taquito_json            15   mixed valid/invalid.
+  [OK]          parse_taquito_json            16   non-assoc in list.
+  [OK]          total_items                    0   empty.
+  [OK]          total_items                    1   public only.
+  [OK]          total_items                    2   local only.
+  [OK]          total_items                    3   both.
+  [OK]          get_item_at_cursor             0   public header.
+  [OK]          get_item_at_cursor             1   public node.
+  [OK]          get_item_at_cursor             2   local header.
+  [OK]          get_item_at_cursor             3   local node.
+  [OK]          get_item_at_cursor             4   out of bounds.
+  [OK]          move_cursor                    0   empty.
+  [OK]          move_cursor                    1   down.
+  [OK]          move_cursor                    2   up.
+  [OK]          move_cursor                    3   bounds max.
+  [OK]          move_cursor                    4   bounds min.
+  [OK]          move_cursor                    5   skips header down.
+  [OK]          move_cursor                    6   skips header up.
+  [OK]          curated_defaults               0   not empty.
+  [OK]          curated_defaults               1   all public.
+  [OK]          curated_defaults               2   all have rpc.
+  [OK]          make_service_for_node          0   basic.
+  [OK]          make_service_for_node          1   no network.
+  [OK]          PBT                            0   parse_taquito_json never c...
+  [OK]          PBT                            1   parse_taquito_json never c...
+  [OK]          PBT                            2   move_cursor always produce...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Rpc_node_selection'.
+Test Successful in 0.011s. 41 tests run.
+Testing `Rpc_browser_actions'.
+This run has ID `AKY8NJ5F'.
+
+  [OK]          get_selected_entry           0   empty.
+  [OK]          get_selected_entry           1   with entries.
+  [OK]          get_selected_entry           2   result mode.
+  [OK]          build_rpc_url                0   root.
+  [OK]          build_rpc_url                1   path.
+  [OK]          default_for_dynamic          0   chain_id.
+  [OK]          default_for_dynamic          1   block_id.
+  [OK]          default_for_dynamic          2   block_hash.
+  [OK]          default_for_dynamic          3   unknown.
+  [OK]          cycle_instance               0   empty.
+  [OK]          cycle_instance               1   forward.
+  [OK]          cycle_instance               2   wrap.
+  [OK]          cycle_instance               3   backward.
+  [OK]          shortcuts                    0   defined.
+  [OK]          shortcuts                    1   format.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Rpc_browser_actions'.
+Test Successful in 0.001s. 15 tests run.
+Testing `UI_Regression_Framework'.
+This run has ID `SFIUWA00'.
+
+  [OK]          framework          0   page_capture.
+  [OK]          framework          1   env_setup.
+  [OK]          framework          2   fixed_time.
+  [OK]          framework          3   deterministic_random.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/UI_Regression_Framework'.
+Test Successful in 0.000s. 4 tests run.
+Testing `Instances Render'.
+This run has ID `HRW1PXXB'.
+
+  [OK]          Service State Rendering          0   running service icon.
+  [OK]          Service State Rendering          1   stopped service icon.
+  [OK]          Service State Rendering          2   failed service icon.
+  [OK]          Service State Rendering          3   enabled badge true.
+  [OK]          Service State Rendering          4   enabled badge false.
+  [OK]          Service State Rendering          5   enabled badge unknown.
+  [OK]          Service State Rendering          6   rpc status running.
+  [OK]          Service State Rendering          7   rpc status stopped.
+  [OK]          Service State Rendering          8   rpc status failed.
+  [OK]          Service Count                    0   empty list.
+  [OK]          Service Count                    1   single service.
+  [OK]          Service Count                    2   multiple services.
+  [OK]          Service Count                    3   many services (50).
+  [OK]          Service Count                    4   stress test (100).
+  [OK]          Service Types                    0   node service.
+  [OK]          Service Types                    1   baker service.
+  [OK]          Service Types                    2   accuser service.
+  [OK]          Service Types                    3   dal service.
+  [OK]          Service Types                    4   mixed types.
+  [OK]          Mixed States                     0   mixed states.
+  [OK]          Mixed States                     1   all same network.
+  [OK]          Mixed States                     2   different networks.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Instances Render'.
+Test Successful in 0.003s. 22 tests run.
+Testing `Rpc_browser_state'.
+This run has ID `RY4WWVVJ'.
+
+  [OK]          init                        0   empty.
+  [OK]          init                        1   with instances.
+  [OK]          instance_selection          0   valid.
+  [OK]          instance_selection          1   invalid.
+  [OK]          instance_selection          2   negative.
+  [OK]          instance_selection          3   current.
+  [OK]          instance_selection          4   current empty.
+  [OK]          navigation                  0   navigate to.
+  [OK]          navigation                  1   nested.
+  [OK]          navigation                  2   up.
+  [OK]          navigation                  3   up to root.
+  [OK]          navigation                  4   up at root.
+  [OK]          navigation                  5   root.
+  [OK]          entries                     0   set entries.
+  [OK]          entries                     1   set loading.
+  [OK]          result                      0   execute get.
+  [OK]          result                      1   set result.
+  [OK]          result                      2   toggle focus uses existing pa...
+  [OK]          cursor                      0   down.
+  [OK]          cursor                      1   up.
+  [OK]          cursor                      2   bounds.
+  [OK]          error                       0   set.
+  [OK]          error                       1   clear.
+  [OK]          target_override             0   initial.
+  [OK]          target_override             1   set in list mode.
+  [OK]          target_override             2   get in list mode.
+  [OK]          target_override             3   fallback.
+  [OK]          target_override             4   enter result inherits.
+  [OK]          target_override             5   add pager inherits.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Rpc_browser_state'.
+Test Successful in 0.004s. 29 tests run.
+Testing `Wallet Modal - Empty Delegates'.
+This run has ID `V3FN25MJ'.
+
+  [OK]          render_wallet_header          0   shows correct message with ...
+  [OK]          render_wallet_header          1   shows node error when deleg...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Wallet Modal - Empty Delegates'.
+Test Successful in 0.001s. 2 tests run.
+qcheck random seed: 465102084
+Testing `Data_transformers_props'.
+This run has ID `UFW05XMJ'.
+
+  [OK]          properties          0   History_mode.of_string(to_string(x)) ...
+  [OK]          properties          1   History_mode.of_string never crashes ...
+  [OK]          properties          2   Dal_health.status_of_string(status_to...
+  [OK]          properties          3   Dal_health.status_of_string never cra...
+  [OK]          properties          4   Delegate_data.For_tests.of_json never...
+  [OK]          properties          5   Delegate_data.For_tests.parse_partici...
+  [OK]          properties          6   Delegate_data.format_tez never crashe...
+  [OK]          properties          7   Baker_highwatermarks.For_tests.parse_...
+  [OK]          properties          8   Baker_highwatermarks.For_tests.parse_...
+  [OK]          properties          9   Baker_highwatermarks.max_level never ...
+  [OK]          properties         10   Baker_highwatermarks.format_summary n...
+  [OK]          properties         11   Foldable_json.of_string never crashes...
+  [OK]          properties         12   Foldable_json.of_json preserves struc...
+  [OK]          properties         13   unfold_all then fold_all returns same...
+  [OK]          properties         14   unfold_all is idempotent.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Data_transformers_props'.
+Test Successful in 0.017s. 15 tests run.
+Testing `rewards_pure'.
+This run has ID `KEQFQ1IR'.
+
+  [OK]          extract_op_hash                    0   bare oo line.
+  [OK]          extract_op_hash                    1   quoted hash.
+  [OK]          extract_op_hash                    2   op-prefixed hash.
+  [OK]          extract_op_hash                    3   on-prefixed hash.
+  [OK]          extract_op_hash                    4   no match.
+  [OK]          extract_op_hash                    5   empty input.
+  [OK]          extract_op_hash                    6   too short.
+  [OK]          cycles_due                         0   every cycle.
+  [OK]          cycles_due                         1   interval 2.
+  [OK]          cycles_due                         2   interval+offset.
+  [OK]          cycles_due                         3   excludes current.
+  [OK]          render_template                    0   basic.
+  [OK]          render_template                    1   amounts.
+  [OK]          render_template                    2   no placeholders.
+  [OK]          render_template                    3   timestamp.
+  [OK]          tez_of_mutez                       0   zero.
+  [OK]          tez_of_mutez                       1   one tez.
+  [OK]          tez_of_mutez                       2   fraction.
+  [OK]          tez_of_mutez                       3   small.
+  [OK]          tez_of_mutez                       4   large.
+  [OK]          total_earned                       0   sum of rewards.
+  [OK]          scheduler_cache_isolation          0   instances with same ba...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/rewards_pure'.
+Test Successful in 0.009s. 22 tests run.
+Testing `Instances Pure Logic'.
+This run has ID `XK85OOHL'.
+
+  [OK]          role_header               0   known roles.
+  [OK]          role_header               1   unknown role capitalizes.
+  [OK]          truncate_visible          0   short text.
+  [OK]          truncate_visible          1   exact width.
+  [OK]          truncate_visible          2   over width.
+  [OK]          truncate_visible          3   zero width.
+  [OK]          truncate_visible          4   empty string.
+  [OK]          truncate_visible          5   preserves ANSI prefix.
+  [OK]          truncate_visible          6   ANSI reset on cut.
+  [OK]          truncate_visible          7   no reset when not truncated.
+  [OK]          pad_line                  0   short line padded.
+  [OK]          pad_line                  1   exact width.
+  [OK]          summary_line              0   empty.
+  [OK]          summary_line              1   managed only.
+  [OK]          summary_line              2   multiple.
+  [OK]          journalctl_args           0   structure.
+  [OK]          journalctl_args           1   user flag.
+  [OK]          journalctl_args           2   different units.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Instances Pure Logic'.
+Test Successful in 0.001s. 18 tests run.
+Testing `Rpc_browser_render_list'.
+This run has ID `AJEKHFTS'.
+
+  [OK]          breadcrumb                 0   root.
+  [OK]          breadcrumb                 1   single.
+  [OK]          breadcrumb                 2   nested.
+  [OK]          instance_selector          0   empty.
+  [OK]          instance_selector          1   valid.
+  [OK]          entry_kind                 0   get.
+  [OK]          entry_kind                 1   sub.
+  [OK]          entry_kind                 2   dyn.
+  [OK]          entry                      0   not selected.
+  [OK]          entry                      1   selected.
+  [OK]          entry                      2   selected focused has bold.
+  [OK]          entry                      3   selected unfocused has dim.
+  [OK]          entry                      4   focus produces different output.
+  [OK]          entry                      5   not selected same regardless o...
+  [OK]          loading_error              0   loading.
+  [OK]          loading_error              1   loading custom.
+  [OK]          loading_error              2   error none.
+  [OK]          loading_error              3   error some.
+  [OK]          help                       0   render.
+  [OK]          render                     0   empty state.
+  [OK]          render                     1   with loading.
+  [OK]          render                     2   with entries.
+  [OK]          render                     3   with error.
+  [OK]          render                     4   with path.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Rpc_browser_render_list'.
+Test Successful in 0.004s. 24 tests run.
+Testing `Instances Navigation'.
+This run has ID `1QI8RKYG'.
+
+  [OK]          single-column             0   up from first service stays at ...
+  [OK]          single-column             1   down from first service -> seco...
+  [OK]          single-column             2   navigate through services.
+  [OK]          multi-column              0   up from first service stays at ...
+  [OK]          multi-column              1   up from column 1 stays at top.
+  [OK]          multi-column              2   down within column.
+  [OK]          multi-column              3   navigation starts at services.
+  [OK]          multi-column              4   up does not overshoot.
+  [OK]          multi-column              5   up/down navigation.
+  [OK]          empty-state               0   navigates to ghost (single colu...
+  [OK]          empty-state               1   navigates to ghost (multi column).
+  [OK]          empty-state               2   ensure_valid_column preserves g...
+  [OK]          empty-state               3   wide terminal multi-column navi...
+  [OK]          external-section          0   single-col: j from last managed...
+  [OK]          external-section          1   multi-col col0: j from last man...
+  [OK]          external-section          2   multi-col col1: j from last man...
+  [OK]          external-section          3   folded external: no transition ...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Instances Navigation'.
+Test Successful in 0.003s. 17 tests run.
+Testing `CLI Progress Tests'.
+This run has ID `9UXUVL6Z'.
+
+  [OK]          progress_bar                0   ascii_empty.
+  [OK]          progress_bar                1   ascii_half.
+  [OK]          progress_bar                2   ascii_full.
+  [OK]          progress_bar                3   ascii_quarter.
+  [OK]          progress_bar                4   clamps_low.
+  [OK]          progress_bar                5   clamps_high.
+  [OK]          progress_bar                6   unicode_length.
+  [OK]          format_size                 0   bytes.
+  [OK]          format_size                 1   kb.
+  [OK]          format_size                 2   mb.
+  [OK]          format_size                 3   gb.
+  [OK]          format_size                 4   zero.
+  [OK]          format_size                 5   boundary_kb.
+  [OK]          format_size                 6   boundary_mb.
+  [OK]          render_binary_line          0   pending.
+  [OK]          render_binary_line          1   in_progress_with_total.
+  [OK]          render_binary_line          2   in_progress_without_total.
+  [OK]          render_binary_line          3   complete.
+  [OK]          render_binary_line          4   unicode_style.
+  [OK]          display_state               0   init.
+  [OK]          display_state               1   update_status.
+  [OK]          display_state               2   set_complete.
+  [OK]          display_state               3   set_checksum.
+  [OK]          display_state               4   clear_checksum.
+  [OK]          display_state               5   preserves_others.
+  [OK]          style_detection             0   dumb_term.
+  [OK]          style_detection             1   empty_term.
+  [OK]          style_detection             2   utf8.
+  [OK]          style_detection             3   no_utf8.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/CLI Progress Tests'.
+Test Successful in 0.002s. 29 tests run.
+qcheck random seed: 189019896
+Testing `RPC Browser State Props'.
+This run has ID `GOGVDS9X'.
+
+  [OK]          state machine               0   invariants hold after random ...
+  [OK]          state machine               1   navigate_to then navigate_up ...
+  [OK]          state machine               2   navigate_root is idempotent.
+  [OK]          state machine               3   navigate_root empties path.
+  [OK]          instance selection          0   select_instance with invalid ...
+  [OK]          instance selection          1   select_instance with valid in...
+  [OK]          pager management            0   add_pager increases count up ...
+  [OK]          pager management            1   remove_pager decreases count.
+  [OK]          pager management            2   cannot remove last pager.
+  [OK]          pager management            3   focus_pager roundtrip.
+  [OK]          pager management            4   enter_result_mode has 1 pager.
+  [OK]          cursor                      0   cursor stays in bounds.
+  [OK]          error                       0   clear_error always clears.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/RPC Browser State Props'.
+Test Successful in 0.010s. 13 tests run.
+qcheck random seed: 492376373
+Testing `Binary_help_explorer_extended'.
+This run has ID `JGYZ2GXF'.
+
+  [OK]          render_value                   0   none.
+  [OK]          render_value                   1   some.
+  [OK]          render_value                   2   empty.
+  [OK]          truncate                       0   short.
+  [OK]          truncate                       1   exact.
+  [OK]          truncate                       2   long.
+  [OK]          truncate                       3   empty.
+  [OK]          option_label                   0   single.
+  [OK]          option_label                   1   multiple.
+  [OK]          option_label                   2   empty.
+  [OK]          wrap_text                      0   short.
+  [OK]          wrap_text                      1   long.
+  [OK]          wrap_text                      2   preserves newlines.
+  [OK]          wrap_text                      3   empty.
+  [OK]          format_tokens                  0   none selected.
+  [OK]          format_tokens                  1   toggle.
+  [OK]          format_tokens                  2   with value.
+  [OK]          format_tokens                  3   mixed.
+  [OK]          option_matches_flag            0   exact.
+  [OK]          name_matches_excluded          0   exact.
+  [OK]          name_matches_excluded          1   prefix.
+  [OK]          name_matches_excluded          2   longer.
+  [OK]          name_matches_excluded          3   no match.
+  [OK]          name_matches_excluded          4   shorter.
+  [OK]          is_excluded_option             0   excluded.
+  [OK]          is_excluded_option             1   not excluded.
+  [OK]          is_excluded_option             2   prefix match.
+  [OK]          init_rows_from_args            0   empty args.
+  [OK]          init_rows_from_args            1   matching flag.
+  [OK]          init_rows_from_args            2   unmatched flag.
+  [OK]          option_hint_markdown           0   basic.
+  [OK]          option_hint_markdown           1   selected.
+  [OK]          option_hint_markdown           2   no doc.
+  [OK]          option_hint_markdown           3   with arg.
+  [OK]          excluded_lists                 0   node has --help.
+  [OK]          excluded_lists                 1   baker has --help.
+  [OK]          excluded_lists                 2   accuser has --help.
+  [OK]          excluded_lists                 3   dal has --help.
+  [OK]          pbt                            0   truncate output <= max_len.
+  [OK]          pbt                            1   truncate preserves short s...
+  [OK]          pbt                            2   wrap_text never crashes.
+  [OK]          pbt                            3   wrap_text preserves all no...
+  [OK]          pbt                            4   parse_initial_args never c...
+  [OK]          pbt                            5   parse_initial_args flags s...
+  [OK]          pbt                            6   name_matches_excluded is r...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Binary_help_explorer_extended'.
+Test Successful in 0.025s. 45 tests run.
+qcheck random seed: 988767718
+Testing `Cli_helpers'.
+This run has ID `K7OS0NHC'.
+
+  [OK]          normalize_opt_string            0   None.
+  [OK]          normalize_opt_string            1   empty.
+  [OK]          normalize_opt_string            2   spaces.
+  [OK]          normalize_opt_string            3   value.
+  [OK]          normalize_opt_string            4   trims.
+  [OK]          normalize_opt_string            5   tabs.
+  [OK]          normalize_opt_string            6   inner spaces.
+  [OK]          cmdliner_error                  0   basic.
+  [OK]          cmdliner_error                  1   empty.
+  [OK]          run_result                      0   ok.
+  [OK]          run_result                      1   error.
+  [OK]          history_mode_choices            0   count.
+  [OK]          history_mode_choices            1   rolling.
+  [OK]          history_mode_choices            2   full.
+  [OK]          history_mode_choices            3   archive.
+  [OK]          history_mode_doc                0   non-empty.
+  [OK]          history_mode_doc                1   mentions modes.
+  [OK]          is_interactive                  0   returns bool.
+  [OK]          split_at_last_comma             0   no comma.
+  [OK]          split_at_last_comma             1   one comma.
+  [OK]          split_at_last_comma             2   multiple commas.
+  [OK]          split_at_last_comma             3   trailing comma.
+  [OK]          split_at_last_comma             4   with spaces.
+  [OK]          split_at_last_comma             5   empty.
+  [OK]          compute_required_space          0   snapshot.
+  [OK]          compute_required_space          1   download.
+  [OK]          compute_required_space          2   zero.
+  [OK]          pbt                             0   normalize_opt_string is i...
+  [OK]          pbt                             1   normalize None is None.
+  [OK]          pbt                             2   normalize result is trimmed.
+  [OK]          pbt                             3   normalize Some result is ...
+  [OK]          pbt                             4   split_at_last_comma prese...
+  [OK]          pbt                             5   split_at_last_comma: befo...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Cli_helpers'.
+Test Successful in 0.006s. 33 tests run.
+Testing `Keys_page'.
+This run has ID `N6CKIPNX'.
+
+  [OK]          base_dir_deduplication          0   deduplicates default dir ...
+  [OK]          base_dir_deduplication          1   ensures uniqueness with m...
+  [OK]          base_dir_deduplication          2   normalizes trailing slash...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Keys_page'.
+Test Successful in 0.043s. 3 tests run.
+Testing `Binaries_page'.
+This run has ID `5BPMWOZM'.
+
+  [OK]          initialization          0   page loads.
+  [OK]          initialization          1   empty state.
+  [OK]          navigation              0   up/down.
+  [OK]          navigation              1   esc back.
+  [OK]          navigation              2   tab toggle.
+  [OK]          navigation              3   refresh.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Binaries_page'.
+Test Successful in 0.011s. 6 tests run.
+Testing `rewards_page_custom_baker'.
+This run has ID `KDIR8W4X'.
+
+  [OK]          keybinding          0   'a' is in handled_keys.
+  [OK]          modal_flow          0   pressing 'a' opens first modal.
+  [OK]          modal_flow          1   KT1 address is rejected.
+  [OK]          modal_flow          2   Esc cancels modal.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/rewards_page_custom_baker'.
+Test Successful in 0.038s. 4 tests run.
+Testing `Diagnostics_page'.
+This run has ID `P6LK0POM'.
+
+  [OK]          initialization          0   page loads.
+  [OK]          scrolling               0   down/up.
+  [OK]          scrolling               1   vim j/k.
+  [OK]          key_actions             0   metrics toggle.
+  [OK]          key_actions             1   cache clear.
+  [OK]          key_actions             2   duration change.
+  [OK]          key_actions             3   esc back.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Diagnostics_page'.
+Test Successful in 0.036s. 7 tests run.
+Testing `Main_shell Back navigation'.
+This run has ID `4IQMZWQB'.
+
+  [OK]          apply_sub_nav          0   Back from hidden page (rewards) cl...
+  [OK]          apply_sub_nav          1   Back from regular tab propagates n...
+  [OK]          apply_sub_nav          2   Back from sandbox clears on_hidden...
+  [OK]          apply_sub_nav          3   Back from diagnostics clears on_hi...
+  [OK]          apply_sub_nav          4   None navigation preserves state.
+  [OK]          apply_sub_nav          5   Quit from hidden page propagates.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Main_shell Back navigation'.
+Test Successful in 0.111s. 6 tests run.
+Testing `Global shortcuts in direct-navigation pages'.
+This run has ID `1WA1H71A'.
+
+  [OK]          rpc_browser          0   help modal opens with '?'.
+  [OK]          log_viewer           0   help modal opens with '?'.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Global shortcuts in direct-navigation pages'.
+Test Successful in 0.111s. 2 tests run.
+Testing `Cmd_rpc'.
+This run has ID `ZTOXGLHI'.
+
+  [OK]          service_from_url          0   basic.
+  [OK]          service_from_url          1   localhost.
+  [OK]          resolve_service           0   url only.
+  [OK]          resolve_service           1   multiple error.
+  [OK]          resolve_service           2   none error.
+  [OK]          resolve_service           3   public node.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Cmd_rpc'.
+Test Successful in 0.116s. 6 tests run.
+Testing `Wallets_page'.
+This run has ID `TLU2OI2R'.
+
+  [OK]          base_dir_deduplication           0   deduplicates default dir...
+  [OK]          base_dir_deduplication           1   deduplicates multiple ma...
+  [OK]          base_dir_deduplication           2   normalizes trailing slas...
+  [OK]          base_dir_deduplication           3   registry directories app...
+  [OK]          base_dir_deduplication           4   registry removal removes...
+  [OK]          base_dir_deduplication           5   registry merges services...
+  [OK]          fold_unfold                      0   tab toggles fold on grou...
+  [OK]          fold_unfold                      1   tab toggles fold via mai...
+  [OK]          refresh_on_dirty_flag            0   imported key appears wit...
+  [OK]          scheduler_initial_fetch          0   scheduler fetches balanc...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Wallets_page'.
+Test Successful in 0.159s. 10 tests run.
+Testing `UI_Regressions_Forms_Comprehensive'.
+This run has ID `5LUV927E'.
+
+  [OK]          install_node             0   instance_name_short.
+  [OK]          install_node             1   instance_name_long.
+  [OK]          install_node             2   instance_name_numbers.
+  [OK]          install_node             3   network_mainnet.
+  [OK]          install_node             4   network_shadownet.
+  [OK]          install_node             5   history_mode_focus.
+  [OK]          install_node             6   history_mode_full.
+  [OK]          install_node             7   history_mode_archive.
+  [OK]          install_node             8   snapshot_focus.
+  [OK]          install_node             9   snapshot_disabled.
+  [OK]          install_node            10   data_dir_focus.
+  [OK]          install_node            11   data_dir_custom.
+  [OK]          install_node            12   rpc_addr_focus.
+  [OK]          install_node            13   rpc_addr_custom.
+  [OK]          install_node            14   p2p_addr_focus.
+  [OK]          install_node            15   service_user_focus.
+  [OK]          install_node            16   bootstrap_threshold_focus.
+  [OK]          install_node            17   enable_service_focus.
+  [OK]          install_node            18   complete_navigation.
+  [OK]          install_baker            0   empty.
+  [OK]          install_baker            1   instance_name_filled.
+  [OK]          install_baker            2   node_instance_focus.
+  [OK]          install_baker            3   protocol_focus.
+  [OK]          install_baker            4   delegate_focus.
+  [OK]          install_baker            5   liquidity_toggle_focus.
+  [OK]          install_baker            6   dal_node_focus.
+  [OK]          install_baker            7   service_user_focus.
+  [OK]          install_baker            8   enable_service_focus.
+  [OK]          install_accuser          0   empty.
+  [OK]          install_accuser          1   instance_name_filled.
+  [OK]          install_accuser          2   node_instance_focus.
+  [OK]          install_accuser          3   protocol_focus.
+  [OK]          install_accuser          4   service_user_focus.
+  [OK]          install_accuser          5   enable_service_focus.
+  [OK]          install_dal              0   empty.
+  [OK]          install_dal              1   instance_name_filled.
+  [OK]          install_dal              2   node_instance_focus.
+  [OK]          install_dal              3   network_focus.
+  [OK]          install_dal              4   profile_focus.
+  [OK]          install_dal              5   rpc_addr_focus.
+  [OK]          install_dal              6   service_user_focus.
+  [OK]          install_dal              7   enable_service_focus.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/UI_Regressions_Forms_Comprehensive'.
+Test Successful in 0.199s. 42 tests run.
+Testing `Port_validation'.
+This run has ID `WOTVAJMH'.
+
+  [OK]          parse_host_port            0   parse IPv4:port.
+  [OK]          parse_host_port            1   parse hostname:port.
+  [OK]          parse_host_port            2   parse wildcard:port.
+  [OK]          parse_host_port            3   parse IPv6:port.
+  [OK]          parse_host_port            4   parse no port.
+  [OK]          parse_host_port            5   parse invalid format.
+  [OK]          parse_host_port            6   parse empty string.
+  [OK]          parse_host_port            7   parse port only.
+  [OK]          parse_host_port            8   parse port 0.
+  [OK]          parse_host_port            9   parse max port 65535.
+  [OK]          parse_host_port           10   parse over max port.
+  [OK]          parse_host_port           11   parse negative port.
+  [OK]          parse_port                 0   parse port from full address.
+  [OK]          parse_port                 1   parse port from hostname.
+  [OK]          parse_port                 2   parse without colon.
+  [OK]          parse_port                 3   parse invalid number.
+  [OK]          parse_port                 4   parse empty.
+  [OK]          validate_addr              0   validate valid address.
+  [OK]          validate_addr              1   validate invalid format.
+  [OK]          validate_addr              2   validate port too low.
+  [OK]          validate_addr              3   validate port too high.
+  [OK]          validate_addr              4   validate boundary 1024.
+  [OK]          validate_addr              5   validate boundary 65535.
+  [OK]          validate_specific          0   validate RPC address.
+  [OK]          validate_specific          1   validate invalid RPC.
+  [OK]          validate_specific          2   validate P2P address.
+  [OK]          validate_specific          3   validate invalid P2P.
+  [OK]          pp_error                   0   pp_error invalid format.
+  [OK]          pp_error                   1   pp_error out of range.
+  [OK]          pp_error                   2   pp_error used by instance.
+  [OK]          pp_error                   3   pp_error port in use.
+  [OK]          edge_cases                 0   parse with spaces.
+  [OK]          edge_cases                 1   parse multiple colons.
+  [OK]          edge_cases                 2   parse port only format.
+  [OK]          edge_cases                 3   validate localhost.
+  [OK]          edge_cases                 4   validate wildcard.
+  [OK]          next_free_port             0   skips avoided ports.
+  [OK]          next_free_port             1   skips in-use ports.
+  [OK]          next_free_port             2   terminates at boundary.
+  [OK]          next_free_port             3   clamps below 1024.
+  [OK]          next_free_port             4   returns start when free.
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Port_validation'.
+Test Successful in 0.369s. 41 tests run.
+qcheck random seed: 234219089
+Testing `Env_file_parser_props'.
+This run has ID `4C0OZ9FK'.
+
+  [OK]          properties          0   parse_string never crashes on random ...
+  [OK]          properties          1   expand_vars never crashes on random i...
+  [OK]          properties          2   lines starting with # never produce k...
+  [OK]          properties          3   blank lines never produce key-value p...
+  [OK]          properties          4   expand_vars is identity when input ha...
+  [OK]          properties          5   expand_vars replaces known ${VAR} in ...
+  [OK]          properties          6   parse_string returns at most as many ...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Env_file_parser_props'.
+Test Successful in 0.373s. 7 tests run.
+Checking for direct TzKT URL literals outside canonical modules...
+
+No direct TzKT URL literals found outside canonical modules.
+Testing `octez-manager'.
+This run has ID `T3STFTQT'.
+
+  [OK]          history mode                          0   roundtrip.
+  [OK]          history mode                          1   invalid.
+  [OK]          settings                              0   roundtrip.
+  [OK]          job_manager                           0   submit.
+  [OK]          job_manager                           1   timeout kills expir...
+  [OK]          job_manager                           2   no timeout keeps ru...
+  [OK]          job_manager                           3   enqueue sync.
+  [OK]          job_manager                           4   submit on_complete.
+  [OK]          common.env                            0   home_dir.
+  [OK]          common.env                            1   xdg config.
+  [OK]          common.env                            2   data dir.
+  [OK]          common.env                            3   role dir.
+  [OK]          common.env                            4   role dir no duplica...
+  [OK]          common.path                           0   absolute unchanged.
+  [OK]          common.path                           1   relative converted.
+  [OK]          common.path                           2   dotdot relative.
+  [OK]          common.path                           3   empty error.
+  [OK]          common.path                           4   whitespace error.
+  [OK]          common.fs                             0   ensure dirs.
+  [OK]          common.fs                             1   ensure updates perm...
+  [OK]          common.fs                             2   ensure missing owner.
+  [OK]          common.fs                             3   write file.
+  [OK]          common.fs                             4   remove file.
+  [OK]          common.fs                             5   remove directory.
+  [OK]          common.fs                             6   remove missing.
+  [OK]          common.cmd                            0   sh_quote.
+  [OK]          common.cmd                            1   cmd_to_string.
+  [OK]          common.cmd                            2   shellwords parser.
+  [OK]          common.cmd                            3   run helpers.
+  [OK]          common.cmd                            4   run_as self.
+  [OK]          common.download                       0   kill_active_downloa...
+  [OK]          form_builder.common                   0   is_nonempty.
+  [OK]          form_builder.common                   1   normalize.
+  [OK]          form_builder.common                   2   parse_host_port.
+  [OK]          form_builder.common                   3   prepare_extra_args.
+  [OK]          binary_help_explorer                  0   parse_initial_args.
+  [OK]          help_parser                           0   extract global opti...
+  [OK]          help_parser                           1   extract global opti...
+  [OK]          help_parser                           2   split extra args.
+  [OK]          installer.extra_args                  0   split with fallback.
+  [OK]          installer.extra_args                  1   known global options.
+  [OK]          snapshots.basic                       0   slug_of_network.
+  [OK]          snapshots.basic                       1   sanitize.
+  [OK]          snapshots.basic                       2   tzkt_url_construction.
+  [OK]          snapshots.fetch                       0   entry success.
+  [OK]          snapshots.fetch                       1   entry missing metad...
+  [OK]          snapshots.fetch                       2   entry 404.
+  [OK]          snapshots.fetch                       3   list from root.
+  [OK]          snapshots.fetch                       4   list fallback.
+  [OK]          snapshots.fetch                       5   list missing entry ...
+  [OK]          snapshots.fetch                       6   list disappeared en...
+  [OK]          snapshots.fetch                       7   list no advertised.
+  [OK]          snapshots.fetch                       8   fetch_html fallback.
+  [OK]          snapshots.fetch                       9   fetch_html prefers ...
+  [OK]          teztnets                              0   parse pairs.
+  [OK]          teztnets                              1   parse assoc.
+  [OK]          teztnets                              2   parse error.
+  [OK]          teztnets                              3   parse mainnet fallb...
+  [OK]          teztnets                              4   list networks.
+  [OK]          teztnets                              5   list fallback.
+  [OK]          teztnets                              6   list empty json fal...
+  [OK]          teztnets                              7   fetch_json fallback.
+  [OK]          teztnets                              8   fetch_json prefers ...
+  [OK]          teztnets                              9   parse top-level list.
+  [OK]          teztnets                             10   resolve builtin mai...
+  [OK]          teztnets                             11   resolve builtin cas...
+  [OK]          teztnets                             12   resolve URL passthr...
+  [OK]          teztnets                             13   resolve alias lower...
+  [OK]          teztnets                             14   resolve alias mixed...
+  [OK]          teztnets                             15   resolve alias not f...
+  [OK]          teztnets                             16   resolve empty string.
+  [OK]          logging_mode                          0   default is journald.
+  [OK]          logging_mode                          1   to_string.
+  [OK]          installer                             0   instance name unique.
+  [OK]          installer                             1   instance name chars.
+  [OK]          installer                             2   instance name full ...
+  [OK]          installer                             3   journald logging noop.
+  [OK]          installer                             4   drop user heuristic.
+  [OK]          installer                             5   backup missing.
+  [OK]          installer                             6   backup restore.
+  [OK]          installer                             7   normalize data dir.
+  [OK]          installer                             8   endpoint formatting.
+  [OK]          installer                             9   build run args.
+  [OK]          installer                            10   plan direct uri.
+  [OK]          installer                            11   plan tzinit.
+  [OK]          installer                            12   metadata variants.
+  [OK]          installer                            13   strip + detect.
+  [OK]          installer                            14   history mode matches.
+  [OK]          installer                            15   snapshot history mo...
+  [OK]          installer                            16   snapshot history mo...
+  [OK]          installer                            17   node form snapshot ...
+  [OK]          installer                            18   node form snapshot ...
+  [OK]          installer                            19   runtime probe writa...
+  [OK]          installer                            20   baker initial base ...
+  [OK]          installer                            21   accuser initial bas...
+  [OK]          installer                            22   accuser instance na...
+  [OK]          installer                            23   binary help parses.
+  [OK]          installer                            24   help skips dividers.
+  [OK]          installer                            25   baker help parses l...
+  [OK]          installer                            26   baker help parses r...
+  [OK]          service.core                          0   make.
+  [OK]          service.core                          1   invalid history.
+  [OK]          service.json                          0   roundtrip.
+  [OK]          service.json                          1   invalid logging.
+  [OK]          service.registry                      0   list empty.
+  [OK]          service.registry                      1   roundtrip.
+  [OK]          service.registry                      2   invalid json.
+  [OK]          service.registry                      3   remove missing.
+  [OK]          node.env                              0   write file.
+  [OK]          node.env                              1   overwrite.
+  [OK]          node.env                              2   custom pairs.
+  [OK]          systemd                               0   paths.
+  [OK]          systemd                               1   logging.
+  [OK]          systemd                               2   unit queries.
+  [OK]          systemd                               3   install + dropin.
+  [OK]          systemd                               4   extra paths.
+  [OK]          systemd                               5   signatory dependency.
+  [OK]          systemd                               6   baker exec remote.
+  [OK]          systemd                               7   baker exec local.
+  [OK]          systemd                               8   baker exec line lb ...
+  [OK]          systemd                               9   baker exec line dal...
+  [OK]          systemd                              10   baker exec line glo...
+  [OK]          systemd                              11   accuser exec line g...
+  [OK]          system_user                           0   validate missing.
+  [OK]          system_user                           1   service account.
+  [OK]          system_user                           2   system directories.
+  [OK]          system_user                           3   service account root.
+  [OK]          system_user                           4   remove account root.
+  [OK]          cache                                 0   ttl basic.
+  [OK]          cache                                 1   invalidate.
+  [OK]          cache                                 2   result only success.
+  [OK]          cache                                 3   keyed basic.
+  [OK]          cache                                 4   safe_keyed basic.
+  [OK]          cache                                 5   safe_keyed fetch.
+  [OK]          cache                                 6   safe_keyed per-key ...
+  [OK]          cache                                 7   registry no duplica...
+  [OK]          cache                                 8   stats hit/miss.
+  [OK]          cache                                 9   invalidate_all clea...
+  [OK]          port_validation                       0   parse host:port valid.
+  [OK]          port_validation                       1   parse host:port inv...
+  [OK]          port_validation                       2   parse port.
+  [OK]          port_validation                       3   validate addr format.
+  [OK]          port_validation                       4   port out of range.
+  [OK]          port_validation                       5   pp_error.
+  [OK]          service.dependents                    0   roundtrip with depe...
+  [OK]          service.dependents                    1   roundtrip with depe...
+  [OK]          service.dependents                    2   defaults empty.
+  [OK]          instance_name                         0   valid chars.
+  [OK]          instance_name                         1   invalid chars.
+  [OK]          log_viewer                            0   journalctl -o cat.
+  [OK]          log_viewer                            1   journalctl -n 1000.
+  [OK]          log_viewer                            2   colorize ERROR.
+  [OK]          log_viewer                            3   colorize WARNING.
+  [OK]          log_viewer                            4   stderr redirect.
+  [OK]          log_viewer                            5   node unit name.
+  [OK]          log_viewer                            6   baker unit name.
+  [OK]          systemd.unit_state                    0   parse active.
+  [OK]          systemd.unit_state                    1   parse inactive.
+  [OK]          systemd.unit_state                    2   parse failed exit-c...
+  [OK]          systemd.unit_state                    3   parse failed signal.
+  [OK]          systemd.unit_state                    4   parse success result.
+  [OK]          systemd.payout_last_run               0   parse success.
+  [OK]          systemd.payout_last_run               1   parse failed.
+  [OK]          systemd.payout_last_run               2   parse never run.
+  [OK]          systemd.payout_last_run               3   parse missing times...
+  [OK]          binary_registry                       0   bin_source to_string.
+  [OK]          binary_registry                       1   bin_source roundtrip.
+  [OK]          binary_registry                       2   bin_source legacy.
+  [OK]          binary_registry                       3   Managed_octez_index...
+  [OK]          binary_registry                       4   registered dirs CRUD.
+  [OK]          binary_registry                       5   managed versions.
+  [OK]          binary_registry                       6   path resolution.
+  [OK]          binary_registry                       7   service bin_source ...
+  [OK]          binary_registry                       8   service get_bin_sou...
+  [OK]          binary_downloader                     0   arch detection.
+  [OK]          binary_downloader                     1   url construction.
+  [OK]          binary_downloader                     2   parse version json.
+  [OK]          binary_downloader                     3   binaries list.
+  [OK]          binary_downloader                     4   filter latest N maj...
+  [OK]          version_checker                       0   compare versions ba...
+  [OK]          version_checker                       1   compare versions mu...
+  [OK]          version_checker                       2   compare versions rc.
+  [OK]          version_checker                       3   compare versions th...
+  [OK]          version_checker                       4   parse version.
+  [OK]          external_service                      0   role_of_binary_name.
+  [OK]          external_service                      1   confidence_to_string.
+  [OK]          external_service                      2   suggest_instance_name.
+  [OK]          external_service                      3   status_of_unit_state.
+  [OK]          external_service                      4   field_helpers.
+  [OK]          env_file_parser                       0   parse_simple.
+  [OK]          env_file_parser                       1   parse_quoted.
+  [OK]          env_file_parser                       2   parse_comments.
+  [OK]          env_file_parser                       3   expand_vars.
+  [OK]          execstart_parser                      0   extract_binary.
+  [OK]          execstart_parser                      1   unwrap_shell.
+  [OK]          execstart_parser                      2   parse_simple.
+  [OK]          execstart_parser                      3   parse_with_variables.
+  [OK]          execstart_parser                      4   parse_baker.
+  [OK]          execstart_parser                      5   parse_dal_node.
+  [OK]          execstart_parser                      6   parse_baker_with_dal.
+  [OK]          external_service_detector             0   chain_id_mapping.
+  [OK]          external_service_detector             1   is_managed_unit_name.
+  [OK]          bug1_shell_expansion                  0   escape_env_value.
+  [OK]          bug1_shell_expansion                  1   build_run_args.
+  [OK]          bug1_shell_expansion                  2   env_file_sourcing.
+  [OK]          bug2_extra_args_metadata              0   node_extra_args_pre...
+  [OK]          bug2_extra_args_metadata              1   baker_extra_args_pr...
+  [OK]          bug2_extra_args_metadata              2   accuser_extra_args_...
+  [OK]          bug2_extra_args_metadata              3   dal_extra_args_pres...
+  [OK]          bug4_history_mode_preserved           0   history_mode_from_e...
+  [OK]          bug_dal_import_variable_refs          0   dal_variable_refs_i...
+  [OK]          cli_import                            0   strategy_validation.
+  [OK]          cli_import                            1   service_lookup.
+  [OK]          cli_import                            2   field_overrides.
+  [OK]          cli_import                            3   options_construction.
+  [OK]          cli_import                            4   invalid_strategy_ha...
+  [OK]          cli_import                            5   flag_combinations.
+  [OK]          cli_import                            6   service_name_edge_c...
+  [OK]          atomic_downloads                      0   is_complete_install...
+  [OK]          atomic_downloads                      1   is_complete_install...
+  [OK]          atomic_downloads                      2   is_complete_install...
+  [OK]          atomic_downloads                      3   is_complete_install...
+  [OK]          atomic_downloads                      4   cleanup_stale_temp_...
+  [OK]          generate_instance_name                0   weeklynet_with_date.
+  [OK]          generate_instance_name                1   mainnet.
+  [OK]          generate_instance_name                2   with_history_mode.
+  [OK]          generate_instance_name                3   from_url.
+  [OK]          generate_instance_name                4   long_network.
+  [OK]          signer_validation                     0   validate_uri_http_w...
+  [OK]          signer_validation                     1   validate_uri_https_...
+  [OK]          signer_validation                     2   validate_uri_http_d...
+  [OK]          signer_validation                     3   validate_uri_https_...
+  [OK]          signer_validation                     4   validate_uri_unix_s...
+  [OK]          signer_validation                     5   validate_uri_unix_s...
+  [OK]          signer_validation                     6   validate_uri_empty_...
+  [OK]          signer_validation                     7   validate_uri_whites...
+  [OK]          signer_validation                     8   validate_uri_invali...
+  [OK]          signer_validation                     9   validate_uri_invali...
+  [OK]          signer_validation                    10   validate_uri_unix_s...
+  [OK]          signer_validation                    11   validate_uri_unix_s...
+  [OK]          signer_validation                    12   validate_uri_case_i...
+  [OK]          signer_validation                    13   validate_and_resolv...
+  [OK]          signer_validation                    14   validate_and_resolv...
+  [OK]          signer_validation                    15   validate_and_resolv...
+  [OK]          signer_validation                    16   resolve_signatory_n...
+  [OK]          signatory_installer                   0   validate_address_va...
+  [OK]          signatory_installer                   1   validate_address_in...
+  [OK]          signatory_installer                   2   validate_address_in...
+  [OK]          signatory_installer                   3   validate_tezos_key_...
+  [OK]          signatory_installer                   4   validate_tezos_key_...
+  [OK]          signatory_installer                   5   yaml_generation_mem...
+  [OK]          signatory_installer                   6   yaml_generation_fil...
+  [OK]          signatory_installer                   7   secret_json_templat...
+  [OK]          signatory_installer                   8   read_authorized_key...
+  [OK]          signatory_installer                   9   read_authorized_key...
+  [OK]          signatory_installer                  10   read_authorized_key...
+  [OK]          signatory_cli                         0   backend_file_accepted.
+  [OK]          signatory_cli                         1   backend_file_case_i...
+  [OK]          signatory_cli                         2   backend_unsupported...
+  [OK]          signatory_cli                         3   authorized_keys_sin...
+  [OK]          signatory_cli                         4   authorized_keys_mul...
+  [OK]          signatory_cli                         5   authorized_keys_wit...
+  [OK]          signatory_cli                         6   authorized_keys_emp...
+  [OK]          signatory_cli                         7   authorized_keys_onl...
+  [OK]          signatory_cli                         8   watermark_memory.
+  [OK]          signatory_cli                         9   watermark_file.
+  [OK]          signatory_cli                        10   watermark_case_inse...
+  [OK]          signatory_cli                        11   watermark_invalid.
+  [OK]          signatory_cli                        12   keys_dir_default.
+  [OK]          signatory_cli                        13   keys_dir_custom.
+  [OK]          network_name                          0   normalize_known_urls.
+  [OK]          network_name                          1   normalize_canonical...
+  [OK]          network_name                          2   normalize_custom_urls.
+  [OK]          network_name                          3   normalize_whitespace.
+  [OK]          context_keymap                        0   keymap registration.
+  [OK]          context_keymap                        1   empty keymap default.
+  [OK]          context_keymap                        2   special characters ...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/octez-manager'.
+Test Successful in 2.035s. 277 tests run.
+[Domain_pool] task failed: Stdlib.Effect.Unhandled(Eio_unix__Private.Get_monotonic_clock)
+qcheck random seed: 607409496
+Testing `Help_parser_props'.
+This run has ID `JVS9OIFB'.
+
+  [OK]          properties          0   strip_ansi never crashes on random in...
+  [OK]          properties          1   parse_spec never crashes on random in...
+  [OK]          properties          2   classify_arg_kind never crashes on ra...
+  [OK]          properties          3   parse_help_node never crashes on rand...
+  [OK]          properties          4   strip_ansi is idempotent.
+  [OK]          properties          5   strip_ansi output contains no ESC bytes.
+  [OK]          properties          6   classify_arg_kind is deterministic.
+  [OK]          properties          7   classify_arg_kind with arg=None alway...
+  [OK]          properties          8   contains is reflexive: s always conta...
+  [OK]          properties          9   contains with empty needle is always ...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Help_parser_props'.
+Test Successful in 8.040s. 10 tests run.
+qcheck random seed: 610575030
+Testing `Fuzz'.
+This run has ID `47Z25F8L'.
+
+  [OK]          fuzz          0   fuzz: Env_file_parser.parse_string never cr...
+  [OK]          fuzz          1   fuzz: parsed env keys contain no newlines.
+  [OK]          fuzz          2   fuzz: Env_file_parser.expand_vars never cra...
+  [OK]          fuzz          3   fuzz: Execstart_parser.parse never crashes.
+  [OK]          fuzz          4   fuzz: Execstart_parser.unwrap_shell never c...
+  [OK]          fuzz          5   fuzz: unwrap_shell output is never longer t...
+  [OK]          fuzz          6   fuzz: Execstart_parser.extract_binary_path ...
+  [OK]          fuzz          7   fuzz: unwrap_shell is idempotent on adversa...
+  [OK]          fuzz          8   fuzz: Teztnets.parse_networks never crashes.
+  [OK]          fuzz          9   fuzz: Teztnets.parse_networks returns Ok or...
+  [OK]          fuzz         10   fuzz: Snapshots.slug_of_network never crashes.
+  [OK]          fuzz         11   fuzz: Snapshots.sanitize_kind_input never c...
+  [OK]          fuzz         12   fuzz: sanitize_kind_input output has no col...
+
+Full test results in `~/dev/octez-manager/_build/default/test/_build/_tests/Fuzz'.
+Test Successful in 57.207s. 13 tests run.

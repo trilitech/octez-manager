@@ -1,0 +1,2660 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
+(*                                                                            *)
+(******************************************************************************)
+
+module Pager = Miaou_widgets_display.Pager_widget
+module Select_widget = Miaou_widgets_input.Select_widget
+module Textarea_widget = Miaou_widgets_input.Textarea_widget
+module Textbox_widget = Miaou_widgets_input.Textbox_widget
+module Widgets = Miaou_widgets_display.Widgets
+module Navigation = Miaou.Core.Navigation
+
+let first_nonempty_line lines =
+  List.find_opt (fun l -> String.trim l <> "") lines
+
+let extract_major version_str =
+  try
+    match String.split_on_char '.' version_str with
+    | major :: _ -> int_of_string major
+    | [] -> 0
+  with _ -> 0
+
+let set_markdown_hint ?short ?long () =
+  Miaou.Core.Help_hint.clear () ;
+  match (short, long) with
+  | None, None -> ()
+  | _ -> Miaou.Core.Help_hint.push ?short ?long ()
+
+let open_text_modal ~title ~lines =
+  let module Modal = struct
+    type state = Pager.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = Navigation.make (Pager.open_lines ~title:"" lines)
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size =
+      let s = ps.Navigation.s in
+      let rows = max 1 (size.LTerm_geom.rows - 4) in
+      (* Clamp columns so rendered content never exceeds the modal's inner width *)
+      let cols =
+        let inner = max 1 (size.LTerm_geom.cols - 2) in
+        min inner 72
+      in
+      Pager.render ~win:rows ~cols s ~focus
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size =
+      let s = ps.Navigation.s in
+      (* Check if pager is in input mode (search/lookup/help) *)
+      let pager_in_input_mode =
+        match s.Pager.input_mode with
+        | `Search_edit | `Lookup | `Help -> true
+        | `None -> false
+      in
+
+      let key =
+        match Miaou.Core.Keys.of_string key with
+        | Some Miaou.Core.Keys.Up -> "Up"
+        | Some Miaou.Core.Keys.Down -> "Down"
+        | Some (Miaou.Core.Keys.Char "k") -> "Up"
+        | Some (Miaou.Core.Keys.Char "j") -> "Down"
+        | Some (Miaou.Core.Keys.Char "Page_up") -> "Page_up"
+        | Some (Miaou.Core.Keys.Char "Page_down") -> "Page_down"
+        | Some (Miaou.Core.Keys.Char "Home") -> "g"
+        | Some (Miaou.Core.Keys.Char "End") -> "G"
+        | Some (Miaou.Core.Keys.Char "Esc")
+        | Some (Miaou.Core.Keys.Char "Escape")
+        | Some (Miaou.Core.Keys.Char "q") ->
+            "Esc"
+        | _ -> key
+      in
+      (* Don't call close_top here - Modal_manager.handle_key handles it via
+         cancel_on. Just return state unchanged for Esc when not in input mode. *)
+      if key = "Esc" && not pager_in_input_mode then ps
+      else
+        let rows = max 1 (size.LTerm_geom.rows - 4) in
+        let win = rows in
+        let pager, _ = Pager.handle_key ~win s ~key in
+        Navigation.update (fun _ -> pager) ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    (* Limit modal width so header/separator stay on a single line *)
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.7; min = 76; max = 100});
+      dim_background = true;
+    }
+  in
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:(Modal.init ())
+    ~ui
+    ~on_close:(fun _ _ -> ())
+
+let open_choice_modal (type choice) ~title ~(items : choice list) ~to_string
+    ?on_tick ?is_enabled ~on_select () =
+  let is_enabled = Option.value ~default:(fun _ -> true) is_enabled in
+  let wrapped_to_string item =
+    let s = to_string item in
+    if is_enabled item then s else Widgets.themed_muted s
+  in
+  let module Modal = struct
+    type state = choice Select_widget.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = failwith "choice modal init provided by caller"
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size =
+      Select_widget.render_with_size ps.Navigation.s ~focus ~size
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ =
+      match on_tick with
+      | Some f ->
+          f () ;
+          (* Force redraw for animation *)
+          Navigation.update (fun s -> s) ps
+      | None -> ps
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
+      let key =
+        match Miaou.Core.Keys.of_string key with
+        | Some Miaou.Core.Keys.Up -> "Up"
+        | Some Miaou.Core.Keys.Down -> "Down"
+        | Some (Miaou.Core.Keys.Char "k") -> "Up"
+        | Some (Miaou.Core.Keys.Char "j") -> "Down"
+        | Some (Miaou.Core.Keys.Char "Page_up") -> "PageUp"
+        | Some (Miaou.Core.Keys.Char "Page_down") -> "PageDown"
+        | Some (Miaou.Core.Keys.Char "Home") -> "Home"
+        | Some (Miaou.Core.Keys.Char "End") -> "End"
+        | Some Miaou.Core.Keys.Enter -> "Enter"
+        | Some (Miaou.Core.Keys.Char "Esc")
+        | Some (Miaou.Core.Keys.Char "Escape")
+        | Some (Miaou.Core.Keys.Char "q") ->
+            "Esc"
+        | _ -> key
+      in
+      (* Helper to skip over disabled items in a given direction *)
+      let skip_disabled_in_direction s direction =
+        let max_steps = List.length items in
+        let rec loop s steps =
+          if steps >= max_steps then s
+          else
+            match Select_widget.get_selection s with
+            | Some item when not (is_enabled item) ->
+                loop (Select_widget.handle_key s ~key:direction) (steps + 1)
+            | _ -> s
+        in
+        loop s 0
+      in
+      if key = "Enter" then (
+        match Select_widget.get_selection s with
+        | Some item when not (is_enabled item) ->
+            (* Ignore Enter on disabled item *)
+            ps
+        | _ ->
+            Miaou.Core.Modal_manager.set_consume_next_key () ;
+            Miaou.Core.Modal_manager.close_top `Commit ;
+            ps)
+      else if key = "Esc" then (
+        Miaou.Core.Modal_manager.set_consume_next_key () ;
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        ps)
+      else
+        (* Handle navigation keys and skip disabled items *)
+        let s' = Select_widget.handle_key s ~key in
+        let s'' =
+          match key with
+          | "Up" -> skip_disabled_in_direction s' "Up"
+          | "Down" -> skip_disabled_in_direction s' "Down"
+          | "PageUp" -> skip_disabled_in_direction s' "Up"
+          | "PageDown" -> skip_disabled_in_direction s' "Down"
+          | "Home" -> skip_disabled_in_direction s' "Down"
+          | "End" -> skip_disabled_in_direction s' "Up"
+          | _ -> s'
+        in
+        Navigation.update (fun _ -> s'') ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let widget =
+    Select_widget.open_centered ~title:"" ~items ~to_string:wrapped_to_string ()
+  in
+  (* Skip to first enabled item if initial selection is disabled *)
+  let skip_to_enabled s =
+    let max_steps = List.length items in
+    let rec loop s steps =
+      if steps >= max_steps then s
+      else
+        match Select_widget.get_selection s with
+        | Some item when not (is_enabled item) ->
+            loop (Select_widget.handle_key s ~key:"Down") (steps + 1)
+        | _ -> s
+    in
+    loop s 0
+  in
+  let widget = skip_to_enabled widget in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.7; min = 80; max = 100});
+      dim_background = true;
+    }
+  in
+  (* Use push with empty commit_on/cancel_on since we handle Enter/Esc manually
+     in handle_modal_key. This prevents double-close when used as nested modal. *)
+  Miaou.Core.Modal_manager.push
+    (module Modal)
+    ~init:(Navigation.make widget)
+    ~ui
+    ~commit_on:[]
+    ~cancel_on:[]
+    ~on_close:(fun pstate -> function
+      | `Commit -> (
+          match Select_widget.get_selection pstate.Navigation.s with
+          | Some choice -> on_select choice
+          | None -> ())
+      | `Cancel -> ())
+
+let open_choice_modal_with_hint (type choice) ~title ~(items : choice list)
+    ~to_string ~hint ~describe ~on_select () =
+  let describe_fn = describe in
+  (* Helper to update the Miaou Help_hint based on selected item *)
+  let update_help_hint s =
+    let doc_lines =
+      match Select_widget.get_selection s with
+      | Some choice -> describe_fn choice
+      | None -> ( match items with hd :: _ -> describe_fn hd | [] -> [])
+    in
+    let short_text =
+      match first_nonempty_line doc_lines with
+      | None -> None
+      | Some first -> Some (Printf.sprintf "**%s** — %s" title first)
+    in
+    let long_text =
+      match doc_lines with
+      | [] -> None
+      | lines ->
+          Some (Printf.sprintf "### %s\n\n%s" title (String.concat "\n" lines))
+    in
+    set_markdown_hint ?short:short_text ?long:long_text ()
+  in
+  let module Modal = struct
+    type state = choice Select_widget.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = failwith "choice modal init provided by caller"
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size =
+      let s = ps.Navigation.s in
+      (* Update Help_hint whenever rendering so ? shows current selection's doc *)
+      update_help_hint s ;
+      Select_widget.render_with_size s ~focus ~size
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let back ps = ps
+
+    let keymap ps =
+      let noop ps = ps in
+      let kb key help =
+        {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
+      in
+      let s = ps.Navigation.s in
+      let doc_lines =
+        match Select_widget.get_selection s with
+        | Some choice -> describe_fn choice
+        | None -> ( match items with hd :: _ -> describe_fn hd | [] -> [])
+      in
+      let doc_entries =
+        doc_lines
+        |> List.filter (fun l -> String.trim l <> "")
+        |> List.mapi (fun idx line ->
+            kb (Printf.sprintf "doc%d" (idx + 1)) line)
+      in
+      (* Keep keymap mostly for displaying help; handlers are no-op to avoid
+         interfering with handle_modal_key. *)
+      [
+        kb "Enter" "Select";
+        kb "Up" "Up";
+        kb "Down" "Down";
+        kb "PageUp" "Page up";
+        kb "PageDown" "Page down";
+        kb "Home" "Top";
+        kb "End" "Bottom";
+        kb "?" "Show description";
+      ]
+      @ doc_entries
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
+      let mapped =
+        match Miaou.Core.Keys.of_string key with
+        | Some Miaou.Core.Keys.Up -> "Up"
+        | Some Miaou.Core.Keys.Down -> "Down"
+        | Some (Miaou.Core.Keys.Char "k") -> "Up"
+        | Some (Miaou.Core.Keys.Char "j") -> "Down"
+        | Some (Miaou.Core.Keys.Char "Page_up") -> "PageUp"
+        | Some (Miaou.Core.Keys.Char "Page_down") -> "PageDown"
+        | Some (Miaou.Core.Keys.Char "Home") -> "Home"
+        | Some (Miaou.Core.Keys.Char "End") -> "End"
+        | Some Miaou.Core.Keys.Enter -> "Enter"
+        | Some (Miaou.Core.Keys.Char "?") -> "Hint"
+        | Some (Miaou.Core.Keys.Char "Esc")
+        | Some (Miaou.Core.Keys.Char "Escape")
+        | Some (Miaou.Core.Keys.Char "q") ->
+            "Esc"
+        | _ -> key
+      in
+      let key = if mapped = "?" then "Hint" else mapped in
+      if key = "Enter" then (
+        Miaou.Core.Modal_manager.set_consume_next_key () ;
+        Miaou.Core.Modal_manager.close_top `Commit ;
+        ps)
+      else if key = "Hint" then (
+        (match Select_widget.get_selection s with
+        | Some choice -> hint choice
+        | None -> ( match items with hd :: _ -> hint hd | [] -> ())) ;
+        ps)
+      else if key = "Esc" then (
+        Miaou.Core.Modal_manager.set_consume_next_key () ;
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        ps)
+      else Navigation.update (fun _ -> Select_widget.handle_key s ~key) ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let widget = Select_widget.open_centered ~title:"" ~items ~to_string () in
+  (* Set initial Help_hint for the default selection *)
+  update_help_hint widget ;
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.7; min = 80; max = 100});
+      dim_background = true;
+    }
+  in
+  (* Use push with empty commit_on/cancel_on since we handle Enter/Esc manually
+     in handle_modal_key. This prevents double-close when used as nested modal. *)
+  Miaou.Core.Modal_manager.push
+    (module Modal)
+    ~init:(Navigation.make widget)
+    ~ui
+    ~commit_on:[]
+    ~cancel_on:[]
+    ~on_close:(fun pstate -> function
+      | `Commit -> (
+          Miaou.Core.Help_hint.clear () ;
+          match Select_widget.get_selection pstate.Navigation.s with
+          | Some choice -> on_select choice
+          | None -> ())
+      | `Cancel -> Miaou.Core.Help_hint.clear ())
+
+let prompt_text_modal ?title ?(width = 60) ?initial ?placeholder ~on_submit () =
+  let module Modal = struct
+    type state = Textbox_widget.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = failwith "textbox modal init provided by caller"
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size:_ = Textbox_widget.render ps.Navigation.s ~focus
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
+      if key = "Enter" then (
+        Miaou.Core.Modal_manager.close_top `Commit ;
+        ps)
+      else if key = "Esc" || key = "Escape" then (
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        ps)
+      else Navigation.update (fun _ -> Textbox_widget.handle_key s ~key) ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let widget =
+    Textbox_widget.open_centered ?title ~width ?initial ?placeholder ()
+  in
+  let modal_title = Option.value ~default:"Input" title in
+  Miaou.Core.Modal_manager.prompt
+    (module Modal)
+    ~init:(Navigation.make widget)
+    ~title:modal_title
+    ~extract:(fun pstate -> Some (Textbox_widget.get_text pstate.Navigation.s))
+    ~on_result:(function Some text -> on_submit text | None -> ())
+    ()
+
+let prompt_password_modal ?title ?(width = 60) ~on_submit () =
+  let module Modal = struct
+    type state = Textbox_widget.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = failwith "password modal init provided by caller"
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size:_ = Textbox_widget.render ps.Navigation.s ~focus
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
+      if key = "Enter" then (
+        Miaou.Core.Modal_manager.close_top `Commit ;
+        ps)
+      else if key = "Esc" || key = "Escape" then (
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        ps)
+      else Navigation.update (fun _ -> Textbox_widget.handle_key s ~key) ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let widget =
+    Textbox_widget.open_centered
+      ?title
+      ~width
+      ~placeholder:(Some "Enter password")
+      ~mask:true
+      ()
+  in
+  let modal_title = Option.value ~default:"Password" title in
+  Miaou.Core.Modal_manager.prompt
+    (module Modal)
+    ~init:(Navigation.make widget)
+    ~title:modal_title
+    ~extract:(fun pstate -> Some (Textbox_widget.get_text pstate.Navigation.s))
+    ~on_result:(function Some text -> on_submit text | None -> ())
+    ()
+
+let prompt_textarea_modal ?title ?(width = 70) ?(height = 8) ?initial
+    ?placeholder ~on_submit () =
+  let module Modal = struct
+    type state = Textarea_widget.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = failwith "textarea modal init provided by caller"
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size:_ = Textarea_widget.render ps.Navigation.s ~focus
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
+      if key = "Enter" then (
+        Miaou.Core.Modal_manager.close_top `Commit ;
+        ps)
+      else if key = "Esc" || key = "Escape" then (
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        ps)
+      else Navigation.update (fun _ -> Textarea_widget.handle_key s ~key) ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps =
+      Miaou.Core.Tui_page.
+        [
+          {key = "Enter"; help = "Submit"};
+          {key = "Alt+Enter"; help = "New line"};
+          {key = "Esc"; help = "Cancel"};
+        ]
+
+    let has_modal _ = true
+  end in
+  let widget =
+    Textarea_widget.open_centered ?title ~width ~height ?initial ?placeholder ()
+  in
+  let modal_title = Option.value ~default:"Input" title in
+  Miaou.Core.Modal_manager.prompt
+    (module Modal)
+    ~init:(Navigation.make widget)
+    ~title:modal_title
+    ~extract:(fun pstate -> Some (Textarea_widget.value pstate.Navigation.s))
+    ~on_result:(function Some text -> on_submit text | None -> ())
+    ()
+
+let open_multiselect_modal (type choice) ~title ~(items : unit -> choice list)
+    ~to_string ?item_key ~on_select () =
+  let module Modal = struct
+    type state = choice Select_widget.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = failwith "multiselect modal init provided by caller"
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size =
+      Select_widget.render_with_size ps.Navigation.s ~focus ~size
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
+      let key =
+        match Miaou.Core.Keys.of_string key with
+        | Some Miaou.Core.Keys.Up -> "Up"
+        | Some Miaou.Core.Keys.Down -> "Down"
+        | Some (Miaou.Core.Keys.Char "k") -> "Up"
+        | Some (Miaou.Core.Keys.Char "j") -> "Down"
+        | Some (Miaou.Core.Keys.Char "Page_up") -> "PageUp"
+        | Some (Miaou.Core.Keys.Char "Page_down") -> "PageDown"
+        | Some (Miaou.Core.Keys.Char "Home") -> "Home"
+        | Some (Miaou.Core.Keys.Char "End") -> "End"
+        | Some Miaou.Core.Keys.Enter -> "Enter"
+        | Some (Miaou.Core.Keys.Char "Esc")
+        | Some (Miaou.Core.Keys.Char "Escape")
+        | Some (Miaou.Core.Keys.Char "q") ->
+            "Esc"
+        | _ -> key
+      in
+      if key = "Enter" then
+        match Select_widget.get_selection s with
+        | Some choice -> (
+            (* Find the index of current selection BEFORE calling on_select *)
+            let current_items = items () in
+            let selected_idx =
+              match item_key with
+              | Some get_key ->
+                  (* Use custom key extraction for stable comparison *)
+                  let choice_key = get_key choice in
+                  List.find_index
+                    (fun item -> get_key item = choice_key)
+                    current_items
+                  |> Option.value ~default:0
+              | None ->
+                  (* Fall back to direct comparison *)
+                  List.find_index (fun item -> item = choice) current_items
+                  |> Option.value ~default:0
+            in
+            match on_select choice with
+            | `KeepOpen ->
+                (* Rebuild widget with updated items *)
+                let updated_items = items () in
+                Navigation.update
+                  (fun _ ->
+                    let new_widget =
+                      Select_widget.open_centered
+                        ~title:""
+                        ~items:updated_items
+                        ~to_string
+                        ()
+                    in
+                    (* Move cursor back to the same position *)
+                    let rec move_to_index widget idx =
+                      if idx <= 0 then widget
+                      else
+                        move_to_index
+                          (Select_widget.handle_key widget ~key:"Down")
+                          (idx - 1)
+                    in
+                    move_to_index new_widget selected_idx)
+                  ps
+            | `Close ->
+                (* Close modal - the on_select handler has already done its work *)
+                Miaou.Core.Modal_manager.close_top `Commit ;
+                ps)
+        | None -> ps
+      else if key = "Esc" then (
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        ps)
+      else Navigation.update (fun _ -> Select_widget.handle_key s ~key) ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let widget =
+    Select_widget.open_centered ~title:"" ~items:(items ()) ~to_string ()
+  in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.7; min = 80; max = 100});
+      dim_background = true;
+    }
+  in
+  (* Use push with empty commit_on/cancel_on since we handle Enter/Esc manually
+     in handle_modal_key. This prevents the modal from auto-closing on Enter. *)
+  Miaou.Core.Modal_manager.push
+    (module Modal)
+    ~init:(Navigation.make widget)
+    ~ui
+    ~commit_on:[]
+    ~cancel_on:[]
+    ~on_close:(fun _ _ -> ())
+
+let confirm_modal ?title ~message ~on_result () =
+  let label = Option.value ~default:"Confirm" title in
+  let select_title =
+    if String.trim message = "" then label
+    else Printf.sprintf "%s\n%s" label message
+  in
+  open_choice_modal
+    ~title:select_title
+    ~items:[true; false]
+    ~to_string:(function true -> "Yes" | false -> "No")
+    ~on_select:on_result
+    ()
+
+let prompt_validated_text_modal ?title ?(width = 60) ?initial ?placeholder
+    ~validator ~on_submit () =
+  let module Modal = struct
+    type state = unit Miaou_widgets_input.Validated_textbox_widget.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = failwith "validated textbox modal init provided by caller"
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size:_ =
+      Miaou_widgets_input.Validated_textbox_widget.render ps.Navigation.s ~focus
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ =
+      (* Tick debounced validation *)
+      Navigation.update
+        (fun s -> Miaou_widgets_input.Validated_textbox_widget.tick s)
+        ps
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
+      if key = "Enter" then
+        (* Flush any pending validation before checking validity *)
+        let s =
+          Miaou_widgets_input.Validated_textbox_widget.flush_validation s
+        in
+        if Miaou_widgets_input.Validated_textbox_widget.is_valid s then (
+          Miaou.Core.Modal_manager.set_consume_next_key () ;
+          Miaou.Core.Modal_manager.close_top `Commit ;
+          Navigation.update (fun _ -> s) ps)
+        else Navigation.update (fun _ -> s) ps
+      else if key = "Esc" || key = "Escape" then (
+        Miaou.Core.Modal_manager.set_consume_next_key () ;
+        Miaou.Core.Modal_manager.close_top `Cancel ;
+        ps)
+      else
+        (* Process key and flush validation to avoid stale error messages *)
+        let s =
+          Miaou_widgets_input.Validated_textbox_widget.handle_key s ~key
+        in
+        let s =
+          Miaou_widgets_input.Validated_textbox_widget.flush_validation s
+        in
+        Navigation.update (fun _ -> s) ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  (* Adapt validator from (string -> (unit, string) result) to Miaou's validation_result *)
+  let miaou_validator text =
+    match validator text with
+    | Ok () -> Miaou_widgets_input.Validated_textbox_widget.Valid ()
+    | Error msg -> Miaou_widgets_input.Validated_textbox_widget.Invalid msg
+  in
+  let widget =
+    Miaou_widgets_input.Validated_textbox_widget.open_centered
+      ?title
+      ~width
+      ?initial
+      ?placeholder
+      ~validator:miaou_validator
+      ()
+  in
+  let modal_title = Option.value ~default:"Input" title in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {title = modal_title; left = None; max_width = None; dim_background = true}
+  in
+  Miaou.Core.Modal_manager.push
+    (module Modal)
+    ~init:(Navigation.make widget)
+    ~ui
+    ~commit_on:[]
+    ~cancel_on:[]
+    ~on_close:(fun pstate outcome ->
+      match outcome with
+      | `Commit ->
+          on_submit
+            (Miaou_widgets_input.Validated_textbox_widget.value
+               pstate.Navigation.s)
+      | `Cancel -> ())
+
+let wrap_text ~width s =
+  let wrap_line s =
+    let len = String.length s in
+    if len <= width then [s]
+    else
+      let rec aux start =
+        if start >= len then []
+        else
+          let remaining = len - start in
+          if remaining <= width then [String.sub s start remaining]
+          else
+            let limit = start + width in
+            let end_ =
+              try
+                let last_space = String.rindex_from s limit ' ' in
+                if last_space > start then last_space else limit
+              with _ -> limit
+            in
+            let sub = String.sub s start (end_ - start) in
+            let next_start =
+              if end_ < len && s.[end_] = ' ' then end_ + 1 else end_
+            in
+            sub :: aux next_start
+      in
+      aux 0
+  in
+  String.split_on_char '\n' s |> List.map wrap_line |> List.flatten
+
+let show_success ~title message =
+  open_text_modal ~title ~lines:["Success"; ""; message]
+
+let show_error ~title message =
+  let lines = wrap_text ~width:50 message in
+  open_text_modal ~title ~lines:(["Error"; ""] @ lines)
+
+let open_file_browser_modal ?initial_path ~dirs_only ~require_writable
+    ~on_select () =
+  let module File_browser = Miaou_widgets_layout.File_browser_widget in
+  let default_path = if Paths.is_root () then "/" else Paths.home_dir () in
+  let start_path = Option.value initial_path ~default:default_path in
+  let module Modal = struct
+    type state = File_browser.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () =
+      Navigation.make
+        (File_browser.open_centered
+           ~path:start_path
+           ~dirs_only
+           ~require_writable
+           ())
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size =
+      File_browser.render_with_size ps.Navigation.s ~focus ~size
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let back ps = ps
+
+    let keymap ps =
+      let noop ps = ps in
+      let hints = File_browser.key_hints ps.Navigation.s in
+      let kb key help =
+        {Miaou.Core.Tui_page.key; action = noop; help; display_only = true}
+      in
+      List.map (fun (key, help) -> kb key help) hints @ [kb "?" "Help"]
+
+    let handled_keys () =
+      Miaou.Core.Keys.
+        [
+          Up;
+          Down;
+          Left;
+          Right;
+          PageUp;
+          PageDown;
+          Char " ";
+          Enter;
+          Escape;
+          Backspace;
+          Tab;
+          Char "h";
+          Char "j";
+          Char "k";
+          Char "l";
+          Char "n";
+          Char "s";
+        ]
+
+    let handle_modal_key ps key ~size:_ =
+      Navigation.update
+        (fun s ->
+          (* Remap keys for navigation *)
+          let key =
+            match Miaou.Core.Keys.of_string key with
+            | Some Miaou.Core.Keys.Right -> "Right"
+            | Some Miaou.Core.Keys.Left -> "Left"
+            | _ -> key
+          in
+
+          let s' = File_browser.handle_key s ~key in
+          let s'' = File_browser.apply_pending_updates s' in
+          (* Check for cancel *)
+          if File_browser.is_cancelled s'' then (
+            Miaou.Core.Modal_manager.close_top `Cancel ;
+            s'' (* Commit on Enter for files or "." directory *))
+          else
+            match File_browser.get_pending_selection s'' with
+            | Some _ ->
+                Miaou.Core.Modal_manager.close_top `Commit ;
+                s''
+            | None ->
+                if key = "s" && File_browser.can_commit s'' then (
+                  Miaou.Core.Modal_manager.close_top `Commit ;
+                  s'')
+                else s'')
+        ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title =
+        "Browse Directory (Space selects, Enter opens/Selects leaf, Esc to \
+         cancel)";
+      left = None;
+      max_width = Some (Clamped {ratio = 0.85; min = 100; max = 140});
+      dim_background = true;
+    }
+  in
+  (* Space commits via Miaou's commit_on, Enter/s handled manually in handle_key *)
+  Miaou.Core.Modal_manager.push
+    (module Modal)
+    ~init:(Modal.init ())
+    ~ui
+    ~commit_on:["Space"; " "]
+    ~cancel_on:["Esc"; "Escape"]
+    ~on_close:(fun pstate -> function
+      | `Commit -> (
+          match
+            Miaou_widgets_layout.File_browser_widget.get_selection
+              pstate.Navigation.s
+          with
+          | Some path -> on_select path
+          | None -> ())
+      | `Cancel -> ())
+
+type dir_choice =
+  | Existing_dir of Octez_manager_lib.Directory_registry.directory_entry
+  | Browse_new_dir
+  | Type_path
+
+let select_directory_modal ?(extra_paths = []) ~title ~dir_type ~on_select () =
+  (* Load existing directories from registry *)
+  let existing_dirs =
+    match Octez_manager_lib.Directory_registry.list ~dir_type () with
+    | Ok entries -> entries
+    | Error _ -> []
+  in
+
+  (* Synthesize entries for [extra_paths] that aren't already in the
+     registry, so callers can surface paths they discovered elsewhere
+     (e.g. service env files, default locations). *)
+  let registered_paths =
+    List.map
+      (fun (e : Octez_manager_lib.Directory_registry.directory_entry) -> e.path)
+      existing_dirs
+  in
+  let extra_entries =
+    extra_paths
+    |> List.filter (fun p ->
+        not (List.exists (String.equal p) registered_paths))
+    |> List.map
+         (fun path : Octez_manager_lib.Directory_registry.directory_entry ->
+           {
+             path;
+             dir_type;
+             created_at = "";
+             last_used_at = "";
+             registered_services = [];
+           })
+  in
+
+  (* Build choice items: existing dirs + discovered extras + type/browse options *)
+  let items =
+    List.map (fun e -> Existing_dir e) existing_dirs
+    @ List.map (fun e -> Existing_dir e) extra_entries
+    @ [Type_path; Browse_new_dir]
+  in
+
+  let to_string = function
+    | Existing_dir entry ->
+        (* Show path + registered services *)
+        let services_str =
+          match
+            entry.Octez_manager_lib.Directory_registry.registered_services
+          with
+          | [] -> ""
+          | svcs -> "  (" ^ String.concat ", " svcs ^ ")"
+        in
+        entry.Octez_manager_lib.Directory_registry.path ^ services_str
+    | Type_path -> "[ Type a path directly... ]"
+    | Browse_new_dir -> "[ Browse for new directory... ]"
+  in
+
+  (* Shared validation and registration for a typed/browsed path. *)
+  let apply_path_selection path =
+    let trimmed = String.trim path in
+    if trimmed = "" then
+      show_error ~title:"Invalid Path" "Directory path cannot be empty"
+    else if Sys.file_exists trimmed && not (Sys.is_directory trimmed) then
+      show_error ~title:"Invalid Path" "Path exists but is not a directory"
+    else
+      let is_writable_dir dir =
+        try
+          Unix.access dir [Unix.W_OK; Unix.X_OK] ;
+          true
+        with Unix.Unix_error _ -> false
+      in
+      let user, group = Paths.current_user_group_names () in
+      let ensure_dir () =
+        File_ops.ensure_dir_path ~owner:user ~group ~mode:0o755 trimmed
+      in
+      let proceed () =
+        (match
+           Octez_manager_lib.Directory_registry.add
+             ~path:trimmed
+             ~dir_type
+             ~registered_services:[]
+         with
+        | Ok () -> ()
+        | Error (`Msg msg) ->
+            Cmd_runner.append_debug_log ("Registry add failed: " ^ msg)) ;
+        on_select trimmed
+      in
+      if Sys.file_exists trimmed then
+        if is_writable_dir trimmed then proceed ()
+        else
+          show_error
+            ~title:"Permission Denied"
+            (Printf.sprintf "Directory is not writable: %s" trimmed)
+      else
+        match ensure_dir () with
+        | Ok () -> proceed ()
+        | Error (`Msg msg) -> show_error ~title:"Directory Creation Failed" msg
+  in
+
+  let on_choice_select = function
+    | Existing_dir entry ->
+        on_select entry.Octez_manager_lib.Directory_registry.path
+    | Type_path ->
+        (* Let the user type or paste an absolute path directly *)
+        prompt_text_modal
+          ~title:"Enter Directory Path"
+          ~placeholder:(Some "/path/to/directory")
+          ~on_submit:apply_path_selection
+          ()
+    | Browse_new_dir ->
+        (* Open file browser *)
+        open_file_browser_modal
+          ~dirs_only:true
+          ~require_writable:false
+          ~on_select:apply_path_selection
+          ()
+  in
+
+  open_choice_modal ~title ~items ~to_string ~on_select:on_choice_select ()
+
+let select_node_data_dir_modal ~on_select () =
+  select_directory_modal
+    ~title:"Select Node Data Directory"
+    ~dir_type:Octez_manager_lib.Directory_registry.Node_data_dir
+    ~on_select
+    ()
+
+let select_client_base_dir_modal ~on_select () =
+  (* Surface the same set of base directories the Wallets page shows: the
+     default [~/.tezos-client], registered ones, and base dirs referenced by
+     installed baker/accuser service env files. *)
+  let extra_paths = Base_dir_discovery.list_all () in
+  select_directory_modal
+    ~extra_paths
+    ~title:"Select Client Base Directory"
+    ~dir_type:Octez_manager_lib.Directory_registry.Client_base_dir
+    ~on_select
+    ()
+
+let open_download_progress_modal ~version ~on_complete =
+  let module Modal = struct
+    type state = unit
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () =
+      (* Start download in background *)
+      Background_runner.enqueue (fun () ->
+          (* Initialize multi-progress with list of binaries *)
+          Context.multi_progress_start
+            ~version
+            ~binaries:
+              ["octez-node"; "octez-client"; "octez-baker"; "octez-dal-node"] ;
+
+          (* Multi-progress callback *)
+          let multi_progress
+              (mp : Octez_manager_lib.Binary_downloader.multi_progress_state) =
+            Context.multi_progress_update
+              ~binary:mp.current_file
+              ~downloaded:mp.downloaded
+              ~total:mp.total
+          in
+
+          let result =
+            Octez_manager_lib.Binary_downloader.download_version
+              ~version
+              ~verify_checksums:true
+              ~multi_progress
+              ()
+          in
+
+          (* Handle checksums *)
+          match result with
+          | Ok res ->
+              Context.multi_progress_checksum "Verifying checksums..." ;
+              (Unix.sleepf [@allow_forbidden "UI delay - TODO: use Eio"]) 0.5 ;
+              (match
+                 res.Octez_manager_lib.Binary_downloader.checksum_status
+               with
+              | Octez_manager_lib.Binary_downloader.Verified ->
+                  Context.multi_progress_checksum
+                    "\xe2\x9c\x93 All checksums verified"
+              | Octez_manager_lib.Binary_downloader.Skipped ->
+                  Context.multi_progress_checksum
+                    "\xe2\x9a\xa0 Checksum verification skipped"
+              | Octez_manager_lib.Binary_downloader.Failed reason ->
+                  Context.multi_progress_checksum
+                    (Printf.sprintf "\xe2\x9c\x97 Failed: %s" reason)) ;
+              (Unix.sleepf [@allow_forbidden "UI delay - TODO: use Eio"]) 2.0 ;
+              (* Linger to show final status *)
+              Context.multi_progress_finish () ;
+              on_complete true ;
+              (* Close modal after successful download *)
+              Miaou.Core.Modal_manager.close_top `Commit
+          | Error (`Msg msg) ->
+              Context.multi_progress_finish () ;
+              Context.toast_error (Printf.sprintf "Download failed: %s" msg) ;
+              on_complete false ;
+              (* Close modal after failed download *)
+              Miaou.Core.Modal_manager.close_top `Cancel) ;
+      Navigation.make ()
+
+    let update ps _ = ps
+
+    let view _ps ~focus:_ ~size =
+      (* Render multi-progress display (same as binaries page) *)
+      let lines = ref [] in
+      let add s = lines := s :: !lines in
+
+      add (Printf.sprintf "Downloading Octez v%s..." version) ;
+      add "" ;
+
+      (* Add multi-progress display if active *)
+      let multi_progress_lines =
+        Context.render_multi_progress ~cols:(size.LTerm_geom.cols - 4)
+      in
+      if String.trim multi_progress_lines <> "" then add multi_progress_lines
+      else add "Initializing download..." ;
+
+      add "" ;
+      add "Modal will close automatically when download completes." ;
+
+      let content = String.concat "\n" (List.rev !lines) in
+      let lines_list = String.split_on_char '\n' content in
+      Pager.render
+        ~win:(max 1 (size.LTerm_geom.rows - 4))
+        ~cols:(max 1 (size.LTerm_geom.cols - 2))
+        (Pager.open_lines ~title:"" lines_list)
+        ~focus:false
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let keymap _ = []
+
+    let back ps = ps
+
+    let handled_keys _ = []
+
+    let handle_modal_key ps _key ~size:_ = ps
+
+    let handle_key ps _key ~size:_ = ps
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title = Printf.sprintf "Downloading v%s" version;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.8; min = 76; max = 120});
+      dim_background = true;
+    }
+  in
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:(Modal.init ())
+    ~ui
+    ~on_close:(fun _ _ -> ())
+
+(* Type for tracking export log modal result state *)
+type export_result = InProgress | Success of string | Failed of string
+
+let open_export_logs_modal ~instance ~svc ~on_complete =
+  (* Modal-local state: tracks export result for display.
+     Written by the background domain, read by the view function. *)
+  (* Use a plain ref — written once by background, read by main thread.
+     OCaml 5 guarantees single-word ref writes are atomic. *)
+  let result_ref = ref InProgress in
+  let module Modal = struct
+    type state = unit
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () =
+      (* Start export in background *)
+      Background_runner.enqueue (fun () ->
+          (* Initialize progress tracking *)
+          Context.progress_start
+            ~label:"Preparing export..."
+            ~estimate_secs:10.0
+            ~width:50 ;
+          (* Track steps for progress ratio *)
+          let step_count = Atomic.make 0 in
+          let total_steps = 5 in
+          let on_step label =
+            let n = Atomic.fetch_and_add step_count 1 in
+            let ratio = float_of_int n /. float_of_int total_steps in
+            Context.progress_set ~label ~progress:ratio () ;
+            Context.mark_download_dirty ()
+          in
+          let result =
+            Octez_manager_lib.Log_export.export_logs ~instance ~svc ~on_step ()
+          in
+          Context.progress_finish () ;
+          match result with
+          | Ok path ->
+              result_ref := Success path ;
+              Context.mark_download_dirty ()
+          | Error (`Msg msg) ->
+              result_ref := Failed msg ;
+              Context.mark_download_dirty ()) ;
+      Navigation.make ()
+
+    let update ps _ = ps
+
+    let view _ps ~focus:_ ~size =
+      let cols = max 1 (size.LTerm_geom.cols - 4) in
+      let lines = ref [] in
+      let add s = lines := s :: !lines in
+      (match !result_ref with
+      | InProgress ->
+          add (Printf.sprintf "Exporting logs for %s..." instance) ;
+          add "" ;
+          let progress_line = Context.render_progress ~cols in
+          if String.trim progress_line <> "" then add progress_line
+          else add "Preparing export..." ;
+          add "" ;
+          add
+            (Miaou_widgets_display.Widgets.themed_muted
+               "Please wait, this may take a moment.")
+      | Success path ->
+          add
+            (Miaou_widgets_display.Widgets.themed_success
+               "\xe2\x9c\x93 Export complete") ;
+          add "" ;
+          add (Printf.sprintf "Logs exported to:") ;
+          add (Miaou_widgets_display.Widgets.themed_emphasis path) ;
+          add "" ;
+          add
+            (Miaou_widgets_display.Widgets.themed_muted
+               "Press Enter or Esc to close.")
+      | Failed msg ->
+          add
+            (Miaou_widgets_display.Widgets.themed_error
+               "\xe2\x9c\x97 Export failed") ;
+          add "" ;
+          add msg ;
+          add "" ;
+          add
+            (Miaou_widgets_display.Widgets.themed_muted
+               "Press Enter or Esc to close.")) ;
+      String.concat "\n" (List.rev !lines)
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ =
+      if Context.consume_download_dirty () then
+        Navigation.update (fun s -> s) ps
+      else ps
+
+    let keymap _ = []
+
+    let back ps = ps
+
+    let handled_keys _ = []
+
+    let handle_modal_key ps key ~size:_ =
+      match !result_ref with
+      | InProgress -> ps (* Ignore keys while export is running *)
+      | Success path ->
+          if key = "Enter" || key = "Esc" then (
+            Context.toast_success (Printf.sprintf "Logs exported to: %s" path) ;
+            on_complete (Some path) ;
+            Miaou.Core.Modal_manager.set_consume_next_key () ;
+            Miaou.Core.Modal_manager.close_top `Commit ;
+            ps)
+          else ps
+      | Failed msg ->
+          if key = "Enter" || key = "Esc" then (
+            Context.toast_error (Printf.sprintf "Export failed: %s" msg) ;
+            on_complete None ;
+            Miaou.Core.Modal_manager.set_consume_next_key () ;
+            Miaou.Core.Modal_manager.close_top `Cancel ;
+            ps)
+          else ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title = Printf.sprintf "Exporting logs · %s" instance;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.6; min = 60; max = 80});
+      dim_background = true;
+    }
+  in
+  Miaou.Core.Modal_manager.push
+    (module Modal)
+    ~init:(Modal.init ())
+    ~ui
+    ~commit_on:[]
+    ~cancel_on:[]
+    ~on_close:(fun _ _ -> ())
+
+let select_app_bin_dir_modal ~on_select () =
+  (* Load managed versions *)
+  let managed_versions =
+    match Octez_manager_lib.Binary_registry.list_managed_versions () with
+    | Ok versions ->
+        List.map
+          (fun v -> `ManagedVersion v)
+          (List.sort
+             (fun a b ->
+               (* Sort descending: newest first *)
+               -Octez_manager_lib.Version_checker.compare_versions a b)
+             versions)
+    | Error _ -> []
+  in
+
+  (* Load registered directories *)
+  let registered_dirs =
+    match Octez_manager_lib.Binary_registry.load_registered_dirs () with
+    | Error _ -> []
+    | Ok dirs ->
+        List.map
+          (fun (ld : Octez_manager_lib.Binary_registry.registered_dir) ->
+            `Registered (ld.alias, ld.path))
+          dirs
+  in
+
+  (* Get latest uninstalled version to feature at the top *)
+  let latest_uninstalled :
+      Octez_manager_lib.Binary_downloader.version_info option =
+    match Versions_scheduler.get_cached () with
+    | None -> None
+    | Some all_versions ->
+        (* Get already installed versions *)
+        let installed =
+          match Octez_manager_lib.Binary_registry.list_managed_versions () with
+          | Ok vers -> vers
+          | Error _ -> []
+        in
+        (* Find highest installed version *)
+        let highest_installed =
+          List.fold_left
+            (fun acc v ->
+              match acc with
+              | None -> Some v
+              | Some prev ->
+                  if
+                    Octez_manager_lib.Version_checker.compare_versions v prev
+                    > 0
+                  then Some v
+                  else Some prev)
+            None
+            installed
+        in
+        (* Sort available versions newest first *)
+        let sorted_versions =
+          List.sort
+            (fun (a : Octez_manager_lib.Binary_downloader.version_info)
+                 (b : Octez_manager_lib.Binary_downloader.version_info)
+               ->
+              (* Sort descending: newer versions first *)
+              -Octez_manager_lib.Version_checker.compare_versions
+                 a.version
+                 b.version)
+            all_versions
+        in
+        (* Find first version that is:
+           1. Not already installed
+           2. Newer than the highest installed version (if any) *)
+        List.find_opt
+          (fun (vi : Octez_manager_lib.Binary_downloader.version_info) ->
+            let not_installed = not (List.mem vi.version installed) in
+            let newer_than_installed =
+              match highest_installed with
+              | None -> true (* No installed versions, all are candidates *)
+              | Some highest ->
+                  Octez_manager_lib.Version_checker.compare_versions
+                    vi.version
+                    highest
+                  > 0
+            in
+            not_installed && newer_than_installed)
+          sorted_versions
+  in
+
+  (* Build sections with separators *)
+  let items =
+    if managed_versions = [] && registered_dirs = [] then
+      (* No installed versions - show latest uninstalled if available *)
+      match latest_uninstalled with
+      | Some vi -> [`LatestVersion vi; `DownloadOther; `CustomPath]
+      | None -> [`DownloadOther; `CustomPath]
+    else
+      (* Have installed versions - optionally show latest uninstalled at top *)
+      match latest_uninstalled with
+      | Some vi ->
+          `LatestVersion vi
+          :: (managed_versions @ registered_dirs @ [`DownloadOther; `CustomPath])
+      | None ->
+          managed_versions @ registered_dirs @ [`DownloadOther; `CustomPath]
+  in
+
+  let to_string :
+      [ `ManagedVersion of string
+      | `Registered of string * string
+      | `LatestVersion of Octez_manager_lib.Binary_downloader.version_info
+      | `DownloadOther
+      | `CustomPath ] ->
+      string = function
+    | `ManagedVersion v -> Printf.sprintf "v%s (managed)" v
+    | `Registered (alias, path) -> Printf.sprintf "%s  →  %s" alias path
+    | `LatestVersion vi ->
+        Printf.sprintf
+          "Latest (v%s)  <download>"
+          vi.Octez_manager_lib.Binary_downloader.version
+    | `DownloadOther -> "[ Download other version... ]"
+    | `CustomPath -> "[ Browse for custom directory... ]"
+  in
+
+  let on_choice_select = function
+    | `ManagedVersion version ->
+        let path =
+          Octez_manager_lib.Binary_registry.managed_version_path version
+        in
+        let bin_source =
+          Octez_manager_lib.Binary_registry.Managed_octez_version version
+        in
+        on_select (path, bin_source)
+    | `Registered (alias, path) ->
+        let bin_source =
+          Octez_manager_lib.Binary_registry.Registered_alias alias
+        in
+        on_select (path, bin_source)
+    | `LatestVersion (vi : Octez_manager_lib.Binary_downloader.version_info) ->
+        (* Directly download the latest version *)
+        let version = vi.Octez_manager_lib.Binary_downloader.version in
+        open_download_progress_modal ~version ~on_complete:(fun success ->
+            if success then
+              (* Auto-select the downloaded version *)
+              let path =
+                Octez_manager_lib.Binary_registry.managed_version_path version
+              in
+              let bin_source =
+                Octez_manager_lib.Binary_registry.Managed_octez_version version
+              in
+              on_select (path, bin_source))
+    | `DownloadOther -> (
+        (* Show available versions to download *)
+        match Versions_scheduler.get_cached () with
+        | None ->
+            show_error
+              ~title:"No Versions Available"
+              "Could not load available versions. Try again later."
+        | Some versions ->
+            (* Filter to only show 2 latest major versions *)
+            (* Group versions by major version *)
+            let major_versions = Hashtbl.create 5 in
+            List.iter
+              (fun (v : Octez_manager_lib.Binary_downloader.version_info) ->
+                let major = extract_major v.version in
+                let existing = Hashtbl.find_opt major_versions major in
+                Hashtbl.replace
+                  major_versions
+                  major
+                  (v :: Option.value ~default:[] existing))
+              versions ;
+            (* Get the 2 latest major versions *)
+            let all_majors =
+              Hashtbl.to_seq_keys major_versions
+              |> List.of_seq |> List.sort compare
+            in
+            let latest_2_majors =
+              List.rev all_majors |> fun l -> List.filteri (fun i _ -> i < 2) l
+            in
+            let filtered_versions =
+              List.concat_map
+                (fun major ->
+                  Option.value
+                    ~default:[]
+                    (Hashtbl.find_opt major_versions major))
+                latest_2_majors
+            in
+            (* Get already installed versions *)
+            let installed =
+              match
+                Octez_manager_lib.Binary_registry.list_managed_versions ()
+              with
+              | Ok vers -> vers
+              | Error _ -> []
+            in
+            (* Filter out already installed versions *)
+            let version_items =
+              List.filter
+                (fun (vi : Octez_manager_lib.Binary_downloader.version_info) ->
+                  not
+                    (List.mem
+                       vi.Octez_manager_lib.Binary_downloader.version
+                       installed))
+                filtered_versions
+            in
+            if version_items = [] then
+              show_error
+                ~title:"No Versions to Download"
+                "All recent versions are already installed."
+            else
+              open_choice_modal
+                ~title:"Select Version to Download"
+                ~items:version_items
+                ~to_string:(fun vi ->
+                  Printf.sprintf
+                    "v%s%s"
+                    vi.Octez_manager_lib.Binary_downloader.version
+                    (match
+                       vi.Octez_manager_lib.Binary_downloader.release_date
+                     with
+                    | Some date -> Printf.sprintf "  (%s)" date
+                    | None -> ""))
+                ~on_select:(fun vi ->
+                  let version =
+                    vi.Octez_manager_lib.Binary_downloader.version
+                  in
+                  (* Open download progress modal *)
+                  open_download_progress_modal
+                    ~version
+                    ~on_complete:(fun success ->
+                      if success then
+                        (* Auto-select the downloaded version *)
+                        let path =
+                          Octez_manager_lib.Binary_registry.managed_version_path
+                            version
+                        in
+                        let bin_source =
+                          Octez_manager_lib.Binary_registry
+                          .Managed_octez_version
+                            version
+                        in
+                        on_select (path, bin_source)))
+                ())
+    | `CustomPath ->
+        (* Open read-only file browser - no write permissions required *)
+        open_file_browser_modal
+          ~dirs_only:true
+          ~require_writable:false
+          ~on_select:(fun path ->
+            let trimmed = String.trim path in
+
+            (* Validation *)
+            if trimmed = "" then
+              show_error ~title:"Invalid Path" "Directory path cannot be empty"
+            else if not (Sys.file_exists trimmed) then
+              show_error
+                ~title:"Directory Not Found"
+                (Printf.sprintf "Directory does not exist: %s" trimmed)
+            else if not (Sys.is_directory trimmed) then
+              show_error
+                ~title:"Invalid Path"
+                "Path exists but is not a directory"
+            else
+              let bin_source =
+                Octez_manager_lib.Binary_registry.Raw_path trimmed
+              in
+              on_select (trimmed, bin_source))
+          ()
+  in
+
+  open_choice_modal
+    ~title:"Select Octez Binaries"
+    ~items
+    ~to_string
+    ~on_select:on_choice_select
+    ()
+
+(** Signatory-specific app bin dir modal *)
+let rec select_signatory_app_bin_dir_modal ~on_select () =
+  (* Load managed Signatory versions *)
+  let managed_versions =
+    match Octez_manager_lib.Signatory_downloader.list_managed_versions () with
+    | Ok versions ->
+        List.map
+          (fun v -> `ManagedVersion v)
+          (List.sort
+             (fun a b ->
+               (* Sort descending: newest first *)
+               -Octez_manager_lib.Version_utils.compare_versions a b)
+             versions)
+    | Error _ -> []
+  in
+
+  (* Load registered directories *)
+  let registered_dirs =
+    match Octez_manager_lib.Binary_registry.load_registered_dirs () with
+    | Error _ -> []
+    | Ok dirs ->
+        List.map
+          (fun (ld : Octez_manager_lib.Binary_registry.registered_dir) ->
+            `Registered (ld.alias, ld.path))
+          dirs
+  in
+
+  (* Get latest uninstalled Signatory version to feature at the top *)
+  let latest_uninstalled :
+      Octez_manager_lib.Signatory_downloader.version_info option =
+    match Signatory_versions_scheduler.get_cached () with
+    | None -> None
+    | Some all_versions ->
+        (* Get already installed versions *)
+        let installed =
+          match
+            Octez_manager_lib.Signatory_downloader.list_managed_versions ()
+          with
+          | Ok vers -> vers
+          | Error _ -> []
+        in
+        (* Find highest installed version *)
+        let highest_installed =
+          List.fold_left
+            (fun acc v ->
+              match acc with
+              | None -> Some v
+              | Some prev ->
+                  if Octez_manager_lib.Version_utils.compare_versions v prev > 0
+                  then Some v
+                  else Some prev)
+            None
+            installed
+        in
+        (* Sort available versions newest first *)
+        let sorted_versions =
+          List.sort
+            (fun (a : Octez_manager_lib.Signatory_downloader.version_info)
+                 (b : Octez_manager_lib.Signatory_downloader.version_info)
+               ->
+              (* Sort descending: newer versions first *)
+              -Octez_manager_lib.Version_utils.compare_versions
+                 a.version
+                 b.version)
+            all_versions
+        in
+        (* Find first version that is:
+           1. Not already installed
+           2. Newer than the highest installed version (if any) *)
+        List.find_opt
+          (fun (vi : Octez_manager_lib.Signatory_downloader.version_info) ->
+            let not_installed = not (List.mem vi.version installed) in
+            let newer_than_installed =
+              match highest_installed with
+              | None -> true (* No installed versions, all are candidates *)
+              | Some highest ->
+                  Octez_manager_lib.Version_utils.compare_versions
+                    vi.version
+                    highest
+                  > 0
+            in
+            not_installed && newer_than_installed)
+          sorted_versions
+  in
+
+  (* Build sections with separators *)
+  let items =
+    if managed_versions = [] && registered_dirs = [] then
+      (* No installed versions - show latest uninstalled if available *)
+      match latest_uninstalled with
+      | Some vi -> [`LatestVersion vi; `DownloadOther; `CustomPath]
+      | None -> [`DownloadOther; `CustomPath]
+    else
+      (* Have installed versions - optionally show latest uninstalled at top *)
+      match latest_uninstalled with
+      | Some vi ->
+          `LatestVersion vi
+          :: (managed_versions @ registered_dirs @ [`DownloadOther; `CustomPath])
+      | None ->
+          managed_versions @ registered_dirs @ [`DownloadOther; `CustomPath]
+  in
+
+  let to_string :
+      [ `ManagedVersion of string
+      | `Registered of string * string
+      | `LatestVersion of Octez_manager_lib.Signatory_downloader.version_info
+      | `DownloadOther
+      | `CustomPath ] ->
+      string = function
+    | `ManagedVersion v -> Printf.sprintf "Signatory v%s (managed)" v
+    | `Registered (alias, path) -> Printf.sprintf "%s  →  %s" alias path
+    | `LatestVersion vi ->
+        Printf.sprintf
+          "Latest Signatory (v%s)  <download>"
+          vi.Octez_manager_lib.Signatory_downloader.version
+    | `DownloadOther -> "[ Download other Signatory version... ]"
+    | `CustomPath -> "[ Browse for custom directory... ]"
+  in
+
+  let on_choice_select = function
+    | `ManagedVersion version ->
+        let path =
+          Octez_manager_lib.Signatory_downloader.signatory_version_path version
+        in
+        let bin_source =
+          Octez_manager_lib.Binary_registry.Managed_signatory_version version
+        in
+        on_select (path, bin_source)
+    | `Registered (alias, path) ->
+        let bin_source =
+          Octez_manager_lib.Binary_registry.Registered_alias alias
+        in
+        on_select (path, bin_source)
+    | `LatestVersion (vi : Octez_manager_lib.Signatory_downloader.version_info)
+      ->
+        (* Directly download the latest version *)
+        let version = vi.Octez_manager_lib.Signatory_downloader.version in
+        open_signatory_download_progress_modal
+          ~version
+          ~on_complete:(fun success ->
+            if success then
+              (* Auto-select the downloaded version *)
+              let path =
+                Octez_manager_lib.Signatory_downloader.signatory_version_path
+                  version
+              in
+              let bin_source =
+                Octez_manager_lib.Binary_registry.Managed_signatory_version
+                  version
+              in
+              on_select (path, bin_source))
+    | `DownloadOther -> (
+        (* Show available Signatory versions to download *)
+        match Signatory_versions_scheduler.get_cached () with
+        | None ->
+            show_error
+              ~title:"No Versions Available"
+              "Could not load available Signatory versions. Try again later."
+        | Some versions ->
+            (* Get already installed versions *)
+            let installed =
+              match
+                Octez_manager_lib.Signatory_downloader.list_managed_versions ()
+              with
+              | Ok vers -> vers
+              | Error _ -> []
+            in
+            (* Filter out already installed versions *)
+            let version_items =
+              List.filter
+                (fun (vi : Octez_manager_lib.Signatory_downloader.version_info)
+                   -> not (List.mem vi.version installed))
+                versions
+            in
+            if version_items = [] then
+              show_error
+                ~title:"No Versions to Download"
+                "All available Signatory versions are already installed."
+            else
+              open_choice_modal
+                ~title:"Select Signatory Version to Download"
+                ~items:version_items
+                ~to_string:(fun vi ->
+                  Printf.sprintf
+                    "Signatory v%s%s"
+                    vi.Octez_manager_lib.Signatory_downloader.version
+                    (match
+                       vi.Octez_manager_lib.Signatory_downloader.release_date
+                     with
+                    | Some date -> Printf.sprintf "  (%s)" date
+                    | None -> ""))
+                ~on_select:(fun vi ->
+                  let version =
+                    vi.Octez_manager_lib.Signatory_downloader.version
+                  in
+                  (* Open download progress modal *)
+                  open_signatory_download_progress_modal
+                    ~version
+                    ~on_complete:(fun success ->
+                      if success then
+                        (* Auto-select the downloaded version *)
+                        let path =
+                          Octez_manager_lib.Signatory_downloader
+                          .signatory_version_path
+                            version
+                        in
+                        let bin_source =
+                          Octez_manager_lib.Binary_registry
+                          .Managed_signatory_version
+                            version
+                        in
+                        on_select (path, bin_source)))
+                ())
+    | `CustomPath ->
+        (* Open read-only file browser - no write permissions required *)
+        open_file_browser_modal
+          ~dirs_only:true
+          ~require_writable:false
+          ~on_select:(fun path ->
+            let trimmed = String.trim path in
+
+            (* Validation *)
+            if trimmed = "" then
+              show_error ~title:"Invalid Path" "Directory path cannot be empty"
+            else if not (Sys.file_exists trimmed) then
+              show_error
+                ~title:"Directory Not Found"
+                (Printf.sprintf "Directory does not exist: %s" trimmed)
+            else if not (Sys.is_directory trimmed) then
+              show_error
+                ~title:"Invalid Path"
+                "Path exists but is not a directory"
+            else
+              let bin_source =
+                Octez_manager_lib.Binary_registry.Raw_path trimmed
+              in
+              on_select (trimmed, bin_source))
+          ()
+  in
+
+  open_choice_modal
+    ~title:"Select Signatory Binaries"
+    ~items
+    ~to_string
+    ~on_select:on_choice_select
+    ()
+
+(** Signatory download progress modal *)
+and open_signatory_download_progress_modal ~version ~on_complete =
+  let module Modal = struct
+    type state = unit
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () =
+      (* Start download in background *)
+      Background_runner.enqueue (fun () ->
+          let result =
+            Octez_manager_lib.Signatory_downloader.download_version
+              ~version
+              ~verify_checksums:true
+              ()
+          in
+
+          (* Handle result *)
+          match result with
+          | Ok _res ->
+              Context.toast_success
+                (Printf.sprintf "Signatory v%s downloaded successfully" version) ;
+              on_complete true ;
+              (* Close modal after successful download *)
+              Miaou.Core.Modal_manager.close_top `Commit
+          | Error (`Msg msg) ->
+              Context.toast_error
+                (Printf.sprintf "Signatory download failed: %s" msg) ;
+              on_complete false ;
+              (* Close modal after failed download *)
+              Miaou.Core.Modal_manager.close_top `Cancel) ;
+      Navigation.make ()
+
+    let update ps _ = ps
+
+    let view _ps ~focus:_ ~size =
+      let lines = ref [] in
+      let add s = lines := s :: !lines in
+
+      add (Printf.sprintf "Downloading Signatory v%s..." version) ;
+      add "" ;
+      add "Please wait..." ;
+      add "" ;
+      add "Modal will close automatically when download completes." ;
+
+      let content = String.concat "\n" (List.rev !lines) in
+      let lines_list = String.split_on_char '\n' content in
+      Pager.render
+        ~win:(max 1 (size.LTerm_geom.rows - 4))
+        ~cols:(max 1 (size.LTerm_geom.cols - 2))
+        (Pager.open_lines ~title:"" lines_list)
+        ~focus:false
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let keymap _ = []
+
+    let back ps = ps
+
+    let handled_keys _ = []
+
+    let handle_modal_key ps _key ~size:_ = ps
+
+    let handle_key ps _key ~size:_ = ps
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title = Printf.sprintf "Downloading Signatory v%s" version;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.8; min = 76; max = 120});
+      dim_background = true;
+    }
+  in
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:(Modal.init ())
+    ~ui
+    ~on_close:(fun _ _ -> ())
+
+let rec select_index_app_bin_dir_modal ~on_select () =
+  let managed_versions =
+    match Octez_manager_lib.Binary_registry.list_managed_index_versions () with
+    | Ok versions ->
+        List.map
+          (fun v -> `ManagedVersion v)
+          (List.sort
+             (fun a b -> -Octez_manager_lib.Version_utils.compare_versions a b)
+             versions)
+    | Error _ -> []
+  in
+  let registered_dirs =
+    match Octez_manager_lib.Binary_registry.load_registered_dirs () with
+    | Error _ -> []
+    | Ok dirs ->
+        List.map
+          (fun (ld : Octez_manager_lib.Binary_registry.registered_dir) ->
+            `Registered (ld.alias, ld.path))
+          dirs
+  in
+  let items =
+    if managed_versions = [] && registered_dirs = [] then
+      [`DownloadOther; `CustomPath]
+    else managed_versions @ registered_dirs @ [`DownloadOther; `CustomPath]
+  in
+  let to_string :
+      [ `ManagedVersion of string
+      | `Registered of string * string
+      | `DownloadOther
+      | `CustomPath ] ->
+      string = function
+    | `ManagedVersion v -> Printf.sprintf "octez-index v%s (managed)" v
+    | `Registered (alias, path) -> Printf.sprintf "%s  →  %s" alias path
+    | `DownloadOther -> "[ Download other version... ]"
+    | `CustomPath -> "[ Browse for custom directory... ]"
+  in
+  let on_choice_select = function
+    | `ManagedVersion version ->
+        let path =
+          Octez_manager_lib.Binary_registry.managed_index_path version
+        in
+        let bin_source =
+          Octez_manager_lib.Binary_registry.Managed_octez_index_version version
+        in
+        on_select (path, bin_source)
+    | `Registered (alias, path) ->
+        let bin_source =
+          Octez_manager_lib.Binary_registry.Registered_alias alias
+        in
+        on_select (path, bin_source)
+    | `DownloadOther -> (
+        match
+          Octez_manager_lib.Octez_index_downloader.fetch_versions
+            ~include_prerelease:false
+            ()
+        with
+        | Error (`Msg msg) ->
+            show_error
+              ~title:"No Versions Available"
+              (Printf.sprintf "Could not load available versions: %s" msg)
+        | Ok [] ->
+            show_error ~title:"No Versions Available" "No releases found."
+        | Ok versions ->
+            let installed =
+              match
+                Octez_manager_lib.Binary_registry.list_managed_index_versions ()
+              with
+              | Ok vers -> vers
+              | Error _ -> []
+            in
+            let version_items =
+              List.filter
+                (fun (vi :
+                       Octez_manager_lib.Octez_index_downloader.version_info)
+                   -> not (List.mem vi.version installed))
+                versions
+            in
+            if version_items = [] then
+              show_error
+                ~title:"No Versions to Download"
+                "All available octez-index versions are already installed."
+            else
+              open_choice_modal
+                ~title:"Select octez-index Version to Download"
+                ~items:version_items
+                ~to_string:(fun vi ->
+                  Printf.sprintf
+                    "v%s%s"
+                    vi.Octez_manager_lib.Octez_index_downloader.version
+                    (match
+                       vi.Octez_manager_lib.Octez_index_downloader.release_date
+                     with
+                    | Some date -> Printf.sprintf "  (%s)" date
+                    | None -> ""))
+                ~on_select:(fun vi ->
+                  let version =
+                    vi.Octez_manager_lib.Octez_index_downloader.version
+                  in
+                  open_index_download_progress_modal
+                    ~version
+                    ~on_complete:(fun success ->
+                      if success then
+                        let path =
+                          Octez_manager_lib.Binary_registry.managed_index_path
+                            version
+                        in
+                        let bin_source =
+                          Octez_manager_lib.Binary_registry
+                          .Managed_octez_index_version
+                            version
+                        in
+                        on_select (path, bin_source)))
+                ())
+    | `CustomPath ->
+        open_file_browser_modal
+          ~dirs_only:true
+          ~require_writable:false
+          ~on_select:(fun path ->
+            let trimmed = String.trim path in
+            if trimmed = "" then
+              show_error ~title:"Invalid Path" "Directory path cannot be empty"
+            else if not (Sys.file_exists trimmed) then
+              show_error
+                ~title:"Directory Not Found"
+                (Printf.sprintf "Directory does not exist: %s" trimmed)
+            else if not (Sys.is_directory trimmed) then
+              show_error
+                ~title:"Invalid Path"
+                "Path exists but is not a directory"
+            else
+              let bin_source =
+                Octez_manager_lib.Binary_registry.Raw_path trimmed
+              in
+              on_select (trimmed, bin_source))
+          ()
+  in
+  open_choice_modal
+    ~title:"Select octez-index Binaries"
+    ~items
+    ~to_string
+    ~on_select:on_choice_select
+    ()
+
+and open_index_download_progress_modal ~version ~on_complete =
+  let module Modal = struct
+    type state = unit
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () =
+      Background_runner.enqueue (fun () ->
+          let result =
+            Octez_manager_lib.Octez_index_downloader.download_version
+              ~version
+              ()
+          in
+          match result with
+          | Ok _res ->
+              Context.toast_success
+                (Printf.sprintf
+                   "octez-index v%s downloaded successfully"
+                   version) ;
+              on_complete true ;
+              Miaou.Core.Modal_manager.close_top `Commit
+          | Error (`Msg msg) ->
+              Context.toast_error
+                (Printf.sprintf "octez-index download failed: %s" msg) ;
+              on_complete false ;
+              Miaou.Core.Modal_manager.close_top `Cancel) ;
+      Navigation.make ()
+
+    let update ps _ = ps
+
+    let view _ps ~focus:_ ~size =
+      let lines = ref [] in
+      let add s = lines := s :: !lines in
+      add (Printf.sprintf "Downloading octez-index v%s..." version) ;
+      add "" ;
+      add "Please wait..." ;
+      add "" ;
+      add "Modal will close automatically when download completes." ;
+      let content = String.concat "\n" (List.rev !lines) in
+      let lines_list = String.split_on_char '\n' content in
+      Pager.render
+        ~win:(max 1 (size.LTerm_geom.rows - 4))
+        ~cols:(max 1 (size.LTerm_geom.cols - 2))
+        (Pager.open_lines ~title:"" lines_list)
+        ~focus:false
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let keymap _ = []
+
+    let back ps = ps
+
+    let handled_keys _ = []
+
+    let handle_modal_key ps _key ~size:_ = ps
+
+    let handle_key ps _key ~size:_ = ps
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title = Printf.sprintf "Downloading octez-index v%s" version;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.8; min = 76; max = 120});
+      dim_background = true;
+    }
+  in
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:(Modal.init ())
+    ~ui
+    ~on_close:(fun _ _ -> ())
+
+(** Show the global help modal with both global and per-page shortcuts.
+    
+    The modal displays two sections (when applicable):
+    1. Global shortcuts - always shown
+    2. Page-specific shortcuts - shown if the active page has registered a keymap
+    
+    Page shortcuts are retrieved from Context.get_active_page_keymap which is
+    updated by page wrappers (Themed_page, Monitored_page) during view rendering. *)
+let show_help_modal () =
+  (* Global shortcuts - always shown *)
+  let global_section =
+    [
+      "Global shortcuts:";
+      "  ?       - Help";
+      "  m       - Menu";
+      "  C-t     - Theme picker";
+      "  Esc/q   - Close modals / Back";
+      "";
+    ]
+  in
+  (* Page-specific shortcuts - from registered keymap, filtered to remove
+     duplicates of global shortcuts. Pages shouldn't define global shortcuts
+     in their keymaps (they're handled by Global_shortcuts.handle), but we
+     filter defensively to prevent user-visible duplicates.
+     
+     Global shortcut keys are: ?, Esc, q, C-t, m
+     (duplicating Global_shortcuts.reserved_keys to avoid dependency cycle) *)
+  let global_shortcut_keys = ["?"; "Esc"; "q"; "C-t"; "m"] in
+  let page_section =
+    match Context.get_active_page_keymap () with
+    | [] -> []
+    | keymap -> (
+        let filtered_keymap =
+          List.filter
+            (fun (key, _help) ->
+              (* Filter out any page shortcuts that match global shortcut keys *)
+              not (List.mem key global_shortcut_keys))
+            keymap
+        in
+        match filtered_keymap with
+        | [] -> []
+        | _ ->
+            ["Page shortcuts:"]
+            @ List.map
+                (fun (key, help) -> Printf.sprintf "  %-8s - %s" key help)
+                filtered_keymap
+            @ [""])
+  in
+  let lines = global_section @ page_section in
+  open_text_modal ~title:"Help" ~lines
+
+(** Reference to close spinner modal from callback *)
+let spinner_modal_close_ref : (unit -> unit) option ref = ref None
+
+(** Show a spinner modal while a background task runs.
+    @param title Modal title
+    @param label Text shown next to spinner
+    @param work Background work function
+    @param on_complete Called when work completes *)
+let show_spinner_modal ~title ~label ~work ~on_complete () =
+  let done_ref = ref false in
+  let result_ref = ref None in
+  (* Start background work *)
+  Job_manager.submit
+    ~description:title
+    (fun ~append_log:_ () -> work ())
+    ~on_complete:(fun status ->
+      result_ref := Some status ;
+      done_ref := true ;
+      (* Close modal if still open *)
+      (match !spinner_modal_close_ref with
+      | Some close -> close ()
+      | None -> ()) ;
+      (* Convert Job_manager.status to polymorphic variant for interface *)
+      let result : [`Succeeded | `Failed of string | `Cancelled] =
+        match status with
+        | Job_manager.Succeeded -> `Succeeded
+        | Job_manager.Failed msg -> `Failed msg
+        | _ -> `Cancelled
+      in
+      on_complete result) ;
+  (* Create modal *)
+  let module Modal = struct
+    type state = unit
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = Navigation.make ()
+
+    let update ps _ = ps
+
+    let view _ps ~focus:_ ~size:_ =
+      let spinner = Context.render_spinner label in
+      spinner
+
+    let move ps _ = ps
+
+    let refresh ps =
+      (* Auto-close if work is done *)
+      (if !done_ref then
+         match !spinner_modal_close_ref with
+         | Some close -> close ()
+         | None -> ()) ;
+      ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let keymap _ = []
+
+    let back ps = ps
+
+    let handled_keys _ = []
+
+    let handle_modal_key ps _key ~size:_ = ps
+
+    let handle_key ps _key ~size:_ = ps
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.5; min = 40; max = 60});
+      dim_background = true;
+    }
+  in
+  spinner_modal_close_ref :=
+    Some (fun () -> Miaou.Core.Modal_manager.close_top `Commit) ;
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:(Modal.init ())
+    ~ui
+    ~on_close:(fun _ _ -> spinner_modal_close_ref := None)
+
+let open_theme_picker_modal ~title ~items ~to_string ~load_theme ~on_select
+    ~on_cancel () =
+  (* Track the last previewed theme to avoid redundant loads *)
+  let last_preview = ref None in
+  let module Modal = struct
+    type state = string Select_widget.t
+
+    type msg = unit
+
+    type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+    type pstate = state Navigation.t
+
+    let init () = failwith "theme picker modal init provided by caller"
+
+    let update ps _ = ps
+
+    let view ps ~focus ~size =
+      let s = ps.Navigation.s in
+      (* Live preview: apply theme when selection changes *)
+      (match Select_widget.get_selection s with
+      | Some id when !last_preview <> Some id ->
+          last_preview := Some id ;
+          load_theme id
+      | _ -> ()) ;
+      Select_widget.render_with_size s ~focus ~size
+
+    let move ps _ = ps
+
+    let refresh ps = ps
+
+    let service_select ps _ = ps
+
+    let service_cycle ps _ = ps
+
+    let back ps = ps
+
+    let keymap _ = []
+
+    let handled_keys () = []
+
+    let handle_modal_key ps key ~size:_ =
+      let s = ps.Navigation.s in
+      let key =
+        match Miaou.Core.Keys.of_string key with
+        | Some Miaou.Core.Keys.Up -> "Up"
+        | Some Miaou.Core.Keys.Down -> "Down"
+        | Some (Miaou.Core.Keys.Char "k") -> "Up"
+        | Some (Miaou.Core.Keys.Char "j") -> "Down"
+        | Some (Miaou.Core.Keys.Char "Page_up") -> "PageUp"
+        | Some (Miaou.Core.Keys.Char "Page_down") -> "PageDown"
+        | Some (Miaou.Core.Keys.Char "Home") -> "Home"
+        | Some (Miaou.Core.Keys.Char "End") -> "End"
+        | Some Miaou.Core.Keys.Enter -> "Enter"
+        | Some (Miaou.Core.Keys.Char "Esc")
+        | Some (Miaou.Core.Keys.Char "Escape")
+        | Some (Miaou.Core.Keys.Char "q") ->
+            "Esc"
+        | _ -> key
+      in
+      if key = "Enter" || key = "Esc" then ps
+      else Navigation.update (fun _ -> Select_widget.handle_key s ~key) ps
+
+    let handle_key = handle_modal_key
+
+    let on_key ps key ~size =
+      let ps' = handle_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let on_modal_key ps key ~size =
+      let ps' = handle_modal_key ps (Miaou.Core.Keys.to_string key) ~size in
+      (ps', Miaou_interfaces.Key_event.Handled)
+
+    let key_hints _ps = []
+
+    let has_modal _ = true
+  end in
+  let widget = Select_widget.open_centered ~title:"" ~items ~to_string () in
+  (* Trigger initial preview *)
+  (match Select_widget.get_selection widget with
+  | Some id ->
+      last_preview := Some id ;
+      load_theme id
+  | None -> ()) ;
+  let ui : Miaou.Core.Modal_manager.ui =
+    {
+      title;
+      left = None;
+      max_width = Some (Clamped {ratio = 0.7; min = 40; max = 60});
+      dim_background = true;
+    }
+  in
+  Miaou.Core.Modal_manager.push_default
+    (module Modal)
+    ~init:(Navigation.make widget)
+    ~ui
+    ~on_close:(fun pstate -> function
+      | `Commit -> (
+          match Select_widget.get_selection pstate.Navigation.s with
+          | Some choice -> on_select choice
+          | None -> on_cancel ())
+      | `Cancel -> on_cancel ())
+
+type experimental_feature = {
+  title : string;
+  description : string;
+  badge : string;
+  on_select : unit -> unit;
+}
+
+let open_experimental_modal ~features () =
+  let to_string f = Printf.sprintf "%s  [%s]" f.title f.badge in
+  let on_select_feature f = f.on_select () in
+  open_choice_modal
+    ~title:"Experimental Features"
+    ~items:features
+    ~to_string
+    ~on_select:on_select_feature
+    ()
+
+module For_tests = struct
+  let first_nonempty_line = first_nonempty_line
+
+  let wrap_text = wrap_text
+
+  let extract_major = extract_major
+end

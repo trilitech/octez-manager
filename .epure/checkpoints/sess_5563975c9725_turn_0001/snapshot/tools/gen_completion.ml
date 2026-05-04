@@ -1,0 +1,748 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
+(*                                                                            *)
+(******************************************************************************)
+
+open Rresult
+module HP = Octez_manager_lib.Help_parser
+module String_map = Map.Make (String)
+
+let ( let* ) = Result.bind
+
+let escape_zsh_single s =
+  let parts = String.split_on_char '\'' s in
+  String.concat "'\\''" parts
+
+(** Escape a string for use inside a zsh [DESCRIPTION] bracket.
+    Zsh [_arguments] uses [':'] as a structural delimiter and [']'] closes
+    the description bracket, so both must be escaped. ['['] is escaped for
+    symmetry. *)
+let escape_zsh_description s =
+  let s = escape_zsh_single s in
+  let buf = Buffer.create (String.length s) in
+  String.iter
+    (fun c ->
+      match c with
+      | ':' -> Buffer.add_string buf "\\:"
+      | ']' -> Buffer.add_string buf "\\]"
+      | '[' -> Buffer.add_string buf "\\["
+      | _ -> Buffer.add_char buf c)
+    s ;
+  Buffer.contents buf
+
+let write_file path contents =
+  try
+    let oc = open_out_bin path in
+    Fun.protect
+      ~finally:(fun () -> close_out oc)
+      (fun () -> output_string oc contents) ;
+    Ok ()
+  with Sys_error msg ->
+    Error (`Msg ("Failed to write to file '" ^ path ^ "': " ^ msg))
+
+let run_help binary args =
+  let argv = ["env"; "MANPAGER=cat"; "PAGER=cat"; "TERM=dumb"; binary] @ args in
+  match Cmd_runner.run_out argv with
+  | Ok out -> Ok (HP.strip_ansi out)
+  | Error (`Msg msg) -> Error (`Msg msg)
+
+let resolve_binary explicit =
+  match explicit with
+  | Some path -> Ok path
+  | None -> (
+      if Sys.file_exists "./octez-manager" then Ok "./octez-manager"
+      else
+        match Paths.which "octez-manager" with
+        | Some path -> Ok path
+        | None -> Error (`Msg "octez-manager binary not found"))
+
+let load_commands binary =
+  let* help = run_help binary ["--help=plain"] in
+  Ok (HP.parse_cmdliner_commands help)
+
+let load_options binary args =
+  let* help = run_help binary (args @ ["--help=plain"]) in
+  Ok (HP.parse_cmdliner_options help)
+
+let load_instance_actions binary =
+  (* Run with an invalid action to get the error message listing valid actions.
+     We use sh -c to redirect stderr to stdout so we can capture the error message. *)
+  let placeholder = "__invalid_action_placeholder__" in
+  let cmd = Printf.sprintf "%s instance _ %s 2>&1" binary placeholder in
+  let argv = ["sh"; "-c"; cmd] in
+  match Cmd_runner.run_out argv with
+  | Ok output | Error (`Msg output) ->
+      (* Parse: "expected one of 'start', 'stop', ... or 'logs'" *)
+      let extract_actions s =
+        match String.split_on_char '\'' s with
+        | parts ->
+            parts
+            |> List.filteri (fun i _ -> i mod 2 = 1)
+              (* Odd indices are inside quotes *)
+            |> List.filter (fun s ->
+                s <> "" && s <> placeholder && not (String.contains s ' '))
+      in
+      Ok (extract_actions output)
+
+let load_subcommands binary cmd =
+  let* help = run_help binary [cmd; "--help=plain"] in
+  let subs = HP.parse_cmdliner_commands help in
+  (* Filter out tokens that look like positional argument placeholders
+     (e.g. "[NAME]", "(NAME)", "NAME=VALUE") — these are not real subcommands
+     and would produce invalid shell variable names. *)
+  let is_real_subcommand (entry : HP.command_entry) =
+    (not (String.contains entry.HP.name '['))
+    && (not (String.contains entry.HP.name ']'))
+    && (not (String.contains entry.HP.name '('))
+    && (not (String.contains entry.HP.name ')'))
+    && not (String.contains entry.HP.name '=')
+  in
+  Ok (List.filter is_real_subcommand subs)
+
+let dedupe_options entries =
+  let seen = Hashtbl.create 32 in
+  let add acc entry =
+    let key = String.concat "|" entry.HP.names in
+    if Hashtbl.mem seen key then acc
+    else (
+      Hashtbl.add seen key () ;
+      entry :: acc)
+  in
+  List.rev (List.fold_left add [] entries)
+
+let zsh_option_specs (entry : HP.option_entry) =
+  let doc =
+    if entry.HP.doc = "" then ""
+    else "[" ^ escape_zsh_description entry.HP.doc ^ "]"
+  in
+  match entry.HP.arg with
+  | None -> List.map (fun name -> "'" ^ name ^ doc ^ "'") entry.HP.names
+  | Some arg ->
+      let primary = HP.primary_name entry.HP.names in
+      let path_exclusions =
+        [
+          "--node-instance";
+          "--endpoint";
+          "--node-endpoint";
+          "--dal-endpoint";
+          "--rpc-addr";
+          "--net-addr";
+          "--address";
+        ]
+      in
+      let action =
+        if primary = "--history-mode" || primary = "--snapshot-history-mode"
+        then "->history-modes"
+        else if primary = "--snapshot-kind" then "->snapshot-kinds"
+        else if primary = "--liquidity-baking-vote" then "->lb-votes"
+        else if primary = "--service-user" then "_users"
+        else if
+          List.mem primary ["--endpoint"; "--node-endpoint"; "--dal-endpoint"]
+        then "_urls"
+        else if List.mem primary path_exclusions then ""
+        else
+          match entry.HP.kind with
+          | HP.Value HP.Dir -> "_directories"
+          | HP.Value HP.File | HP.Value HP.Path -> "_files"
+          | _ -> ""
+      in
+      List.map
+        (fun name ->
+          "'" ^ name ^ doc ^ ":" ^ escape_zsh_single arg ^ ":" ^ action ^ "'")
+        entry.HP.names
+
+let render_zsh_list name entries =
+  let buf = Buffer.create 256 in
+  Buffer.add_string buf ("  local -a " ^ name ^ "\n") ;
+  Buffer.add_string buf ("  " ^ name ^ "=(\n") ;
+  List.iter
+    (fun (value, doc) ->
+      let entry =
+        if doc = "" then "'" ^ escape_zsh_single value ^ "'"
+        else "'" ^ escape_zsh_single value ^ ":" ^ escape_zsh_single doc ^ "'"
+      in
+      Buffer.add_string buf ("    " ^ entry ^ "\n"))
+    entries ;
+  Buffer.add_string buf "  )\n\n" ;
+  Buffer.contents buf
+
+let render_zsh_options name (options : HP.option_entry list) =
+  let buf = Buffer.create 256 in
+  Buffer.add_string buf ("  local -a " ^ name ^ "\n") ;
+  Buffer.add_string buf ("  " ^ name ^ "=(\n") ;
+  List.iter
+    (fun opt ->
+      zsh_option_specs opt
+      |> List.iter (fun spec -> Buffer.add_string buf ("    " ^ spec ^ "\n")))
+    options ;
+  Buffer.add_string buf "  )\n\n" ;
+  Buffer.contents buf
+
+let render_zsh ~commands ~instance_actions ~options_map ~subcommands_map
+    ~suboptions_map =
+  let sanitize_var s =
+    let buf = Buffer.create (String.length s) in
+    String.iter
+      (fun c ->
+        if
+          (c >= 'a' && c <= 'z')
+          || (c >= 'A' && c <= 'Z')
+          || (c >= '0' && c <= '9')
+          || c = '_'
+        then Buffer.add_char buf c
+        else Buffer.add_char buf '_')
+      s ;
+    Buffer.contents buf
+  in
+  let opts_var cmd = "opts_" ^ sanitize_var cmd in
+  let buf = Buffer.create 8192 in
+  Buffer.add_string buf "#compdef octez-manager\n\n" ;
+  Buffer.add_string
+    buf
+    "# Autogenerated by tools/gen_completion.ml. Do not edit.\n\n" ;
+  Buffer.add_string buf "_octez-manager() {\n" ;
+  Buffer.add_string buf (render_zsh_list "commands" commands) ;
+  Buffer.add_string buf (render_zsh_list "instance_actions" instance_actions) ;
+  Buffer.add_string buf "  local -a history_modes\n" ;
+  Buffer.add_string buf "  history_modes=(\n" ;
+  Buffer.add_string buf "    'archive:Full archive mode'\n" ;
+  Buffer.add_string buf "    'full:Full mode'\n" ;
+  Buffer.add_string buf "    'rolling:Rolling mode'\n" ;
+  Buffer.add_string buf "  )\n\n" ;
+  Buffer.add_string buf "  local -a snapshot_kinds\n" ;
+  Buffer.add_string buf "  snapshot_kinds=(\n" ;
+  Buffer.add_string buf "    'rolling:Rolling snapshot'\n" ;
+  Buffer.add_string buf "    'full:Full snapshot'\n" ;
+  Buffer.add_string buf "    'full:50:Full snapshot with 50 cycles'\n" ;
+  Buffer.add_string buf "    'archive:Archive snapshot'\n" ;
+  Buffer.add_string buf "  )\n\n" ;
+  Buffer.add_string buf "  local -a lb_votes\n" ;
+  Buffer.add_string buf "  lb_votes=(\n" ;
+  Buffer.add_string buf "    'on:Vote for liquidity baking'\n" ;
+  Buffer.add_string buf "    'off:Vote against liquidity baking'\n" ;
+  Buffer.add_string buf "    'pass:Abstain from voting (default)'\n" ;
+  Buffer.add_string buf "  )\n\n" ;
+  String_map.iter
+    (fun key opts ->
+      Buffer.add_string buf (render_zsh_options (opts_var key) opts))
+    options_map ;
+  (* Declare option arrays for each subcommand of each group command *)
+  String_map.iter
+    (fun cmd sub_opts_map ->
+      String_map.iter
+        (fun sub_name opts ->
+          let var = "opts_" ^ sanitize_var cmd ^ "_" ^ sanitize_var sub_name in
+          Buffer.add_string buf (render_zsh_options var opts))
+        sub_opts_map)
+    suboptions_map ;
+  Buffer.add_string buf "  _arguments -C \\\n" ;
+  Buffer.add_string buf "    '1: :->command' \\\n" ;
+  Buffer.add_string buf "    '*:: :->args'\n\n" ;
+  Buffer.add_string buf "  case $state in\n" ;
+  Buffer.add_string buf "    command)\n" ;
+  Buffer.add_string
+    buf
+    "      _describe -t commands 'octez-manager commands' commands\n" ;
+  Buffer.add_string buf "      ;;\n" ;
+  Buffer.add_string buf "    args)\n" ;
+  Buffer.add_string buf "      case $words[1] in\n" ;
+  Buffer.add_string buf "        instance)\n" ;
+  Buffer.add_string buf "          if (( CURRENT == 2 )); then\n" ;
+  Buffer.add_string
+    buf
+    "            local -a instances\n\
+    \            instances=()\n\
+    \            local cmd=\"\"\n\
+    \            if [[ -x ./octez-manager ]]; then\n\
+    \              cmd=./octez-manager\n\
+    \            elif [[ -x _build/bin/octez-manager ]]; then\n\
+    \              cmd=_build/bin/octez-manager\n\
+    \            elif command -v octez-manager >/dev/null 2>&1; then\n\
+    \              cmd=octez-manager\n\
+    \            fi\n\
+    \            if [[ -n $cmd ]]; then\n\
+    \              local out\n\
+    \              out=$($cmd list 2>/dev/null)\n\
+    \              if [[ -n $out ]]; then\n\
+    \                while IFS= read -r line; do\n\
+    \                  if [[ $line == *'('* ]]; then\n\
+    \                    local inst=${line%%[[:space:]]*}\n\
+    \                    instances+=(\"$inst\")\n\
+    \                  fi\n\
+    \                done <<<\"$out\"\n\
+    \              fi\n\
+    \            fi\n\
+    \            if (( ${#instances} )); then\n\
+    \              typeset -U instances\n\
+    \              _describe -t instances 'instances' instances\n\
+    \            else\n\
+    \              _message 'instance name'\n\
+    \            fi\n" ;
+  Buffer.add_string buf "          elif (( CURRENT == 3 )); then\n" ;
+  Buffer.add_string
+    buf
+    "            _describe -t actions 'instance actions' instance_actions\n" ;
+  Buffer.add_string buf "          else\n" ;
+  (* Use dynamically loaded instance options for all actions *)
+  Buffer.add_string buf "            _arguments \\\n" ;
+  Buffer.add_string buf "              $opts_instance\n" ;
+  Buffer.add_string buf "          fi\n" ;
+  Buffer.add_string buf "          ;;\n" ;
+  String_map.iter
+    (fun cmd _ ->
+      if cmd <> "instance" then (
+        let subcmds =
+          match String_map.find_opt cmd subcommands_map with
+          | Some subs when subs <> [] -> subs
+          | _ -> []
+        in
+        let sub_opts_map =
+          match String_map.find_opt cmd suboptions_map with
+          | Some m -> m
+          | None -> String_map.empty
+        in
+        let sub_opts_var sub_name =
+          "opts_" ^ sanitize_var cmd ^ "_" ^ sanitize_var sub_name
+        in
+        Buffer.add_string buf ("        " ^ cmd ^ ")\n") ;
+        if subcmds <> [] then (
+          let subcmd_var = "subcmds_" ^ sanitize_var cmd in
+          Buffer.add_string buf ("          local -a " ^ subcmd_var ^ "\n") ;
+          Buffer.add_string buf ("          " ^ subcmd_var ^ "=(\n") ;
+          List.iter
+            (fun (sub : HP.command_entry) ->
+              let entry =
+                if sub.HP.doc = "" then
+                  "'" ^ escape_zsh_single sub.HP.name ^ "'"
+                else
+                  "'"
+                  ^ escape_zsh_single sub.HP.name
+                  ^ ":"
+                  ^ escape_zsh_description sub.HP.doc
+                  ^ "'"
+              in
+              Buffer.add_string buf ("            " ^ entry ^ "\n"))
+            subcmds ;
+          Buffer.add_string buf "          )\n" ;
+          Buffer.add_string buf "          if (( CURRENT == 2 )); then\n" ;
+          Buffer.add_string buf "            if [[ $cur == -* ]]; then\n" ;
+          Buffer.add_string buf "              _arguments \\\n" ;
+          Buffer.add_string buf ("                $" ^ opts_var cmd ^ "\n") ;
+          Buffer.add_string buf "            else\n" ;
+          Buffer.add_string
+            buf
+            ("              _describe -t subcommands '" ^ cmd ^ " subcommands' "
+           ^ subcmd_var ^ "\n") ;
+          Buffer.add_string buf "            fi\n" ;
+          if not (String_map.is_empty sub_opts_map) then (
+            Buffer.add_string buf "          else\n" ;
+            Buffer.add_string buf "            case $words[2] in\n" ;
+            List.iter
+              (fun (sub : HP.command_entry) ->
+                Buffer.add_string buf ("              " ^ sub.HP.name ^ ")\n") ;
+                Buffer.add_string buf "                _arguments \\\n" ;
+                Buffer.add_string
+                  buf
+                  ("                  $" ^ sub_opts_var sub.HP.name ^ "\n") ;
+                Buffer.add_string buf "                ;;\n")
+              subcmds ;
+            Buffer.add_string buf "            esac\n" ;
+            Buffer.add_string buf "          fi\n")
+          else Buffer.add_string buf "          fi\n")
+        else (
+          Buffer.add_string buf "          _arguments \\\n" ;
+          Buffer.add_string buf ("            $" ^ opts_var cmd ^ "\n")) ;
+        Buffer.add_string buf "          ;;\n"))
+    options_map ;
+  Buffer.add_string buf "      esac\n" ;
+  Buffer.add_string buf "      ;;\n" ;
+  Buffer.add_string buf "  esac\n" ;
+  Buffer.add_string buf "}\n\n" ;
+  Buffer.add_string buf "if [[ -n $ZSH_VERSION ]]; then\n" ;
+  Buffer.add_string buf "  compdef _octez-manager octez-manager\n" ;
+  Buffer.add_string buf "fi\n" ;
+  Buffer.contents buf
+
+let render_bash ~commands ~instance_actions ~options_map ~subcommands_map
+    ~suboptions_map ~kinds =
+  let bash_subopts_var cmd sub_name =
+    let sanitize s =
+      let buf = Buffer.create (String.length s) in
+      String.iter
+        (fun c ->
+          if
+            (c >= 'a' && c <= 'z')
+            || (c >= 'A' && c <= 'Z')
+            || (c >= '0' && c <= '9')
+            || c = '_'
+          then Buffer.add_char buf c
+          else Buffer.add_char buf '_')
+        s ;
+      Buffer.contents buf
+    in
+    sanitize cmd ^ "_" ^ sanitize sub_name ^ "_opts"
+  in
+  let unique_list items =
+    let seen = Hashtbl.create 32 in
+    let add acc item =
+      if Hashtbl.mem seen item then acc
+      else (
+        Hashtbl.add seen item () ;
+        item :: acc)
+    in
+    List.rev (List.fold_left add [] items)
+  in
+  let buf = Buffer.create 8192 in
+  Buffer.add_string buf "# Bash completion for octez-manager\n" ;
+  Buffer.add_string
+    buf
+    "# Autogenerated by tools/gen_completion.ml. Do not edit.\n\n" ;
+  Buffer.add_string buf "_octez_manager_list_instances() {\n" ;
+  Buffer.add_string
+    buf
+    "  local cmd=\"\"\n\
+    \  if [[ -x ./octez-manager ]]; then\n\
+    \    cmd=./octez-manager\n\
+    \  elif [[ -x _build/bin/octez-manager ]]; then\n\
+    \    cmd=_build/bin/octez-manager\n\
+    \  elif command -v octez-manager >/dev/null 2>&1; then\n\
+    \    cmd=octez-manager\n\
+    \  fi\n\n\
+    \  if [[ -n $cmd ]]; then\n\
+    \    local line\n\
+    \    while IFS= read -r line; do\n\
+    \      if [[ $line == *\"(\"* ]]; then\n\
+    \        printf '%s\\n' \"${line%%[[:space:]]*}\"\n\
+    \      fi\n\
+    \    done < <(\"$cmd\" list 2>/dev/null)\n\
+    \  fi\n\
+     }\n\n" ;
+  Buffer.add_string buf "_octez_manager() {\n" ;
+  Buffer.add_string buf "  local cur prev cmd action opts\n" ;
+  Buffer.add_string buf "  COMPREPLY=()\n" ;
+  Buffer.add_string buf "  cur=\"${COMP_WORDS[COMP_CWORD]}\"\n" ;
+  Buffer.add_string buf "  prev=\"${COMP_WORDS[COMP_CWORD-1]}\"\n\n" ;
+  Buffer.add_string
+    buf
+    ("  local commands=\"" ^ String.concat " " commands ^ "\"\n") ;
+  Buffer.add_string
+    buf
+    ("  local instance_actions=\"" ^ String.concat " " instance_actions ^ "\"\n") ;
+
+  Buffer.add_string buf "  local history_modes=\"archive full rolling\"\n" ;
+  Buffer.add_string
+    buf
+    "  local snapshot_kinds=\"rolling full full:50 archive\"\n" ;
+  Buffer.add_string buf "  local lb_votes=\"on off pass\"\n" ;
+  (* Declare option name variables for each subcommand of each group command *)
+  String_map.iter
+    (fun cmd sub_opts_map ->
+      String_map.iter
+        (fun sub_name opts ->
+          let var = bash_subopts_var cmd sub_name in
+          let names = List.concat_map (fun o -> o.HP.names) opts in
+          Buffer.add_string
+            buf
+            ("  local " ^ var ^ "=\"" ^ String.concat " " names ^ "\"\n"))
+        sub_opts_map)
+    suboptions_map ;
+  Buffer.add_string buf "\n" ;
+  Buffer.add_string
+    buf
+    "  if [[ $prev == --endpoint || $prev == --node-endpoint || $prev == \
+     --dal-endpoint ]]; then\n\
+    \    if declare -F _urls >/dev/null; then\n\
+    \      _urls\n\
+    \    else\n\
+    \      COMPREPLY=( $(compgen -W \"http:// https://\" -- \"$cur\") )\n\
+    \    fi\n\
+    \    return 0\n\
+    \  fi\n\n" ;
+  Buffer.add_string buf "  case \"$prev\" in\n" ;
+  Buffer.add_string
+    buf
+    "    --history-mode|--snapshot-history-mode)\n\
+    \      COMPREPLY=( $(compgen -W \"$history_modes\" -- \"$cur\") )\n\
+    \      return 0\n\
+    \      ;;\n" ;
+  Buffer.add_string
+    buf
+    "    --snapshot-kind)\n\
+    \      COMPREPLY=( $(compgen -W \"$snapshot_kinds\" -- \"$cur\") )\n\
+    \      return 0\n\
+    \      ;;\n" ;
+  Buffer.add_string
+    buf
+    "    --liquidity-baking-vote)\n\
+    \      COMPREPLY=( $(compgen -W \"$lb_votes\" -- \"$cur\") )\n\
+    \      return 0\n\
+    \      ;;\n" ;
+  Buffer.add_string
+    buf
+    "    --service-user)\n\
+    \      COMPREPLY=( $(compgen -A user -- \"$cur\") )\n\
+    \      return 0\n\
+    \      ;;\n" ;
+  let add_case pattern action =
+    if pattern = "" then ()
+    else
+      Buffer.add_string
+        buf
+        ("    " ^ pattern ^ ")\n      COMPREPLY=( $(" ^ action
+       ^ " -- \"$cur\") )\n      return 0\n      ;;\n")
+  in
+  let dir_opts =
+    List.filter (fun (_, kind) -> kind = `Dir) kinds |> List.map fst
+  in
+  let file_opts =
+    List.filter (fun (_, kind) -> kind = `File) kinds |> List.map fst
+  in
+  let builtin_dir_opts =
+    ["--app-bin-dir"; "--data-dir"; "--base-dir"; "--node-data-dir"]
+  in
+  let builtin_file_opts = ["--log-file"; "--ui-logfile"; "--snapshot-uri"] in
+  add_case (String.concat "|" builtin_dir_opts) "compgen -d" ;
+  add_case (String.concat "|" builtin_file_opts) "compgen -f" ;
+  let dir_opts =
+    dir_opts
+    |> List.filter (fun opt -> not (List.mem opt builtin_dir_opts))
+    |> unique_list
+  in
+  let file_opts =
+    file_opts
+    |> List.filter (fun opt -> not (List.mem opt builtin_file_opts))
+    |> unique_list
+  in
+  add_case (String.concat "|" dir_opts) "compgen -d" ;
+  add_case (String.concat "|" file_opts) "compgen -f" ;
+  Buffer.add_string buf "  esac\n\n" ;
+  Buffer.add_string buf "  if [[ $COMP_CWORD -eq 1 ]]; then\n" ;
+  Buffer.add_string
+    buf
+    "    COMPREPLY=( $(compgen -W \"$commands --help\" -- \"$cur\") )\n" ;
+  Buffer.add_string buf "    return 0\n  fi\n\n" ;
+  Buffer.add_string buf "  cmd=\"${COMP_WORDS[1]}\"\n" ;
+  Buffer.add_string buf "  if [[ $cmd == -* ]]; then\n" ;
+  Buffer.add_string
+    buf
+    "    COMPREPLY=( $(compgen -W \"$commands --help\" -- \"$cur\") )\n" ;
+  Buffer.add_string buf "    return 0\n  fi\n\n" ;
+  Buffer.add_string buf "  case \"$cmd\" in\n" ;
+  Buffer.add_string buf "    instance)\n" ;
+  Buffer.add_string buf "      if [[ $COMP_CWORD -eq 2 ]]; then\n" ;
+  Buffer.add_string
+    buf
+    "        local instances\n\
+    \        instances=\"$(_octez_manager_list_instances)\"\n\
+    \        if [[ -n $instances ]]; then\n\
+    \          COMPREPLY=( $(compgen -W \"$instances\" -- \"$cur\") )\n\
+    \        fi\n\
+    \        return 0\n\
+    \      fi\n" ;
+  Buffer.add_string buf "      if [[ $COMP_CWORD -eq 3 ]]; then\n" ;
+  Buffer.add_string
+    buf
+    "        COMPREPLY=( $(compgen -W \"$instance_actions --help\" -- \
+     \"$cur\") )\n\
+    \        return 0\n\
+    \      fi\n" ;
+  (* Use dynamically loaded instance options for all actions *)
+  let instance_opts =
+    match String_map.find_opt "instance" options_map with
+    | Some opts -> String.concat " " opts
+    | None -> "--help"
+  in
+  Buffer.add_string buf "      if [[ $cur == -* ]]; then\n" ;
+  Buffer.add_string buf (Printf.sprintf "        opts=\"%s\"\n" instance_opts) ;
+  Buffer.add_string
+    buf
+    "        COMPREPLY=( $(compgen -W \"$opts\" -- \"$cur\") )\n\
+    \      fi\n\
+    \      return 0\n\
+    \      ;;\n" ;
+  String_map.iter
+    (fun cmd opts ->
+      if cmd <> "instance" then (
+        let subcmd_names =
+          match String_map.find_opt cmd subcommands_map with
+          | Some subs when subs <> [] ->
+              List.map (fun (sub : HP.command_entry) -> sub.HP.name) subs
+          | _ -> []
+        in
+        let sub_opts_map =
+          match String_map.find_opt cmd suboptions_map with
+          | Some m -> m
+          | None -> String_map.empty
+        in
+        Buffer.add_string buf ("    " ^ cmd ^ ")\n") ;
+        if subcmd_names <> [] then (
+          (* Word 2: offer subcommands or group flags *)
+          Buffer.add_string buf "      if [[ $COMP_CWORD -eq 2 ]]; then\n" ;
+          Buffer.add_string buf "        if [[ $cur == -* ]]; then\n" ;
+          Buffer.add_string
+            buf
+            ("          opts=\"" ^ String.concat " " opts ^ "\"\n") ;
+          Buffer.add_string
+            buf
+            "          COMPREPLY=( $(compgen -W \"$opts\" -- \"$cur\") )\n" ;
+          Buffer.add_string buf "        else\n" ;
+          Buffer.add_string
+            buf
+            ("          COMPREPLY=( $(compgen -W \""
+            ^ String.concat " " subcmd_names
+            ^ "\" -- \"$cur\") )\n") ;
+          Buffer.add_string buf "        fi\n" ;
+          (* Word 3+: dispatch to subcommand-specific options *)
+          if not (String_map.is_empty sub_opts_map) then (
+            Buffer.add_string buf "      else\n" ;
+            Buffer.add_string buf "        local subcmd=\"${COMP_WORDS[2]}\"\n" ;
+            Buffer.add_string buf "        case \"$subcmd\" in\n" ;
+            List.iter
+              (fun sub_name ->
+                let var = bash_subopts_var cmd sub_name in
+                Buffer.add_string buf ("          " ^ sub_name ^ ")\n") ;
+                Buffer.add_string buf "            if [[ $cur == -* ]]; then\n" ;
+                Buffer.add_string
+                  buf
+                  ("              COMPREPLY=( $(compgen -W \"$" ^ var
+                 ^ "\" -- \"$cur\") )\n") ;
+                Buffer.add_string buf "            fi\n" ;
+                Buffer.add_string buf "            ;;\n")
+              subcmd_names ;
+            Buffer.add_string buf "        esac\n" ;
+            Buffer.add_string buf "      fi\n")
+          else Buffer.add_string buf "      fi\n")
+        else (
+          Buffer.add_string buf "      if [[ $cur == -* ]]; then\n" ;
+          Buffer.add_string
+            buf
+            ("        opts=\"" ^ String.concat " " opts ^ "\"\n") ;
+          Buffer.add_string
+            buf
+            "        COMPREPLY=( $(compgen -W \"$opts\" -- \"$cur\") )\n" ;
+          Buffer.add_string buf "      fi\n") ;
+        Buffer.add_string buf "      return 0\n" ;
+        Buffer.add_string buf "      ;;\n"))
+    options_map ;
+  Buffer.add_string buf "  esac\n}\n\n" ;
+  Buffer.add_string buf "complete -F _octez_manager octez-manager\n" ;
+  Buffer.contents buf
+
+let collect_kinds options =
+  let path_exclusions =
+    [
+      "--node-instance";
+      "--endpoint";
+      "--node-endpoint";
+      "--dal-endpoint";
+      "--rpc-addr";
+      "--net-addr";
+      "--address";
+    ]
+  in
+  let to_kind opt =
+    let primary = HP.primary_name opt.HP.names in
+    if primary = "--service-user" || List.mem primary path_exclusions then None
+    else
+      match opt.kind with
+      | HP.Value HP.Dir -> Some (primary, `Dir)
+      | HP.Value HP.File | HP.Value HP.Path -> Some (primary, `File)
+      | _ -> None
+  in
+  options |> List.filter_map to_kind
+
+let () =
+  let binary_arg = ref None in
+  let out_dir = ref "completions" in
+  let usage = "gen_completion [--binary PATH] [--out-dir DIR]" in
+  Arg.parse
+    [
+      ("--binary", Arg.String (fun s -> binary_arg := Some s), "Binary path");
+      ("--out-dir", Arg.Set_string out_dir, "Output directory");
+    ]
+    (fun _ -> ())
+    usage ;
+  let result =
+    let* binary = resolve_binary !binary_arg in
+    let* cmds = load_commands binary in
+    let cmd_names = List.map (fun c -> c.HP.name) cmds in
+    let* options_by_cmd =
+      List.fold_left
+        (fun acc cmd ->
+          let* acc = acc in
+          let* opts = load_options binary [cmd] in
+          Ok (String_map.add cmd (dedupe_options opts) acc))
+        (Ok String_map.empty)
+        cmd_names
+    in
+    let options_map = options_by_cmd in
+    let zsh_commands = List.map (fun c -> (c.HP.name, c.HP.doc)) cmds in
+    let* action_names = load_instance_actions binary in
+    let instance_actions = List.map (fun name -> (name, "")) action_names in
+    let* subcommands_map =
+      List.fold_left
+        (fun acc cmd ->
+          let* acc = acc in
+          let* subs = load_subcommands binary cmd in
+          Ok (String_map.add cmd subs acc))
+        (Ok String_map.empty)
+        cmd_names
+    in
+    let* suboptions_map =
+      String_map.fold
+        (fun cmd subcmds acc ->
+          let* acc = acc in
+          if subcmds = [] then Ok acc
+          else
+            let* sub_opts_map =
+              List.fold_left
+                (fun sub_acc (sub : HP.command_entry) ->
+                  let* sub_acc = sub_acc in
+                  let* opts = load_options binary [cmd; sub.HP.name] in
+                  Ok (String_map.add sub.HP.name (dedupe_options opts) sub_acc))
+                (Ok String_map.empty)
+                subcmds
+            in
+            Ok (String_map.add cmd sub_opts_map acc))
+        subcommands_map
+        (Ok String_map.empty)
+    in
+    let zsh =
+      render_zsh
+        ~commands:zsh_commands
+        ~instance_actions
+        ~options_map
+        ~subcommands_map
+        ~suboptions_map
+    in
+    let bash_options_map =
+      String_map.map
+        (fun opts -> List.concat_map (fun o -> o.HP.names) opts)
+        options_map
+    in
+    let all_opts =
+      String_map.fold (fun _ opts acc -> opts @ acc) options_by_cmd []
+    in
+    let kinds = collect_kinds all_opts in
+    let bash =
+      render_bash
+        ~commands:cmd_names
+        ~instance_actions:(List.map fst instance_actions)
+        ~options_map:bash_options_map
+        ~subcommands_map
+        ~suboptions_map
+        ~kinds
+    in
+    let zsh_path = Filename.concat !out_dir "octez-manager.zsh" in
+    let bash_path = Filename.concat !out_dir "octez-manager.bash" in
+    let* () = write_file zsh_path zsh in
+    let* () = write_file bash_path bash in
+    Ok ()
+  in
+  match result with
+  | Ok () -> ()
+  | Error (`Msg msg) ->
+      prerr_endline ("gen_completion: " ^ msg) ;
+      exit 1

@@ -1,0 +1,217 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
+(** Tests for improved help modal - will FAIL until implementation complete.
+    
+    These tests define the TARGET behavior after implementing the help modal
+    improvements. They should PASS after all batches are complete. *)
+
+open Alcotest
+module HD = Lib_miaou_internal.Headless_driver
+module TH = Tui_test_helpers_lib.Tui_test_helpers
+module Instances = Octez_manager_ui.Instances
+module Diagnostics_page = Octez_manager_ui.Diagnostics_page
+module Wallets_page = Octez_manager_ui.Wallets_page
+module Main_shell = Octez_manager_ui.Main_shell
+
+(** Test: Help modal shows both global and page sections *)
+let test_help_modal_has_both_sections () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Instances.Page) ;
+
+      (* Wait for initial render to complete - ensures keymap is registered *)
+      ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
+
+      ignore (HD.Stateful.send_key "?") ;
+      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+
+      let screen = TH.get_screen_text () in
+
+      (* MUST have global shortcuts section *)
+      check
+        bool
+        "has 'Global shortcuts:' section"
+        true
+        (TH.contains_substring screen "Global shortcuts:") ;
+
+      (* MUST have page shortcuts section *)
+      check
+        bool
+        "has 'Page shortcuts:' section"
+        true
+        (TH.contains_substring screen "Page shortcuts:"))
+
+(** Test: Instances page shows its keymap *)
+let test_instances_page_shortcuts () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Instances.Page) ;
+
+      (* Wait for initial render to complete - ensures keymap is registered *)
+      ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
+
+      ignore (HD.Stateful.send_key "?") ;
+      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+
+      let screen = TH.get_screen_text () in
+
+      (* From instances.ml:339 keymap - check visible entries *)
+      check
+        bool
+        "shows 'Enter' shortcut"
+        true
+        (TH.contains_substring screen "Enter") ;
+      check
+        bool
+        "shows 'Open' help text"
+        true
+        (TH.contains_substring screen "Open") ;
+      check bool "shows 'g' shortcut" true (TH.contains_substring screen "g") ;
+      check
+        bool
+        "shows 'Group/Role view' help"
+        true
+        (TH.contains_substring screen "Group/Role view") ;
+
+      (* Scroll down to see more entries *)
+      ignore (HD.Stateful.send_key "Down") ;
+      ignore (HD.Stateful.send_key "Down") ;
+      ignore (HD.Stateful.send_key "Down") ;
+      ignore (HD.Stateful.idle_wait ~iterations:3 ~sleep:0.001 ()) ;
+
+      let screen2 = TH.get_screen_text () in
+
+      (* Check entries that appear after scrolling *)
+      check
+        bool
+        "shows 'G' for Group actions"
+        true
+        (TH.contains_substring screen2 "Group actions") ;
+      check
+        bool
+        "shows 'd' for Diagnostics"
+        true
+        (TH.contains_substring screen2 "Diagnostics"))
+
+(** Test: Diagnostics page shows its keymap *)
+let test_diagnostics_page_shortcuts () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Diagnostics_page.Page) ;
+
+      (* Wait for initial render to complete - ensures keymap is registered *)
+      ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
+
+      ignore (HD.Stateful.send_key "?") ;
+      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+
+      let screen = TH.get_screen_text () in
+
+      (* From diagnostics_page.ml:171 keymap - check visible entries *)
+      check
+        bool
+        "shows 'Esc' for Back"
+        true
+        (TH.contains_substring screen "Esc") ;
+      check
+        bool
+        "shows 'Back' help text"
+        true
+        (TH.contains_substring screen "Back") ;
+      check
+        bool
+        "shows 'r' for Refresh"
+        true
+        (TH.contains_substring screen "Refresh"))
+
+(** Test: Wallets page uses global help modal (custom help removed) *)
+let test_wallets_uses_global_help () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Wallets_page.Page) ;
+
+      (* Wait for initial render to complete - ensures keymap is registered *)
+      ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
+
+      ignore (HD.Stateful.send_key "?") ;
+      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+
+      let screen = TH.get_screen_text () in
+
+      (* Should NOT show old custom title *)
+      check
+        bool
+        "does NOT show 'Wallets Page Help'"
+        false
+        (TH.contains_substring screen "Wallets Page Help") ;
+
+      (* Should show new structured help *)
+      check
+        bool
+        "shows 'Global shortcuts:'"
+        true
+        (TH.contains_substring screen "Global shortcuts:") ;
+      check
+        bool
+        "shows 'Page shortcuts:'"
+        true
+        (TH.contains_substring screen "Page shortcuts:") ;
+
+      (* Should show wallets keymap entries *)
+      check
+        bool
+        "shows 'Esc' for Back"
+        true
+        (TH.contains_substring screen "Back"))
+
+(** Test: Main shell shows active tab's keymap (instances by default) *)
+let test_main_shell_shows_child_keymap () =
+  TH.with_test_env (fun () ->
+      (* Main_shell starts on instances tab by default *)
+      HD.Stateful.init (module Main_shell.Page) ;
+
+      (* Wait for initial render to complete - ensures keymap is registered *)
+      ignore (HD.Stateful.idle_wait ~iterations:2 ~sleep:0.001 ()) ;
+
+      ignore (HD.Stateful.send_key "?") ;
+      ignore (HD.Stateful.idle_wait ~iterations:5 ~sleep:0.001 ()) ;
+
+      let screen = TH.get_screen_text () in
+
+      (* Should show global shortcuts *)
+      check
+        bool
+        "shows global shortcuts"
+        true
+        (TH.contains_substring screen "Global shortcuts:") ;
+
+      (* Should show instances page shortcuts (since that's the default tab) *)
+      check
+        bool
+        "shows Page shortcuts section"
+        true
+        (TH.contains_substring screen "Page shortcuts:") ;
+
+      (* Verify it shows instances-specific shortcuts *)
+      check
+        bool
+        "shows 'Open' from instances keymap"
+        true
+        (TH.contains_substring screen "Open"))
+
+let () =
+  Alcotest.run
+    "Help Modal Improvements"
+    [
+      ( "new_behavior",
+        [
+          ("shows both sections", `Quick, test_help_modal_has_both_sections);
+          ("instances page shortcuts", `Quick, test_instances_page_shortcuts);
+          ("diagnostics page shortcuts", `Quick, test_diagnostics_page_shortcuts);
+          ("wallets uses global help", `Quick, test_wallets_uses_global_help);
+          ( "main shell shows child keymap",
+            `Quick,
+            test_main_shell_shows_child_keymap );
+        ] );
+    ]

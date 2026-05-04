@@ -1,0 +1,36 @@
+[2026-05-04 15:22:33] [warn] Replacing existing backend with id 'claude-code'
+[2026-05-04 15:22:33] [warn] Replacing existing backend with id 'gemini'
+[2026-05-04 15:22:33] [warn] Replacing existing backend with id 'codex'
+[2026-05-04 15:22:33] [warn] Replacing existing backend with id 'opencode'
+[2026-05-04 15:22:33] [warn] Replacing existing backend with id 'copilot'
+[2026-05-04 16:03:55] [warn] Replacing existing backend with id 'claude-code'
+[2026-05-04 16:03:55] [warn] Replacing existing backend with id 'gemini'
+[2026-05-04 16:03:55] [warn] Replacing existing backend with id 'codex'
+[2026-05-04 16:03:55] [warn] Replacing existing backend with id 'opencode'
+[2026-05-04 16:03:55] [warn] Replacing existing backend with id 'copilot'
+[2026-05-04 16:07:44] [warn] Replacing existing backend with id 'claude-code'
+[2026-05-04 16:07:44] [warn] Replacing existing backend with id 'gemini'
+[2026-05-04 16:07:44] [warn] Replacing existing backend with id 'codex'
+[2026-05-04 16:07:44] [warn] Replacing existing backend with id 'opencode'
+[2026-05-04 16:07:44] [warn] Replacing existing backend with id 'copilot'
+[2026-05-04 16:23:42] [info] Lead resolved team: default-build (2 agents)
+[2026-05-04 16:23:42] [info]   agent: role=builder backend=claude-code mcp=[epure, playwright]
+[2026-05-04 16:23:42] [info]   agent: role=reviewer backend=claude-code mcp=[epure]
+[2026-05-04 16:23:42] [info]   validators: [reviewer]  max_rejections: 3
+[2026-05-04 16:53:51] [info] Lead resolved team: default-build (2 agents)
+[2026-05-04 16:53:51] [info]   agent: role=builder backend=claude-code mcp=[epure, playwright]
+[2026-05-04 16:53:51] [info]   agent: role=reviewer backend=claude-code mcp=[epure]
+[2026-05-04 16:53:51] [info]   validators: [reviewer]  max_rejections: 3
+[2026-05-04 17:17:29] [warn] Replacing existing backend with id 'claude-code'
+[2026-05-04 17:17:29] [warn] Replacing existing backend with id 'gemini'
+[2026-05-04 17:17:29] [warn] Replacing existing backend with id 'codex'
+[2026-05-04 17:17:29] [warn] Replacing existing backend with id 'opencode'
+[2026-05-04 17:17:29] [warn] Replacing existing backend with id 'copilot'
+[2026-05-04 17:19:56] [info] Lead resolved team: ocaml-lint-hook-team (3 agents)
+[2026-05-04 17:19:57] [info] Epic branch ready: epic/1-build-lint-tool-for-ocaml
+[2026-05-04 17:19:59] [warn] create_epic_mr failed (gh pr create failed: Eio.Io Process Child_error Exited (code 1),
+  running command: gh pr create --head epic/1 --base main --title "[Epic #1] Build lint tool for ocaml" --body-file /tmp/epure_epic_pr_efcf05.md) — continuing without MR
+[2026-05-04 17:34:47] [warn] context_limits: unknown model "", using default limit 100000
+[2026-05-04 17:34:47] [info] Validators: parallel (memory: 19%)
+[2026-05-04 17:38:07] [info] Validators: parallel (memory: 19%)
+[2026-05-04 17:43:36] [info] Lead re-assessed team for attempt 2 (max_rejections=1, validators=3)

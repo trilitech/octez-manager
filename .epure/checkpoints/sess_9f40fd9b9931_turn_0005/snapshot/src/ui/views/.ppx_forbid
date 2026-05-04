@@ -1,0 +1,12 @@
+# ppx_forbid configuration for octez_manager_ui_views
+#
+# Belt-and-suspenders Eio enforcement for the views library.
+# The dune stanza for octez_manager_ui_views excludes eio/eio_main/eio_posix
+# from its dependency list. This ppx_forbid rule adds a compile-time message
+# that explains exactly how to fix a violation, since linker errors alone are
+# not actionable enough.
+#
+# Remediation: Move I/O into a *_scheduler.ml or *_actions.ml file and pass
+# pre-computed values as immutable snapshots to the view instead.
+
+module Eio "Eio is forbidden in view modules — move I/O into a *_scheduler.ml or *_actions.ml file and pass pre-computed values to the view instead."

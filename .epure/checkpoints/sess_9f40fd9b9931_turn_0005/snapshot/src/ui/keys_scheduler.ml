@@ -1,0 +1,366 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
+open Octez_manager_lib
+
+type wallet_data = {
+  pkh : string;
+  network : string;
+  spendable_balance : string;
+  staked_balance : string;
+  full_balance : string;
+  delegate : string option;
+  is_registered : bool;
+  active_consensus_key : string option;
+  delegate_staking_params : Baker_wallet_data.staking_parameters option;
+  delegate_apy : float option;
+  fetched_at : float;
+}
+
+(** Cache: pkh -> wallet_data list (one per network) *)
+let cache : (string, wallet_data list) Hashtbl.t = Hashtbl.create 64
+
+let cache_lock = Mutex.create ()
+
+(** Keys to poll: (base_dir, pkh list) pairs *)
+let tracked_keys : (string * string list) list ref = ref []
+
+let keys_lock = Mutex.create ()
+
+let get_wallet_data ~pkh =
+  Mutex.protect cache_lock (fun () ->
+      Hashtbl.find_opt cache pkh |> Option.value ~default:[])
+
+(** Store wallet_data for a pkh, merging with existing entries for other
+    networks. *)
+let store_wallet_data wd =
+  Mutex.protect cache_lock (fun () ->
+      let existing =
+        Hashtbl.find_opt cache wd.pkh |> Option.value ~default:[]
+      in
+      let others =
+        List.filter
+          (fun (w : wallet_data) -> not (String.equal w.network wd.network))
+          existing
+      in
+      Hashtbl.replace cache wd.pkh (wd :: others))
+
+let set_keys keys = Mutex.protect keys_lock (fun () -> tracked_keys := keys)
+
+let stop_flag = Atomic.make false
+
+let started = ref false
+
+(** Worker queue for per-key fetch requests with deduplication. *)
+let worker : unit Worker_queue.t = Worker_queue.create ~name:"keys" ()
+
+(** Get all node endpoints grouped by network.
+    Starts with local running nodes, then supplements with public RPC nodes
+    for any networks not already covered locally.  This ensures that a key
+    from a ghostnet-only setup is still checked on mainnet, etc. *)
+let get_node_endpoints () =
+  let local =
+    Data.load_service_states ()
+    |> List.filter (fun (st : Data.Service_state.t) ->
+        String.equal st.service.role "node"
+        && match st.status with Running -> true | _ -> false)
+    |> List.map (fun (st : Data.Service_state.t) ->
+        ( Network_name.normalize st.service.network,
+          Rpc_addr.to_endpoint st.service.rpc_addr ))
+  in
+  let local_networks = List.map fst local |> List.sort_uniq String.compare in
+  let public_extra =
+    Public_nodes_cache.get_nodes ()
+    |> List.filter_map (fun (n : Public_nodes_cache.node_info) ->
+        match n.network with
+        | Some net
+          when not (List.exists (fun ln -> String.equal ln net) local_networks)
+          ->
+            Some (net, n.rpc_addr)
+        | _ -> None)
+  in
+  local @ public_extra
+
+(** Pick one random endpoint per network, distributing load across providers. *)
+let pick_endpoints () =
+  let all = get_node_endpoints () in
+  let by_network : (string, string list) Hashtbl.t = Hashtbl.create 8 in
+  List.iter
+    (fun (net, ep) ->
+      let existing =
+        Hashtbl.find_opt by_network net |> Option.value ~default:[]
+      in
+      Hashtbl.replace by_network net (ep :: existing))
+    all ;
+  Hashtbl.fold
+    (fun net eps acc ->
+      let arr = Array.of_list eps in
+      let ep = arr.(Random.int (Array.length arr)) in
+      (net, ep) :: acc)
+    by_network
+    []
+
+(** Fetch a JSON string field from an RPC endpoint. *)
+let rpc_get_string endpoint path =
+  let url = endpoint ^ path in
+  match Cmd_runner.run_out_silent ["curl"; "-sfL"; "--max-time"; "10"; url] with
+  | Error _ -> None
+  | Ok body -> (
+      try
+        match Yojson.Safe.from_string body with
+        | `String s -> Some s
+        | _ -> Some (String.trim body)
+      with _ -> Some (String.trim body))
+
+(** Fetch JSON from an RPC endpoint. *)
+let rpc_get_json endpoint path =
+  let url = endpoint ^ path in
+  match Cmd_runner.run_out_silent ["curl"; "-sfL"; "--max-time"; "10"; url] with
+  | Error _ -> None
+  | Ok body -> ( try Some (Yojson.Safe.from_string body) with _ -> None)
+
+(** Fetch estimated APY for a delegate from the indexer.
+    Averages return rate over recent completed cycles, then annualizes. *)
+let fetch_delegate_apy ~network ~delegate_pkh =
+  (* Fetch recent reward cycles *)
+  let rewards_path =
+    Printf.sprintf
+      "/v1/rewards/bakers/%s?limit=5&select=cycle,bakingPower,blockRewardsDelegated,blockRewardsStakedOwn,blockRewardsStakedEdge,blockRewardsStakedShared,attestationRewardsDelegated,attestationRewardsStakedOwn,attestationRewardsStakedEdge,attestationRewardsStakedShared"
+      delegate_pkh
+  in
+  let rewards_result = Indexer.fetch ~network ~timeout:10.0 rewards_path in
+  match rewards_result with
+  | Error _ -> None
+  | Ok rewards_body -> (
+      (* Fetch protocol constants for cycles_per_year *)
+      let constants_path =
+        "/v1/protocols?limit=1&sort.desc=firstLevel&select=constants.blocksPerCycle,constants.timeBetweenBlocks"
+      in
+      let constants_result =
+        Indexer.fetch ~network ~timeout:10.0 constants_path
+      in
+      match constants_result with
+      | Error _ -> None
+      | Ok constants_body -> (
+          try
+            let open Yojson.Safe.Util in
+            (* Parse protocol constants *)
+            let constants_json = Yojson.Safe.from_string constants_body in
+            let proto =
+              match constants_json with `List (h :: _) -> h | _ -> `Null
+            in
+            let blocks_per_cycle =
+              proto
+              |> member "constants.blocksPerCycle"
+              |> to_int_option |> Option.value ~default:0
+            in
+            let time_between_blocks =
+              proto
+              |> member "constants.timeBetweenBlocks"
+              |> to_int_option |> Option.value ~default:0
+            in
+            if blocks_per_cycle = 0 || time_between_blocks = 0 then None
+            else
+              let cycle_duration =
+                Float.of_int blocks_per_cycle
+                *. Float.of_int time_between_blocks
+              in
+              let cycles_per_year = 365.25 *. 86400.0 /. cycle_duration in
+              (* Parse rewards *)
+              let rewards_json = Yojson.Safe.from_string rewards_body in
+              let cycles = match rewards_json with `List l -> l | _ -> [] in
+              let rates =
+                List.filter_map
+                  (fun cycle ->
+                    let power =
+                      cycle |> member "bakingPower" |> to_float_option
+                      |> Option.value ~default:0.0
+                    in
+                    if Float.equal power 0.0 then None
+                    else
+                      let sum_field name =
+                        cycle |> member name |> to_float_option
+                        |> Option.value ~default:0.0
+                      in
+                      let total_rewards =
+                        sum_field "blockRewardsDelegated"
+                        +. sum_field "blockRewardsStakedOwn"
+                        +. sum_field "blockRewardsStakedEdge"
+                        +. sum_field "blockRewardsStakedShared"
+                        +. sum_field "attestationRewardsDelegated"
+                        +. sum_field "attestationRewardsStakedOwn"
+                        +. sum_field "attestationRewardsStakedEdge"
+                        +. sum_field "attestationRewardsStakedShared"
+                      in
+                      if Float.equal total_rewards 0.0 then None
+                      else Some (total_rewards /. power))
+                  cycles
+              in
+              match rates with
+              | [] -> None
+              | _ ->
+                  let avg_rate =
+                    List.fold_left ( +. ) 0.0 rates
+                    /. Float.of_int (List.length rates)
+                  in
+                  Some (avg_rate *. cycles_per_year *. 100.0)
+          with _ -> None))
+
+(** Fetch balance data for a pkh from a node endpoint. *)
+let fetch_wallet_data ~network ~endpoint ~pkh =
+  let base =
+    Printf.sprintf "/chains/main/blocks/head/context/contracts/%s" pkh
+  in
+  let spendable =
+    rpc_get_string endpoint (base ^ "/balance") |> Option.value ~default:"0"
+  in
+  let full_balance =
+    rpc_get_string endpoint (base ^ "/full_balance")
+    |> Option.value ~default:spendable
+  in
+  let delegate = rpc_get_string endpoint (base ^ "/delegate") in
+  (* Fetch delegate's active staking parameters if delegating *)
+  let delegate_staking_params =
+    match delegate with
+    | Some d -> (
+        let path =
+          Printf.sprintf
+            "/chains/main/blocks/head/context/delegates/%s/active_staking_parameters"
+            d
+        in
+        match rpc_get_json endpoint path with
+        | Some json -> Baker_wallet_data.parse_staking_parameters json
+        | None -> None)
+    | None -> None
+  in
+  (* Check if this pkh is itself a registered delegate *)
+  let delegate_path =
+    Printf.sprintf "/chains/main/blocks/head/context/delegates/%s" pkh
+  in
+  let is_registered =
+    match
+      Cmd_runner.run_out_silent
+        ["curl"; "-sfL"; "--max-time"; "10"; endpoint ^ delegate_path]
+    with
+    | Ok _ -> true
+    | Error _ -> false
+  in
+  let active_consensus_key =
+    if is_registered then
+      rpc_get_string endpoint (delegate_path ^ "/consensus_key")
+    else None
+  in
+  (* Compute staked = full - spendable *)
+  let staked_balance =
+    match (int_of_string_opt full_balance, int_of_string_opt spendable) with
+    | Some full, Some spend -> string_of_int (full - spend)
+    | _ -> "0"
+  in
+  {
+    pkh;
+    network = Network_name.normalize network;
+    spendable_balance = spendable;
+    staked_balance;
+    full_balance;
+    delegate;
+    is_registered;
+    active_consensus_key;
+    delegate_staking_params;
+    delegate_apy = None;
+    fetched_at = Unix.gettimeofday ();
+  }
+
+(** Fetch a pkh across all networks, storing results incrementally. *)
+let fetch_pkh_all_networks ~pkh =
+  let endpoints = pick_endpoints () in
+  List.iter
+    (fun (network, endpoint) ->
+      if not (Atomic.get stop_flag) then
+        let wd = fetch_wallet_data ~network ~endpoint ~pkh in
+        (* Fetch delegate APY from tzkt if delegating *)
+        let delegate_apy =
+          match wd.delegate with
+          | Some d -> fetch_delegate_apy ~network ~delegate_pkh:d
+          | None -> None
+        in
+        store_wallet_data {wd with delegate_apy})
+    endpoints
+
+(** Poll interval: 30 seconds. Data fresher than this is not re-fetched. *)
+let poll_interval = 30.0
+
+(** Request a fetch for a specific PKH. The request is dropped if the PKH is
+    already pending in the worker queue or its cached data is fresh enough
+    (< 30s old on all networks). *)
+let request_fetch ~pkh =
+  let dominated =
+    get_wallet_data ~pkh
+    |> List.for_all (fun (w : wallet_data) ->
+        Unix.gettimeofday () -. w.fetched_at < poll_interval)
+  in
+  if (not dominated) || List.length (get_wallet_data ~pkh) = 0 then
+    Worker_queue.submit_unit worker ~key:pkh ~work:(fun () ->
+        fetch_pkh_all_networks ~pkh)
+
+(** Force an immediate re-fetch for a specific PKH, bypassing staleness. *)
+let force_refresh ~pkh =
+  Worker_queue.submit_unit worker ~key:pkh ~work:(fun () ->
+      fetch_pkh_all_networks ~pkh)
+
+let refresh_tzkt_aliases () =
+  let networks =
+    get_node_endpoints () |> List.map fst |> List.sort_uniq String.compare
+  in
+  List.iter
+    (fun network ->
+      if Tzkt_aliases.needs_refresh ~network then Tzkt_aliases.refresh ~network)
+    networks
+
+(** Queue balance fetches for all tracked keys. Uses [request_fetch] so
+    fresh data is not re-fetched and duplicate pending requests are dropped. *)
+let fetch_all_tracked_keys () =
+  let keys = Mutex.protect keys_lock (fun () -> !tracked_keys) in
+  List.iter
+    (fun (_base_dir, pkhs) -> List.iter (fun pkh -> request_fetch ~pkh) pkhs)
+    keys
+
+let scheduler_loop () =
+  Worker_queue.start worker ;
+  Eio_unix.sleep 3.0 ;
+  (* Initial fetch: queue balance requests for all tracked keys so that
+     data is available as soon as the user opens the Wallets page. *)
+  fetch_all_tracked_keys () ;
+  while not (Atomic.get stop_flag) do
+    (try refresh_tzkt_aliases () with _ -> ()) ;
+    (* Periodic refresh: re-queue stale keys *)
+    fetch_all_tracked_keys () ;
+    Eio_unix.sleep poll_interval
+  done ;
+  Worker_queue.stop worker
+
+let start () =
+  if not !started then (
+    started := true ;
+    Atomic.set stop_flag false ;
+    Domain_pool.submit scheduler_loop)
+
+let stop () =
+  Atomic.set stop_flag true ;
+  Worker_queue.stop worker
+
+let get_endpoints_for_network ~network =
+  get_node_endpoints ()
+  |> List.filter_map (fun (net, endpoint) ->
+      if String.equal net network then Some endpoint else None)
+
+module Internal_for_tests = struct
+  let fetch_all_tracked_keys = fetch_all_tracked_keys
+
+  let get_tracked_pkhs () =
+    let keys = Mutex.protect keys_lock (fun () -> !tracked_keys) in
+    List.concat_map (fun (_base_dir, pkhs) -> pkhs) keys
+end

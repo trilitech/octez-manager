@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "miaou-composer": {
+      "type": "stdio",
+      "command": "miaou-composer-mcp"
+    },
+    "desktop-commander": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@wonderwhy-er/desktop-commander"
+      ],
+      "env": {}
+    }
+  }
+}

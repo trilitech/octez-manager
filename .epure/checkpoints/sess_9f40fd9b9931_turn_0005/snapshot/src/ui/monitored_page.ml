@@ -1,0 +1,80 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
+(*                                                                            *)
+(******************************************************************************)
+
+(** Wrapper functor that adds automatic metrics tracking to any page *)
+
+module Make
+    (P : Miaou.Core.Tui_page.PAGE_SIG)
+    (Config : sig
+      val page_name : string
+    end) :
+  Miaou.Core.Tui_page.PAGE_SIG with type state = P.state and type msg = P.msg =
+struct
+  type state = P.state
+
+  type msg = P.msg
+
+  type key_binding = state Miaou.Core.Tui_page.key_binding_desc
+
+  type pstate = P.pstate
+
+  let init = P.init
+
+  let update = P.update
+
+  (* Wrap view with metrics tracking and keymap registration *)
+  let view ps ~focus ~size =
+    Metrics.record_render ~page:Config.page_name (fun () ->
+        (* Register this page's keymap for the help modal *)
+        let keymap_pairs =
+          List.map
+            (fun (kb : key_binding) -> (kb.Miaou.Core.Tui_page.key, kb.help))
+            (P.keymap ps)
+        in
+        Context.register_active_page_keymap (fun () -> keymap_pairs) ;
+        (* Render page *)
+        P.view ps ~focus ~size)
+
+  let move = P.move
+
+  let refresh = P.refresh
+
+  let service_select = P.service_select
+
+  let service_cycle = P.service_cycle
+
+  let back = P.back
+
+  let handle_modal_key = P.handle_modal_key
+
+  let handle_key ps key ~size =
+    Metrics.mark_input_event () ;
+    if Miaou.Core.Modal_manager.has_active () then P.handle_key ps key ~size
+    else
+      match Global_shortcuts.handle key with
+      | Global_shortcuts.Handled -> ps
+      | Global_shortcuts.NotGlobal -> P.handle_key ps key ~size
+
+  let on_key ps key ~size =
+    Metrics.mark_input_event () ;
+    if Miaou.Core.Modal_manager.has_active () then P.on_key ps key ~size
+    else
+      let key_str = Miaou.Core.Keys.to_string key in
+      match Global_shortcuts.handle key_str with
+      | Global_shortcuts.Handled -> (ps, Miaou_interfaces.Key_event.Handled)
+      | Global_shortcuts.NotGlobal -> P.on_key ps key ~size
+
+  let on_modal_key = P.on_modal_key
+
+  let key_hints = P.key_hints
+
+  let keymap = P.keymap
+
+  let handled_keys = P.handled_keys
+
+  let has_modal = P.has_modal
+end

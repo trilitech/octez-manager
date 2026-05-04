@@ -1,0 +1,72 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
+(*                                                                            *)
+(******************************************************************************)
+
+(** Unified directory registry for tracking both node data directories and
+    client base directories used by services. *)
+
+(** Directory type discriminator *)
+type dir_type =
+  | Node_data_dir  (** Node data directory (used by node services) *)
+  | Client_base_dir
+      (** Client base directory / wallet (used by baker/signer) *)
+  | App_bin_dir  (** Application binary directory (contains octez binaries) *)
+
+(** Directory registry entry *)
+type directory_entry = {
+  path : string;  (** Absolute directory path *)
+  dir_type : dir_type;  (** Type of directory *)
+  created_at : string;  (** ISO timestamp: YYYY-MM-DD HH:MM:SS *)
+  last_used_at : string;  (** ISO timestamp of last use *)
+  registered_services : string list;  (** Instance names using this directory *)
+}
+
+(** Register or update a directory in the registry.
+    If the path already exists, updates its registered_services and last_used_at.
+    Entries are limited to 10 per type, keeping the most recently used.
+    All queries return entries sorted by last_used_at (most recent first). *)
+val add :
+  path:string ->
+  dir_type:dir_type ->
+  registered_services:string list ->
+  (unit, [`Msg of string]) result
+
+(** Find a directory entry by path. *)
+val find_by_path : string -> (directory_entry option, [`Msg of string]) result
+
+(** List all registered directories.
+    @param dir_type Optional filter by directory type *)
+val list :
+  ?dir_type:dir_type -> unit -> (directory_entry list, [`Msg of string]) result
+
+(** Remove a directory from the registry. *)
+val remove : string -> (unit, [`Msg of string]) result
+
+(** Update registered services for an existing directory entry.
+    If the directory doesn't exist, does nothing. *)
+val update_registered_services :
+  path:string ->
+  registered_services:string list ->
+  (unit, [`Msg of string]) result
+
+(** Remove all directories from the registry. *)
+val clear_all : unit -> (unit, [`Msg of string]) result
+
+(** Migrate from old base_dirs.json format.
+    Called automatically on first read. *)
+val migrate_from_base_dir_registry : unit -> (unit, [`Msg of string]) result
+
+(** Test-only functions *)
+module For_test : sig
+  val directory_entry_to_yojson : directory_entry -> Yojson.Safe.t
+
+  val directory_entry_of_yojson :
+    Yojson.Safe.t -> (directory_entry, [`Msg of string]) result
+
+  val dir_type_to_yojson : dir_type -> Yojson.Safe.t
+
+  val dir_type_of_yojson : Yojson.Safe.t -> (dir_type, string) result
+end

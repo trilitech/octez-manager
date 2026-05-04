@@ -1,0 +1,63 @@
+#!/bin/bash
+# Pre-commit hook for octez-manager
+# Ensures code quality before committing
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# Check if opam environment is set up
+if ! command -v opam &> /dev/null; then
+    echo "❌ opam not found. Please install opam first."
+    exit 1
+fi
+
+# Ensure opam environment is loaded using the project's local switch.
+# Using --switch . is fragile: on fallback it picks up whatever global switch
+# is active in the shell (e.g. octez-setup / OCaml 5.2.1), which cannot
+# compile tools/arch_index.ml that requires the OCaml 5.3 Typedtree API.
+# Explicitly resolving the project root makes the switch selection robust.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+eval "$(opam env --switch "$REPO_ROOT")"
+
+# 1. Format check
+echo "📝 Checking code formatting..."
+if ! dune fmt --auto-promote 2>&1 | grep -q "Files formatted"; then
+    # Add any formatted files
+    if git diff --name-only | grep -q "\.ml\|\.mli"; then
+        echo "✨ Code formatted - staging changes..."
+        git add -u
+    fi
+fi
+
+# 2. Copyright check
+echo "©️  Checking copyright headers..."
+if ! ./scripts/check-copyright.sh; then
+    echo "⚠️  Copyright headers need updating. Running fix..."
+    ./scripts/check-copyright.sh --fix
+    # Stage the fixed files
+    git add -u
+    echo "✅ Copyright headers fixed and staged"
+fi
+
+# 3. Build check
+echo "🔨 Building project..."
+if ! dune build @check 2>&1; then
+    echo "❌ Build failed. Please fix errors before committing."
+    exit 1
+fi
+
+# 4. Check no direct TzKT URL literals outside Indexer module
+echo "🌐 Checking for direct TzKT URL literals..."
+if ! ./scripts/check-direct-tzkt.sh; then
+    echo "❌ Direct TzKT URL found outside indexer module. Fix before committing."
+    exit 1
+fi
+
+# 5. Quick unit tests (skip slow integration tests)
+echo "🧪 Running quick unit tests..."
+if ! dune runtest --force test/test_common_utils.exe test/test_port_validation.exe 2>&1; then
+    echo "⚠️  Some tests failed, but allowing commit (full CI will catch issues)"
+fi
+
+echo "✅ Pre-commit checks passed!"

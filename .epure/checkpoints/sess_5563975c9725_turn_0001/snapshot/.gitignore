@@ -1,0 +1,40 @@
+_build/
+_opam/
+_opam
+.install/
+*.install
+*.merlin
+*.swp
+.envrc
+_coverage/
+*.coverage
+TODO.md
+TODO_CAPABILITIES.md
+octez-manager
+opencode.json
+
+# Internal/private docs
+internal_docs/
+
+# Feature specs (contain proprietary research/references)
+specs/
+.specify/
+
+# Docs site build output
+docs/dist/
+docs/node_modules/
+docs/.astro/
+test/integration/cli-tester/octez-manager
+docs/architecture.db
+_coverage/
+coverage-report/
+test/integration/cli-tester/Dockerfile.local-golden
+docs/architecture.db-shm
+docs/architecture.db-wal
+secret.json
+
+# Agent harness (local agent roster, not tracked)
+.harness/
+
+# Claude Code agent runtime worktrees (per-agent ephemeral checkouts)
+.claude/worktrees/

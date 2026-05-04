@@ -1,0 +1,169 @@
+/* Octez Manager - Tezos-inspired theme (aligned with Tezlink style) */
+
+:root {
+  /* Tezos blue palette */
+  --sl-color-accent-low: #e6f0ff;
+  --sl-color-accent: #0D61FF;
+  --sl-color-accent-high: #0a4fd6;
+}
+
+/* Light theme (default) */
+:root,
+:root[data-theme='light'] {
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: #f8f9fa;
+  --sl-color-bg-sidebar: #f8f9fa;
+  --sl-color-white: #1a1a1a;
+  --sl-color-gray-1: #374151;
+  --sl-color-gray-2: #6b7280;
+  --sl-color-gray-3: #9ca3af;
+  --sl-color-gray-5: #e5e7eb;
+  --sl-color-bg-inline-code: #f3f4f6;
+}
+
+/* Dark theme */
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #1e3a5f;
+  --sl-color-bg: #18181b;
+  --sl-color-bg-nav: #1f1f23;
+  --sl-color-bg-sidebar: #1f1f23;
+  --sl-color-white: #fafafa;
+  --sl-color-gray-1: #d4d4d8;
+  --sl-color-gray-2: #a1a1aa;
+  --sl-color-gray-3: #71717a;
+  --sl-color-gray-5: #3f3f46;
+  --sl-color-bg-inline-code: #27272a;
+}
+
+/* Hero section */
+.hero {
+  padding-bottom: 2rem;
+}
+
+.hero .tagline {
+  font-size: 1.25rem;
+  color: var(--sl-color-gray-1);
+}
+
+/* Hero action buttons - ensure readable text in dark mode */
+.hero a.primary {
+  color: #ffffff !important;
+}
+
+/* Code blocks - terminal style */
+pre {
+  border-radius: 8px;
+  border: 1px solid var(--sl-color-gray-5);
+}
+
+pre code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.9rem;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  border-bottom: 2px solid var(--sl-color-accent);
+  padding: 0.75rem;
+}
+
+td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--sl-color-gray-5);
+}
+
+/* Cards - clean, professional style */
+.card {
+  border: 1px solid var(--sl-color-gray-5);
+  background: var(--sl-color-bg);
+}
+
+.card .icon {
+  color: var(--sl-color-accent);
+}
+
+/* CardGrid - consistent spacing */
+.sl-link-card {
+  border-color: var(--sl-color-gray-5);
+}
+
+/* Horizontal rules */
+hr {
+  border: none;
+  border-top: 1px solid var(--sl-color-gray-5);
+  margin: 2.5rem 0;
+}
+
+/* Command styling */
+code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  background: var(--sl-color-bg-inline-code);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+}
+
+/* Header / Title bar - clean, minimal style */
+.page > .header {
+  border-bottom: 1px solid var(--sl-color-gray-5);
+}
+
+/* Site title styling */
+.site-title {
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+
+.site-title:hover {
+  color: var(--sl-color-accent);
+}
+
+.site-title img {
+  height: 2rem;
+}
+
+/* Header right-side icons */
+.header .social-icons a {
+  color: var(--sl-color-gray-2);
+}
+
+.header .social-icons a:hover {
+  color: var(--sl-color-accent);
+}
+
+/* Sidebar - Tezlink-aligned styling */
+
+/* Group titles - cleaner typography */
+.sidebar-content .large {
+  font-size: var(--sl-text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sl-color-gray-2);
+  font-weight: 600;
+}
+
+/* Active page indicator - subtle left border instead of full background */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+  background-color: var(--sl-color-accent-low);
+  color: var(--sl-color-accent);
+  border-left: 3px solid var(--sl-color-accent);
+  margin-left: -3px;
+  font-weight: 600;
+}
+
+/* Regular sidebar links */
+.sidebar-content a {
+  color: var(--sl-color-gray-1);
+}
+
+.sidebar-content a:hover,
+.sidebar-content a:focus {
+  color: var(--sl-color-accent);
+}

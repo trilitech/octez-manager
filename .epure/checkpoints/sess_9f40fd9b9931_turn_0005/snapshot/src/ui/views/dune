@@ -1,0 +1,22 @@
+(include_subdirs no)
+
+(library
+ (name octez_manager_ui_views)
+ (public_name octez-manager.ui.views)
+ (wrapped false)
+ (libraries
+  octez_manager_lib
+  miaou-core.interfaces
+  miaou-core.widgets.display
+  miaou-core.widgets.input
+  miaou-core.widgets.layout
+  miaou-core.widgets.navigation
+  miaou-core.canvas
+  miaou-core.style
+  lambda-term)
+ ; No eio, eio_main, eio_posix, eio.unix — belt-and-suspenders enforcement
+ ; below via ppx_forbid in .ppx_forbid (see also src/ui/views/.ppx_forbid).
+ (preprocess
+  (pps ppx_deriving.show ppx_forbid))
+ (instrumentation
+  (backend bisect_ppx)))

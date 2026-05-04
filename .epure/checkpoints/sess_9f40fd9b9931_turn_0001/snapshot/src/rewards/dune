@@ -1,0 +1,8 @@
+(include_subdirs no)
+
+(library
+ (name octez_manager_rewards)
+ (public_name octez-manager.rewards)
+ (libraries octez_manager_common yojson rresult unix)
+ (instrumentation
+  (backend bisect_ppx)))
