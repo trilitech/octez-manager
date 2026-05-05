@@ -2,10 +2,10 @@
   "metadata": {
     "generated_at": "2026-04-09T00:00:00.000000",
     "generated_by": "Rebase: merge main (101 tests) + install-index test",
-    "total_tests": 101,
-    "total_duration": 816.05,
+    "total_tests": 102,
+    "total_duration": 819.05,
     "shard_count": 5,
-    "mean_shard_duration": 162.61,
+    "mean_shard_duration": 163.81,
     "max_shard_duration": 190.61,
     "min_shard_duration": 143.78,
     "duration_std_dev": 19.8,
@@ -56,10 +56,11 @@
       "group/58-group-name-validation.sh",
       "import/54-import-node-config-preservation.sh",
       "import/55-import-node-identity-preservation.sh",
-      "import/56-import-node-missing-config-created.sh"
+      "import/56-import-node-missing-config-created.sh",
+      "install/01-verified-release.sh"
     ],
-    "test_count": 17,
-    "total_duration": 143.78
+    "test_count": 18,
+    "total_duration": 146.78
   },
   "shard-3": {
     "tests": [
