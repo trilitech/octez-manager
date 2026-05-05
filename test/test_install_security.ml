@@ -63,6 +63,7 @@ let test_docs_do_not_recommend_main_pipe () =
         path
         "raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh")
     [
+      "install.sh";
       "README.md";
       "docs/src/content/docs/index.mdx";
       "docs/src/content/docs/getting-started/installation.md";
