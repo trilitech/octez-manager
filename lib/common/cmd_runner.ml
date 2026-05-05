@@ -265,6 +265,8 @@ let run_out_with_timeout_hook :
 
 let set_run_out_with_timeout_hook f = run_out_with_timeout_hook := Some f
 
+let reset_run_out_with_timeout_hook () = run_out_with_timeout_hook := None
+
 let run_out_with_timeout ~timeout argv =
   append_debug_log ("RUN_OUT " ^ cmd_to_string argv) ;
   match !run_out_with_timeout_hook with

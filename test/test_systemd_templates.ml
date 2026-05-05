@@ -173,6 +173,21 @@ let test_unit_template_empty_bin_dir () =
   in
   check bool "fallback /usr/bin" true (contains_s tpl "/usr/bin")
 
+let test_unit_template_system_hardening () =
+  let tpl =
+    Octez_manager_lib.Systemd_unit_template.unit_template
+      ~user_mode:false
+      ~role:"node"
+      ~app_bin_dir:"/usr/bin"
+      ~user:"tezos"
+      ()
+  in
+  check bool "runs as user" true (contains_s tpl "User=tezos") ;
+  check bool "runs as group" true (contains_s tpl "Group=tezos") ;
+  check bool "no new privileges" true (contains_s tpl "NoNewPrivileges=yes") ;
+  check bool "private tmp" true (contains_s tpl "PrivateTmp=yes") ;
+  check bool "strict system" true (contains_s tpl "ProtectSystem=strict")
+
 (* ── parse_unit_state_output ─────────────────────────────────── *)
 
 let test_parse_active () =
@@ -261,6 +276,10 @@ let () =
           test_case "baker" `Quick test_unit_template_baker;
           test_case "with prestart" `Quick test_unit_template_with_prestart;
           test_case "empty bin dir" `Quick test_unit_template_empty_bin_dir;
+          test_case
+            "system hardening"
+            `Quick
+            test_unit_template_system_hardening;
         ] );
       ( "parse_unit_state_output",
         [

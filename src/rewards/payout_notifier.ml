@@ -80,28 +80,58 @@ let escape_json_string s =
     s ;
   Buffer.contents buf
 
+let write_private_temp_file ~prefix ~suffix content =
+  let tmp_dir = Filename.get_temp_dir_name () in
+  let rec create attempt =
+    let path =
+      Filename.concat
+        tmp_dir
+        (Printf.sprintf "%s%d-%d%s" prefix (Unix.getpid ()) attempt suffix)
+    in
+    try
+      let fd =
+        Unix.openfile path [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_EXCL] 0o600
+      in
+      let oc = Unix.out_channel_of_descr fd in
+      Fun.protect
+        ~finally:(fun () -> close_out_noerr oc)
+        (fun () -> output_string oc content) ;
+      path
+    with Unix.Unix_error (Unix.EEXIST, _, _) -> create (attempt + 1)
+  in
+  create 0
+
+let curl_config_line key value =
+  Printf.sprintf "%s = \"%s\"\n" key (escape_json_string value)
+
+let post_json_with_curl_config ~url ~payload ?authorization () =
+  let authorization_config =
+    match authorization with
+    | Some header -> curl_config_line "header" header
+    | None -> ""
+  in
+  let config =
+    curl_config_line "url" url ^ "request = \"POST\"\n"
+    ^ "header = \"Content-Type: application/json\"\n" ^ authorization_config
+    ^ curl_config_line "data" payload
+  in
+  let config_path =
+    write_private_temp_file ~prefix:"om-payout-curl-" ~suffix:".conf" config
+  in
+  Fun.protect
+    ~finally:(fun () -> try Sys.remove config_path with Sys_error _ -> ())
+    (fun () ->
+      Cmd_runner.run_out_with_timeout
+        ~timeout:30.0
+        ["curl"; "-fsSL"; "--max-time"; "30"; "--config"; config_path])
+
 (* ── Channel dispatch ────────────────────────────────────── *)
 
 let send_discord ~webhook_url ~message =
   let payload =
     Printf.sprintf {|{"content":"%s"}|} (escape_json_string message)
   in
-  let argv =
-    [
-      "curl";
-      "-fsSL";
-      "--max-time";
-      "30";
-      "-X";
-      "POST";
-      "-H";
-      "Content-Type: application/json";
-      "-d";
-      payload;
-      webhook_url;
-    ]
-  in
-  match Cmd_runner.run_out_with_timeout ~timeout:30.0 argv with
+  match post_json_with_curl_config ~url:webhook_url ~payload () with
   | Ok _ -> Ok ()
   | Error (`Msg msg) -> Error msg
 
@@ -118,22 +148,7 @@ let send_telegram ~api_token ~receivers ~message =
           chat_id
           (escape_json_string message)
       in
-      let argv =
-        [
-          "curl";
-          "-fsSL";
-          "--max-time";
-          "30";
-          "-X";
-          "POST";
-          "-H";
-          "Content-Type: application/json";
-          "-d";
-          payload;
-          url;
-        ]
-      in
-      match Cmd_runner.run_out_with_timeout ~timeout:30.0 argv with
+      match post_json_with_curl_config ~url ~payload () with
       | Ok _ -> ()
       | Error (`Msg msg) ->
           errors := Printf.sprintf "chat_id %d: %s" chat_id msg :: !errors)
@@ -146,24 +161,13 @@ let send_webhook ~url ~auth ~message =
   in
   let auth_headers =
     match auth with
-    | Rewards.No_auth -> []
+    | Rewards.No_auth -> None
     | Rewards.Bearer token ->
-        ["-H"; Printf.sprintf "Authorization: Bearer %s" token]
+        Some (Printf.sprintf "Authorization: Bearer %s" token)
   in
-  let argv =
-    [
-      "curl";
-      "-fsSL";
-      "--max-time";
-      "30";
-      "-X";
-      "POST";
-      "-H";
-      "Content-Type: application/json";
-    ]
-    @ auth_headers @ ["-d"; payload; url]
-  in
-  match Cmd_runner.run_out_with_timeout ~timeout:30.0 argv with
+  match
+    post_json_with_curl_config ~url ~payload ?authorization:auth_headers ()
+  with
   | Ok _ -> Ok ()
   | Error (`Msg msg) -> Error msg
 

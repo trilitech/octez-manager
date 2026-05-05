@@ -97,7 +97,9 @@ octez-manager
 
 ### System Mode (Recommended for production)
 
-Run as root. Creates **system-level systemd services** with dedicated service users.
+Run the manager with root privileges to create system-level systemd units and
+prepare service users. The managed Octez daemons do not run as root: generated
+units set `User=<service-user>` and `Group=<service-user>`.
 
 ```bash
 sudo octez-manager
@@ -108,6 +110,11 @@ sudo octez-manager
 | Services | `/etc/systemd/system/` |
 | Configuration | `/etc/octez/instances/` |
 | Data | `/var/lib/octez/` |
+
+Generated system services include hardening directives such as
+`NoNewPrivileges=yes`, `PrivateTmp=yes`, and `ProtectSystem=strict`. Routine
+system-mode management currently uses `sudo octez-manager`; a narrower admin
+group or polkit profile is not yet documented.
 
 > **Note:** User mode and system mode are independent. Instances created in one mode are not visible in the other.
 
