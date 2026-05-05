@@ -450,12 +450,17 @@ jobs:
         run: |
           mkdir -p release
           cp _build/default/src/main.exe release/octez-manager-${{ github.ref_name }}-linux-x86_64
+          cp _build/default/src/main.exe release/octez-manager-linux-x86_64
           chmod +x release/octez-manager-${{ github.ref_name }}-linux-x86_64
+          chmod +x release/octez-manager-linux-x86_64
 
       - name: Generate checksums
         run: |
           cd release
-          sha256sum octez-manager-${{ github.ref_name }}-linux-x86_64 > sha256sums.txt
+          sha256sum \
+            octez-manager-${{ github.ref_name }}-linux-x86_64 \
+            octez-manager-linux-x86_64 \
+            > sha256sums.txt
 
       - name: Upload binary for packaging jobs
         uses: actions/upload-artifact@v4
@@ -469,6 +474,7 @@ jobs:
         with:
           files: |
             release/octez-manager-${{ github.ref_name }}-linux-x86_64
+            release/octez-manager-linux-x86_64
             release/sha256sums.txt
           generate_release_notes: true
 
@@ -514,11 +520,14 @@ jobs:
             --deb-dist stable \
             bin/octez-manager-${{ github.ref_name }}-linux-x86_64=/usr/local/bin/octez-manager
           mv *.deb octez-manager_${{ steps.version.outputs.version }}_ubuntu_amd64.deb
+          sha256sum octez-manager_${{ steps.version.outputs.version }}_ubuntu_amd64.deb > octez-manager_${{ steps.version.outputs.version }}_ubuntu_amd64.deb.sha256
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          files: octez-manager_${{ steps.version.outputs.version }}_ubuntu_amd64.deb
+          files: |
+            octez-manager_${{ steps.version.outputs.version }}_ubuntu_amd64.deb
+            octez-manager_${{ steps.version.outputs.version }}_ubuntu_amd64.deb.sha256
 
   package-debian:
     name: Package (.deb Debian)
@@ -566,8 +575,11 @@ jobs:
             --deb-dist bookworm \
             bin/octez-manager-${{ github.ref_name }}-linux-x86_64=/usr/local/bin/octez-manager
           mv *.deb octez-manager_${{ steps.version.outputs.version }}_debian_amd64.deb
+          sha256sum octez-manager_${{ steps.version.outputs.version }}_debian_amd64.deb > octez-manager_${{ steps.version.outputs.version }}_debian_amd64.deb.sha256
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          files: octez-manager_${{ steps.version.outputs.version }}_debian_amd64.deb
+          files: |
+            octez-manager_${{ steps.version.outputs.version }}_debian_amd64.deb
+            octez-manager_${{ steps.version.outputs.version }}_debian_amd64.deb.sha256

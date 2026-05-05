@@ -46,19 +46,21 @@
 
 ### Installation
 
-**Quick install (default location):**
+Download the latest Linux binary and launch the TUI:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh
+curl -fsSLO https://github.com/trilitech/octez-manager/releases/latest/download/octez-manager-linux-x86_64
+chmod +x octez-manager-linux-x86_64
+./octez-manager-linux-x86_64
 ```
 
-- Root user: installs to `/usr/local/bin` (system-wide)
-- Regular user: installs to `~/.local/bin` (user-local)
+For a PATH install with checksum verification, see
+[Installation](docs/src/content/docs/getting-started/installation.md).
 
 **Custom installation directory:**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh -s -- --prefix=/custom/path
+install -D octez-manager-linux-x86_64 /custom/path/octez-manager
 ```
 
 ### Prerequisites

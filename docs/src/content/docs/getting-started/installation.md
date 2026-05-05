@@ -7,26 +7,47 @@ description: How to install Octez Manager
 
 - Linux (Ubuntu 22.04+, Debian 12+, or similar)
 
-## Quick Install (Recommended)
+## Verified Install (Recommended)
 
-Install with a single command:
+Download the latest release binary, verify it against the release checksum
+manifest, then install it on your PATH:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh
+ASSET=octez-manager-linux-x86_64
+curl -fsSLO "https://github.com/trilitech/octez-manager/releases/latest/download/${ASSET}"
+curl -fsSLO https://github.com/trilitech/octez-manager/releases/latest/download/sha256sums.txt
+grep "  ${ASSET}$" sha256sums.txt > "${ASSET}.sha256"
+sha256sum -c "${ASSET}.sha256"
+chmod +x "${ASSET}"
+install -D "${ASSET}" ~/.local/bin/octez-manager
 ```
 
-This downloads the latest release and installs it to:
-- `~/.local/bin/` when run as a regular user
-- `/usr/local/bin/` when run as root
+This installs Octez Manager to `~/.local/bin/octez-manager`.
 
-> **Note:** If `~/.local/bin` is not in your PATH, the installer will show instructions to add it.
+> **Note:** If `~/.local/bin` is not in your PATH, add it before launching
+> `octez-manager`.
+
+### Version-Pinned Install
+
+For reproducible deployments, pin the release tag explicitly:
+
+```bash
+VERSION=v1.0.0
+ASSET="octez-manager-${VERSION}-linux-x86_64"
+curl -fsSLO "https://github.com/trilitech/octez-manager/releases/download/${VERSION}/${ASSET}"
+curl -fsSLO "https://github.com/trilitech/octez-manager/releases/download/${VERSION}/sha256sums.txt"
+grep "  ${ASSET}$" sha256sums.txt > "${ASSET}.sha256"
+sha256sum -c "${ASSET}.sha256"
+chmod +x "${ASSET}"
+install -D "${ASSET}" ~/.local/bin/octez-manager
+```
 
 ### Custom Installation Directory
 
 Use `--prefix` to specify a custom location:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh -s -- --prefix=/opt/bin
+install -D octez-manager-linux-x86_64 /opt/bin/octez-manager
 ```
 
 ### Verify Installation
@@ -41,11 +62,16 @@ If you prefer to download manually, get the binary from [GitHub Releases](https:
 
 ```bash
 # Download (replace vX.Y.Z with the latest version)
-curl -LO https://github.com/trilitech/octez-manager/releases/latest/download/octez-manager-vX.Y.Z-linux-x86_64
+VERSION=vX.Y.Z
+ASSET="octez-manager-${VERSION}-linux-x86_64"
+curl -LO "https://github.com/trilitech/octez-manager/releases/download/${VERSION}/${ASSET}"
+curl -LO "https://github.com/trilitech/octez-manager/releases/download/${VERSION}/sha256sums.txt"
+grep "  ${ASSET}$" sha256sums.txt > "${ASSET}.sha256"
+sha256sum -c "${ASSET}.sha256"
 
 # Make executable and move to PATH
-chmod +x octez-manager-v*-linux-x86_64
-sudo mv octez-manager-v*-linux-x86_64 /usr/local/bin/octez-manager
+chmod +x "${ASSET}"
+sudo mv "${ASSET}" /usr/local/bin/octez-manager
 
 # Verify
 octez-manager --version
