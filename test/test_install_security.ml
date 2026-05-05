@@ -5,8 +5,22 @@
 (*                                                                            *)
 (******************************************************************************)
 
+let rec find_repo_root dir =
+  if
+    Sys.file_exists (Filename.concat dir "README.md")
+    && Sys.file_exists (Filename.concat dir "install.sh")
+  then dir
+  else
+    let parent = Filename.dirname dir in
+    if String.equal parent dir then failwith "could not locate repository root"
+    else find_repo_root parent
+
+let repo_root = lazy (find_repo_root (Sys.getcwd ()))
+
+let repo_path path = Filename.concat (Lazy.force repo_root) path
+
 let read_file path =
-  let ic = open_in path in
+  let ic = open_in (repo_path path) in
   Fun.protect
     ~finally:(fun () -> close_in_noerr ic)
     (fun () -> In_channel.input_all ic)
