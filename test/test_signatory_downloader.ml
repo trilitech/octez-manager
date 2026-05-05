@@ -19,6 +19,14 @@
 open Alcotest
 open Octez_manager_lib
 
+let contains_substring s sub =
+  let sub_len = String.length sub in
+  let rec loop i =
+    i + sub_len <= String.length s
+    && (String.equal (String.sub s i sub_len) sub || loop (i + 1))
+  in
+  sub_len = 0 || loop 0
+
 (* ============================================================ *)
 (* Architecture Tests *)
 (* ============================================================ *)
@@ -255,6 +263,43 @@ let test_signatory_version_path_rc () =
     true
     (Str.string_match (Str.regexp ".*rc1.*") path 0)
 
+let test_verify_tarball_checksum_missing_entry_fails () =
+  let result =
+    Signatory_downloader.For_tests.verify_tarball_checksum
+      ~tarball_name:"signatory_1.3.1_linux_amd64.tar.gz"
+      ~tarball_path:"/tmp/signatory.tar.gz"
+      ~checksums:[]
+      ~verify_file:(fun ~filepath:_ ~expected_hash:_ -> Ok ())
+  in
+  match result with
+  | Ok () -> fail "missing checksum entry must fail closed"
+  | Error (`Msg msg) ->
+      check
+        bool
+        "mentions missing entry"
+        true
+        (contains_substring msg "Missing checksum entry")
+
+let test_verify_tarball_checksum_uses_downloaded_tarball () =
+  let verified_path = ref None in
+  let verification =
+    Signatory_downloader.For_tests.verify_tarball_checksum
+      ~tarball_name:"signatory_1.3.1_linux_amd64.tar.gz"
+      ~tarball_path:"/tmp/downloaded-signatory.tar.gz"
+      ~checksums:[("signatory_1.3.1_linux_amd64.tar.gz", "expected")]
+      ~verify_file:(fun ~filepath ~expected_hash:_ ->
+        verified_path := Some filepath ;
+        Ok ())
+  in
+  (match verification with
+  | Ok () -> ()
+  | Error (`Msg msg) -> fail ("verification failed: " ^ msg)) ;
+  check
+    (option string)
+    "verifies original downloaded tarball"
+    (Some "/tmp/downloaded-signatory.tar.gz")
+    !verified_path
+
 (* ============================================================ *)
 (* Test Suite Registration *)
 (* ============================================================ *)
@@ -302,6 +347,16 @@ let path_tests =
     ("signatory_version_path RC", `Quick, test_signatory_version_path_rc);
   ]
 
+let checksum_tests =
+  [
+    ( "missing checksum entry fails",
+      `Quick,
+      test_verify_tarball_checksum_missing_entry_fails );
+    ( "verifies downloaded tarball",
+      `Quick,
+      test_verify_tarball_checksum_uses_downloaded_tarball );
+  ]
+
 let () =
   Alcotest.run
     "Signatory_downloader"
@@ -311,4 +366,5 @@ let () =
       ("JSON Parsing", parsing_tests);
       ("Size Formatting", size_tests);
       ("Path Construction", path_tests);
+      ("Checksums", checksum_tests);
     ]

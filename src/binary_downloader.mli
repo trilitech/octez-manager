@@ -137,4 +137,12 @@ module For_tests : sig
   (** Parse versions.json content *)
   val parse_version_json :
     Yojson.Safe.t -> (version_info list, Rresult.R.msg) result
+
+  val verify_downloaded_binaries :
+    dest_dir:string ->
+    downloaded_binaries:string list ->
+    checksums:(string * string) list ->
+    verify_file:
+      (filepath:string -> expected_hash:string -> (unit, Rresult.R.msg) result) ->
+    (unit, Rresult.R.msg) result
 end

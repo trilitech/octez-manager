@@ -165,6 +165,12 @@ let verify_checksum ~filepath ~expected_hash =
       expected_hash
       actual_hash
 
+let verify_tarball_checksum ~tarball_name ~tarball_path ~checksums ~verify_file
+    : (unit, R.msg) result =
+  match List.assoc_opt tarball_name checksums with
+  | None -> R.error_msgf "Missing checksum entry for %s" tarball_name
+  | Some expected_hash -> verify_file ~filepath:tarball_path ~expected_hash
+
 (** Download utilities *)
 
 let download_file_curl ~url ~dest ?progress () =
@@ -328,18 +334,9 @@ let download_version ~version ?(verify_checksums = true) ?progress () =
   let tarball = Filename.concat temp_dir "signatory.tar.gz" in
   let* () = download_file_curl ~url ~dest:tarball ?progress () in
 
-  (* Extract binary *)
-  let* binary_path = extract_tarball ~tarball ~dest_dir:temp_dir in
-
-  (* Make executable *)
-  let* () = Cmd_runner.run ["chmod"; "+x"; binary_path] in
-
-  (* Remove tarball *)
-  (try Sys.remove tarball with _ -> ()) ;
-
   (* Verify checksum if requested *)
-  let checksum_status =
-    if verify_checksums then
+  let* checksum_status =
+    if verify_checksums then (
       match fetch_checksums ~version with
       | Ok checksums -> (
           let tarball_name =
@@ -348,26 +345,33 @@ let download_version ~version ?(verify_checksums = true) ?progress () =
               version
               (arch_to_string arch)
           in
-          match List.assoc_opt tarball_name checksums with
-          | Some expected_hash -> (
-              (* Re-download tarball temporarily for verification *)
-              let verify_tarball = Filename.concat temp_dir "verify.tar.gz" in
-              match download_file_curl ~url ~dest:verify_tarball () with
-              | Ok () -> (
-                  match
-                    verify_checksum ~filepath:verify_tarball ~expected_hash
-                  with
-                  | Ok () ->
-                      (try Sys.remove verify_tarball with _ -> ()) ;
-                      Verified
-                  | Error (`Msg reason) ->
-                      (try Sys.remove verify_tarball with _ -> ()) ;
-                      Failed reason)
-              | Error (`Msg reason) -> Failed reason)
-          | None -> Skipped)
-      | Error (`Msg reason) -> Failed reason
-    else Skipped
+          match
+            verify_tarball_checksum
+              ~tarball_name
+              ~tarball_path:tarball
+              ~checksums
+              ~verify_file:verify_checksum
+          with
+          | Ok () -> Ok Verified
+          | Error (`Msg reason) ->
+              (try ignore (Cmd_runner.run_out ["rm"; "-rf"; temp_dir])
+               with _ -> ()) ;
+              R.error_msgf "Checksum verification failed: %s" reason)
+      | Error (`Msg reason) ->
+          (try ignore (Cmd_runner.run_out ["rm"; "-rf"; temp_dir])
+           with _ -> ()) ;
+          R.error_msgf "Checksum verification failed: %s" reason)
+    else Ok Skipped
   in
+
+  (* Extract only the verified archive. *)
+  let* binary_path = extract_tarball ~tarball ~dest_dir:temp_dir in
+
+  (* Make executable *)
+  let* () = Cmd_runner.run ["chmod"; "+x"; binary_path] in
+
+  (* Remove tarball *)
+  (try Sys.remove tarball with _ -> ()) ;
 
   (* Save metadata *)
   let metadata =
@@ -455,4 +459,6 @@ module For_tests = struct
   let tarball_url = tarball_url
 
   let checksums_url = checksums_url
+
+  let verify_tarball_checksum = verify_tarball_checksum
 end
