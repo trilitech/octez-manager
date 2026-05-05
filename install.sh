@@ -5,10 +5,10 @@ set -e
 #
 # Usage:
 #   Default installation:
-#     curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh
+#     VERSION=v1.0.0 sh install.sh
 #
 #   Custom installation directory:
-#     curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh -s -- --prefix=/custom/path
+#     VERSION=v1.0.0 sh install.sh --prefix=/custom/path
 #
 # Default installation directories:
 #   - Root user: /usr/local/bin (system-wide)
