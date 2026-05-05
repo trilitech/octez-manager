@@ -123,4 +123,12 @@ module For_tests : sig
   val tarball_url : version:string -> arch:arch -> string
 
   val checksums_url : version:string -> string
+
+  val verify_tarball_checksum :
+    tarball_name:string ->
+    tarball_path:string ->
+    checksums:(string * string) list ->
+    verify_file:
+      (filepath:string -> expected_hash:string -> (unit, Rresult.R.msg) result) ->
+    (unit, Rresult.R.msg) result
 end

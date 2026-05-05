@@ -260,6 +260,21 @@ let verify_checksum ~filepath ~expected_hash =
       expected_hash
       actual_hash
 
+let verify_downloaded_binaries ~dest_dir ~downloaded_binaries ~checksums
+    ~verify_file =
+  let rec check = function
+    | [] -> Ok ()
+    | binary :: rest -> (
+        let filepath = Filename.concat dest_dir binary in
+        match List.assoc_opt binary checksums with
+        | None -> R.error_msgf "Missing checksum entry for %s" binary
+        | Some expected_hash -> (
+            match verify_file ~filepath ~expected_hash with
+            | Ok () -> check rest
+            | Error _ as e -> e))
+  in
+  check downloaded_binaries
+
 (** Download utilities *)
 
 (** Get file size via HEAD request
@@ -511,23 +526,13 @@ let download_version ~version ?(verify_checksums = true) ?progress
       if verify_checksums then
         match fetch_checksums ~version ~arch with
         | Ok checksums -> (
-            let verify_all () =
-              let rec check = function
-                | [] -> Ok ()
-                | binary :: rest -> (
-                    let filepath = Filename.concat dest_dir binary in
-                    match List.assoc_opt binary checksums with
-                    | Some expected_hash -> (
-                        match verify_checksum ~filepath ~expected_hash with
-                        | Ok () -> check rest
-                        | Error _ as e -> e)
-                    | None ->
-                        (* Binary not in checksums file - skip *)
-                        check rest)
-              in
-              check downloaded_binaries
-            in
-            match verify_all () with
+            match
+              verify_downloaded_binaries
+                ~dest_dir
+                ~downloaded_binaries
+                ~checksums
+                ~verify_file:verify_checksum
+            with
             | Ok () -> Verified
             | Error (`Msg reason) -> Failed reason)
         | Error (`Msg reason) -> Failed reason
@@ -551,6 +556,15 @@ let download_version ~version ?(verify_checksums = true) ?progress
     in
     let metadata_file = Filename.concat dest_dir ".metadata.json" in
     (try Yojson.Safe.to_file metadata_file metadata with _ -> ()) ;
+
+    let* () =
+      match checksum_status with
+      | Verified | Skipped -> Ok ()
+      | Failed reason ->
+          (try ignore (Cmd_runner.run_out ["rm"; "-rf"; temp_dir])
+           with _ -> ()) ;
+          R.error_msgf "Checksum verification failed: %s" reason
+    in
 
     (* Atomic rename: move from temp to final location *)
     let* () =
@@ -626,4 +640,6 @@ let remove_version version =
 
 module For_tests = struct
   let parse_version_json = parse_version_json
+
+  let verify_downloaded_binaries = verify_downloaded_binaries
 end

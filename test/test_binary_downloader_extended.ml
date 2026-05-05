@@ -20,6 +20,14 @@
 open Alcotest
 open Octez_manager_lib
 
+let contains_substring s sub =
+  let sub_len = String.length sub in
+  let rec loop i =
+    i + sub_len <= String.length s
+    && (String.equal (String.sub s i sub_len) sub || loop (i + 1))
+  in
+  sub_len = 0 || loop 0
+
 (* ============================================================ *)
 (* Architecture Tests *)
 (* ============================================================ *)
@@ -273,6 +281,37 @@ let test_binaries_for_version_rc () =
   | Ok binaries -> check bool "rc has binaries" true (List.length binaries > 0)
   | Error _ -> fail "should work for rc versions"
 
+let test_verify_downloaded_binaries_missing_checksum_fails () =
+  let result =
+    Binary_downloader.For_tests.verify_downloaded_binaries
+      ~dest_dir:"/tmp"
+      ~downloaded_binaries:["octez-node"; "octez-client"]
+      ~checksums:[("octez-node", "hash")]
+      ~verify_file:(fun ~filepath:_ ~expected_hash:_ -> Ok ())
+  in
+  match result with
+  | Ok () -> fail "missing checksum entry must fail closed"
+  | Error (`Msg msg) ->
+      check
+        bool
+        "mentions missing entry"
+        true
+        (contains_substring msg "Missing checksum entry")
+
+let test_verify_downloaded_binaries_mismatch_fails () =
+  let result =
+    Binary_downloader.For_tests.verify_downloaded_binaries
+      ~dest_dir:"/tmp"
+      ~downloaded_binaries:["octez-node"]
+      ~checksums:[("octez-node", "expected")]
+      ~verify_file:(fun ~filepath:_ ~expected_hash:_ ->
+        Error (`Msg "checksum mismatch"))
+  in
+  match result with
+  | Ok () -> fail "checksum mismatch must fail closed"
+  | Error (`Msg msg) ->
+      check bool "propagates mismatch" true (contains_substring msg "mismatch")
+
 (* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
@@ -322,6 +361,16 @@ let binaries_tests =
     ("binaries for rc version", `Quick, test_binaries_for_version_rc);
   ]
 
+let checksum_tests =
+  [
+    ( "missing checksum entry fails",
+      `Quick,
+      test_verify_downloaded_binaries_missing_checksum_fails );
+    ( "checksum mismatch fails",
+      `Quick,
+      test_verify_downloaded_binaries_mismatch_fails );
+  ]
+
 let () =
   Alcotest.run
     "Binary_downloader_extended"
@@ -331,4 +380,5 @@ let () =
       ("version_parsing", version_parsing_tests);
       ("size_formatting", size_tests);
       ("binaries", binaries_tests);
+      ("checksums", checksum_tests);
     ]
