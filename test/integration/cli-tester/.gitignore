@@ -1,2 +1,3 @@
 # Built binary (copied during test run)
 octez-manager
+test_golden_path_tui_v2

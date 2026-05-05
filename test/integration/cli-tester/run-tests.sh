@@ -2,7 +2,7 @@
 # Integration test runner
 set -euo pipefail
 
-TESTS_DIR="/tests"
+TESTS_DIR="${TESTS_DIR:-/tests}"
 SANDBOX_URL="${SANDBOX_URL:-http://sandbox:8080}"
 NODE_RPC="${NODE_RPC:-http://sandbox:8732}"
 
@@ -36,6 +36,19 @@ wait_for_sandbox() {
 
 	fail "Sandbox did not become ready"
 	return 1
+}
+
+requires_sandbox() {
+	local mode="${1:-}"
+
+	case "$mode" in
+	install | install/* | "$TESTS_DIR"/install/*)
+		return 1
+		;;
+	*)
+		return 0
+		;;
+	esac
 }
 
 # Run a single test
@@ -95,10 +108,16 @@ run_tests() {
 		fi
 
 		log "Shard $shard_id contains ${#tests[@]} tests"
+	elif [ -n "$mode" ] && [ -f "$TESTS_DIR/$mode" ]; then
+		log "Running single test: $mode"
+		tests+=("$TESTS_DIR/$mode")
+	elif [ -n "$mode" ] && [ -f "$mode" ]; then
+		log "Running single test: $mode"
+		tests+=("$mode")
 	elif [ "$mode" == "all" ] || [ -z "$mode" ]; then
 		# All mode: run all tests (for local dev)
 		log "Running all test categories"
-		for category in node dal baker accuser import binaries signatory group headless; do
+		for category in node dal baker accuser import binaries install signatory group headless; do
 			if [ -d "$TESTS_DIR/$category" ]; then
 				for test in $(ls "$TESTS_DIR/$category"/*.sh 2>/dev/null | sort); do
 					tests+=("$test")
@@ -270,7 +289,11 @@ main() {
 	export OCTEZ_BIN_DIR="/opt/octez"
 	export TEST_INSTANCE="test-node"
 
-	wait_for_sandbox
+	if requires_sandbox "$mode"; then
+		wait_for_sandbox
+	else
+		log "Skipping sandbox wait for installer-only tests"
+	fi
 
 	if [ "$mode" == "--shard" ]; then
 		run_tests --shard "$shard_id"

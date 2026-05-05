@@ -33,6 +33,7 @@ services:
     cgroup: host
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - ../../install.sh:/install.sh:ro
     tmpfs:
       - /run
       - /run/lock

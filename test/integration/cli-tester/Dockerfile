@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     netbase \
     procps \
+    python3 \
     bc \
     parallel \
     && rm -rf /var/lib/apt/lists/*

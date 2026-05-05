@@ -14,8 +14,10 @@ set -e
 #   - Root user: /usr/local/bin (system-wide)
 #   - Regular user: ~/.local/bin (user-local, XDG Base Directory)
 
-REPO="trilitech/octez-manager"
-BINARY_NAME="octez-manager"
+REPO="${REPO:-trilitech/octez-manager}"
+BINARY_NAME="${BINARY_NAME:-octez-manager}"
+GITHUB_LATEST_RELEASE_URL="${OCTEZ_MANAGER_GITHUB_LATEST_RELEASE_URL:-https://api.github.com/repos/$REPO/releases/latest}"
+RELEASE_DOWNLOAD_BASE_URL="${OCTEZ_MANAGER_RELEASE_DOWNLOAD_BASE_URL:-https://github.com/$REPO/releases/download}"
 
 # Parse arguments
 PREFIX=""
@@ -69,9 +71,13 @@ x86_64 | amd64) ARCH="x86_64" ;;
 	;;
 esac
 
-# Get latest version
-echo "Fetching latest version..."
-VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+# Get latest version unless VERSION is pinned by the caller.
+if [ -z "${VERSION:-}" ]; then
+	echo "Fetching latest version..."
+	VERSION=$(curl -fsSL "$GITHUB_LATEST_RELEASE_URL" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+else
+	echo "Using version $VERSION"
+fi
 
 if [ -z "$VERSION" ]; then
 	echo "Failed to fetch latest version"
@@ -80,8 +86,8 @@ fi
 
 # Download binary
 ASSET_NAME="octez-manager-${VERSION}-${OS}-${ARCH}"
-DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET_NAME"
-CHECKSUMS_URL="https://github.com/$REPO/releases/download/$VERSION/sha256sums.txt"
+DOWNLOAD_URL="$RELEASE_DOWNLOAD_BASE_URL/$VERSION/$ASSET_NAME"
+CHECKSUMS_URL="$RELEASE_DOWNLOAD_BASE_URL/$VERSION/sha256sums.txt"
 
 echo "Downloading $ASSET_NAME..."
 TMPDIR=$(mktemp -d)
