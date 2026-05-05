@@ -81,12 +81,27 @@ fi
 # Download binary
 ASSET_NAME="octez-manager-${VERSION}-${OS}-${ARCH}"
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET_NAME"
+CHECKSUMS_URL="https://github.com/$REPO/releases/download/$VERSION/sha256sums.txt"
 
 echo "Downloading $ASSET_NAME..."
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
-curl -fsSL "$DOWNLOAD_URL" -o "$TMPDIR/$BINARY_NAME"
-chmod +x "$TMPDIR/$BINARY_NAME"
+curl -fsSL "$DOWNLOAD_URL" -o "$TMPDIR/$ASSET_NAME"
+
+echo "Verifying checksum..."
+if ! command -v sha256sum >/dev/null 2>&1; then
+	echo "sha256sum is required to verify the download"
+	exit 1
+fi
+curl -fsSL "$CHECKSUMS_URL" -o "$TMPDIR/sha256sums.txt"
+EXPECTED_SHA256=$(grep "  $ASSET_NAME$" "$TMPDIR/sha256sums.txt" | awk '{print $1}' | head -n 1)
+if [ -z "$EXPECTED_SHA256" ]; then
+	echo "No checksum entry found for $ASSET_NAME"
+	exit 1
+fi
+printf '%s  %s\n' "$EXPECTED_SHA256" "$ASSET_NAME" > "$TMPDIR/$ASSET_NAME.sha256"
+(cd "$TMPDIR" && sha256sum -c "$ASSET_NAME.sha256")
+chmod +x "$TMPDIR/$ASSET_NAME"
 
 # Create install directory if it doesn't exist
 if [ ! -d "$INSTALL_DIR" ]; then
@@ -101,9 +116,9 @@ fi
 # Install
 echo "Installing to $INSTALL_DIR/$BINARY_NAME..."
 if [ -w "$INSTALL_DIR" ]; then
-	mv "$TMPDIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
+	mv "$TMPDIR/$ASSET_NAME" "$INSTALL_DIR/$BINARY_NAME"
 else
-	sudo mv "$TMPDIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
+	sudo mv "$TMPDIR/$ASSET_NAME" "$INSTALL_DIR/$BINARY_NAME"
 fi
 
 echo ""

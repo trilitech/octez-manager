@@ -16,21 +16,23 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid, Code, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+import { Card, CardGrid, Code, Aside } from '@astrojs/starlight/components';
 
 <Aside type="caution" title="Experimental Software">
 Octez Manager is in early development. Recommended for **testnet use only** (Shadownet, Weeklynet). We do not guarantee backward compatibility with future versions.
 </Aside>
 
-## Install in seconds
+## Try It Locally
 
-<Tabs>
-  <TabItem label="Script">
+Download the latest Linux binary and launch the TUI:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh
+curl -fsSLO https://github.com/trilitech/octez-manager/releases/latest/download/octez-manager-linux-x86_64
+chmod +x octez-manager-linux-x86_64
+./octez-manager-linux-x86_64
 ```
-  </TabItem>
-</Tabs>
+
+For a PATH install with checksum verification, see the [installation guide](/getting-started/installation/).
 
 ## See it in action
 
