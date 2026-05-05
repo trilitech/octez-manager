@@ -244,6 +244,45 @@ let chunk_list ~size lst =
   in
   aux [] lst
 
+let validate_batch_size batch_size =
+  if batch_size <= 0 then Error "batch_size must be > 0" else Ok ()
+
+let timestamp_now () =
+  let tm = Unix.gmtime (Unix.gettimeofday ()) in
+  Printf.sprintf
+    "%04d-%02d-%02dT%02d:%02d:%02dZ"
+    (tm.Unix.tm_year + 1900)
+    (tm.Unix.tm_mon + 1)
+    tm.Unix.tm_mday
+    tm.Unix.tm_hour
+    tm.Unix.tm_min
+    tm.Unix.tm_sec
+
+let write_reports ~report_dir ~baker ~cycle ~results ~invalid ?summary () =
+  match
+    Payout_report.write_payouts_csv ~dir:report_dir ~baker ~cycle results
+  with
+  | Error msg -> Error (Printf.sprintf "failed to write payouts.csv: %s" msg)
+  | Ok () -> (
+      match
+        Payout_report.write_invalid_csv ~dir:report_dir ~baker ~cycle invalid
+      with
+      | Error msg ->
+          Error (Printf.sprintf "failed to write invalid.csv: %s" msg)
+      | Ok () -> (
+          match summary with
+          | None -> Ok ()
+          | Some summary -> (
+              match
+                Payout_report.write_summary_json ~dir:report_dir summary
+              with
+              | Error msg ->
+                  Error (Printf.sprintf "failed to write summary.json: %s" msg)
+              | Ok () -> Ok ())))
+
+let should_write_paid_summary ~dry_run ~total ~succeeded =
+  dry_run || total = List.length succeeded
+
 (* ── Main execution ────────────────────────────────────────── *)
 
 let execute_merged ~ctx ~payouts ?(dry_run = false) ?on_progress
@@ -252,70 +291,73 @@ let execute_merged ~ctx ~payouts ?(dry_run = false) ?on_progress
   if String.length (String.trim ctx.payout_key_alias) = 0 then
     Error "payout_key_alias is not configured"
   else
-    let total = List.length payouts in
-    let chunks = chunk_list ~size:batch_size payouts in
-    let results = ref [] in
-    let processed = ref 0 in
-    let consecutive_failures = ref 0 in
-    let aborted = ref false in
-    List.iter
-      (fun chunk ->
-        if not !aborted then begin
-          let batch_results = execute_batch ~ctx ~payouts:chunk ~dry_run in
-          let batch_ok =
-            List.exists
-              (fun (r : Rewards.payout_result) -> r.success)
-              batch_results
-          in
-          if batch_ok then consecutive_failures := 0
-          else consecutive_failures := !consecutive_failures + 1 ;
-          (* Fire per-transfer progress callbacks *)
-          List.iter
-            (fun result ->
-              processed := !processed + 1 ;
-              results := result :: !results ;
-              match on_progress with
-              | Some cb ->
-                  cb
-                    {
-                      current = !processed;
-                      total;
-                      delegator = result.Rewards.delegator;
-                      result;
-                    }
-              | None -> ())
-            batch_results ;
-          (* Abort after 2 consecutive failed batches *)
-          if !consecutive_failures >= 2 then aborted := true
-        end)
-      chunks ;
-    (* Mark remaining payouts as aborted if we stopped early *)
-    if !aborted then begin
-      let remaining_count = total - !processed in
-      if remaining_count > 0 then begin
-        let remaining_payouts = drop !processed payouts in
+    match validate_batch_size batch_size with
+    | Error _ as e -> e
+    | Ok () ->
+        let total = List.length payouts in
+        let chunks = chunk_list ~size:batch_size payouts in
+        let results = ref [] in
+        let processed = ref 0 in
+        let consecutive_failures = ref 0 in
+        let aborted = ref false in
         List.iter
-          (fun (delegator, recipient, amount) ->
-            processed := !processed + 1 ;
-            let result =
-              {
-                Rewards.delegator;
-                recipient;
-                amount;
-                op_hash = None;
-                success = false;
-                note = "aborted: consecutive batch failures";
-              }
-            in
-            results := result :: !results ;
-            match on_progress with
-            | Some cb -> cb {current = !processed; total; delegator; result}
-            | None -> ())
-          remaining_payouts
-      end
-    end ;
-    let results = List.rev !results in
-    Ok results
+          (fun chunk ->
+            if not !aborted then begin
+              let batch_results = execute_batch ~ctx ~payouts:chunk ~dry_run in
+              let batch_ok =
+                List.exists
+                  (fun (r : Rewards.payout_result) -> r.success)
+                  batch_results
+              in
+              if batch_ok then consecutive_failures := 0
+              else consecutive_failures := !consecutive_failures + 1 ;
+              (* Fire per-transfer progress callbacks *)
+              List.iter
+                (fun result ->
+                  processed := !processed + 1 ;
+                  results := result :: !results ;
+                  match on_progress with
+                  | Some cb ->
+                      cb
+                        {
+                          current = !processed;
+                          total;
+                          delegator = result.Rewards.delegator;
+                          result;
+                        }
+                  | None -> ())
+                batch_results ;
+              (* Abort after 2 consecutive failed batches *)
+              if !consecutive_failures >= 2 then aborted := true
+            end)
+          chunks ;
+        (* Mark remaining payouts as aborted if we stopped early *)
+        if !aborted then begin
+          let remaining_count = total - !processed in
+          if remaining_count > 0 then begin
+            let remaining_payouts = drop !processed payouts in
+            List.iter
+              (fun (delegator, recipient, amount) ->
+                processed := !processed + 1 ;
+                let result =
+                  {
+                    Rewards.delegator;
+                    recipient;
+                    amount;
+                    op_hash = None;
+                    success = false;
+                    note = "aborted: consecutive batch failures";
+                  }
+                in
+                results := result :: !results ;
+                match on_progress with
+                | Some cb -> cb {current = !processed; total; delegator; result}
+                | None -> ())
+              remaining_payouts
+          end
+        end ;
+        let results = List.rev !results in
+        Ok results
 
 let execute ~ctx ~(blueprint : Rewards.payout_blueprint) ?(dry_run = false)
     ?on_progress ?(batch_size = 80) () =
@@ -323,155 +365,159 @@ let execute ~ctx ~(blueprint : Rewards.payout_blueprint) ?(dry_run = false)
   if String.length (String.trim ctx.payout_key_alias) = 0 then
     Error "payout_key_alias is not configured"
   else
-    let cycle = blueprint.cycle in
-    let instance = ctx.instance in
-    (* Check double-payment *)
-    if (not dry_run) && Payout_report.cycle_is_paid ~instance ~cycle then
-      Error (Printf.sprintf "Cycle %d has already been paid." cycle)
-    else
-      let report_dir =
-        if dry_run then Payout_report.dry_report_dir ~instance ~cycle
-        else Payout_report.report_dir ~instance ~cycle
-      in
-      (* Ensure report directory exists *)
-      let rec ensure_dir path =
-        if Sys.file_exists path then ()
-        else (
-          ensure_dir (Filename.dirname path) ;
-          try Unix.mkdir path 0o755
-          with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
-      in
-      ensure_dir report_dir ;
-      let lock_path = Filename.concat report_dir ".lock" in
-      File_ops.with_file_lock lock_path (fun () ->
-          let payouts = collect_payouts blueprint in
-          let total = List.length payouts in
-          let chunks = chunk_list ~size:batch_size payouts in
-          let results = ref [] in
-          let processed = ref 0 in
-          let consecutive_failures = ref 0 in
-          let aborted = ref false in
-          List.iter
-            (fun chunk ->
-              if not !aborted then begin
-                let batch_results =
-                  execute_batch ~ctx ~payouts:chunk ~dry_run
-                in
-                let batch_ok =
-                  List.exists
-                    (fun (r : Rewards.payout_result) -> r.success)
-                    batch_results
-                in
-                if batch_ok then consecutive_failures := 0
-                else consecutive_failures := !consecutive_failures + 1 ;
-                (* Fire per-transfer progress callbacks *)
-                List.iter
-                  (fun result ->
-                    processed := !processed + 1 ;
-                    results := result :: !results ;
-                    match on_progress with
-                    | Some cb ->
-                        cb
-                          {
-                            current = !processed;
-                            total;
-                            delegator = result.Rewards.delegator;
-                            result;
-                          }
-                    | None -> ())
-                  batch_results ;
-                (* Abort after 2 consecutive failed batches *)
-                if !consecutive_failures >= 2 then aborted := true
-              end)
-            chunks ;
-          (* Mark remaining payouts as aborted if we stopped early *)
-          if !aborted then begin
-            let remaining_count = total - !processed in
-            if remaining_count > 0 then begin
-              let remaining_payouts = drop !processed payouts in
+    match validate_batch_size batch_size with
+    | Error _ as e -> e
+    | Ok () ->
+        let cycle = blueprint.cycle in
+        let instance = ctx.instance in
+        let report_dir =
+          if dry_run then Payout_report.dry_report_dir ~instance ~cycle
+          else Payout_report.report_dir ~instance ~cycle
+        in
+        (* Ensure report directory exists *)
+        let rec ensure_dir path =
+          if Sys.file_exists path then ()
+          else (
+            ensure_dir (Filename.dirname path) ;
+            try Unix.mkdir path 0o755
+            with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
+        in
+        ensure_dir report_dir ;
+        let lock_path = Filename.concat report_dir ".lock" in
+        File_ops.with_file_lock lock_path (fun () ->
+            if (not dry_run) && Payout_report.cycle_is_paid ~instance ~cycle
+            then Error (Printf.sprintf "Cycle %d has already been paid." cycle)
+            else
+              let payouts = collect_payouts blueprint in
+              let total = List.length payouts in
+              let chunks = chunk_list ~size:batch_size payouts in
+              let results = ref [] in
+              let processed = ref 0 in
+              let consecutive_failures = ref 0 in
+              let aborted = ref false in
               List.iter
-                (fun (delegator, recipient, amount) ->
-                  processed := !processed + 1 ;
-                  let result =
-                    {
-                      Rewards.delegator;
-                      recipient;
-                      amount;
-                      op_hash = None;
-                      success = false;
-                      note = "aborted: consecutive batch failures";
-                    }
-                  in
-                  results := result :: !results ;
-                  match on_progress with
-                  | Some cb ->
-                      cb {current = !processed; total; delegator; result}
-                  | None -> ())
-                remaining_payouts
-            end
-          end ;
-          let results = List.rev !results in
-          let succeeded =
-            List.filter (fun (r : Rewards.payout_result) -> r.success) results
-          in
-          let distributed =
-            List.fold_left
-              (fun acc (r : Rewards.payout_result) ->
-                if r.success then Int64.add acc r.amount else acc)
-              0L
-              results
-          in
-          let tx_fees_paid = blueprint.estimated_tx_fees in
-          let summary : Rewards.cycle_summary =
-            {
-              cycle;
-              delegators = blueprint.total_delegators;
-              paid_delegators = List.length succeeded;
-              own_staked_balance = 0L;
-              own_delegated_balance = 0L;
-              external_staked_balance = 0L;
-              external_delegated_balance = 0L;
-              earned_rewards = blueprint.earned_rewards;
-              earned_block_fees = blueprint.earned_block_fees;
-              distributed_rewards = distributed;
-              bond_income = blueprint.baker_bond_income;
-              fee_income = blueprint.baker_fee_income;
-              tx_fees_paid;
-              timestamp =
-                (let tm = Unix.gmtime (Unix.gettimeofday ()) in
-                 Printf.sprintf
-                   "%04d-%02d-%02dT%02d:%02d:%02dZ"
-                   (tm.Unix.tm_year + 1900)
-                   (tm.Unix.tm_mon + 1)
-                   tm.Unix.tm_mday
-                   tm.Unix.tm_hour
-                   tm.Unix.tm_min
-                   tm.Unix.tm_sec);
-            }
-          in
-          (* Write reports *)
-          let invalid =
-            List.filter
-              (fun (r : Rewards.delegator_reward) ->
-                match r.status with Rewards.Eligible -> false | _ -> true)
-              blueprint.delegator_rewards
-          in
-          let _ =
-            Payout_report.write_payouts_csv
-              ~dir:report_dir
-              ~baker:blueprint.baker
-              ~cycle
-              results
-          in
-          let _ =
-            Payout_report.write_invalid_csv
-              ~dir:report_dir
-              ~baker:blueprint.baker
-              ~cycle
-              invalid
-          in
-          let _ = Payout_report.write_summary_json ~dir:report_dir summary in
-          Ok (results, summary))
+                (fun chunk ->
+                  if not !aborted then begin
+                    let batch_results =
+                      execute_batch ~ctx ~payouts:chunk ~dry_run
+                    in
+                    let batch_ok =
+                      List.exists
+                        (fun (r : Rewards.payout_result) -> r.success)
+                        batch_results
+                    in
+                    if batch_ok then consecutive_failures := 0
+                    else consecutive_failures := !consecutive_failures + 1 ;
+                    (* Fire per-transfer progress callbacks *)
+                    List.iter
+                      (fun result ->
+                        processed := !processed + 1 ;
+                        results := result :: !results ;
+                        match on_progress with
+                        | Some cb ->
+                            cb
+                              {
+                                current = !processed;
+                                total;
+                                delegator = result.Rewards.delegator;
+                                result;
+                              }
+                        | None -> ())
+                      batch_results ;
+                    (* Abort after 2 consecutive failed batches *)
+                    if !consecutive_failures >= 2 then aborted := true
+                  end)
+                chunks ;
+              (* Mark remaining payouts as aborted if we stopped early *)
+              if !aborted then begin
+                let remaining_count = total - !processed in
+                if remaining_count > 0 then begin
+                  let remaining_payouts = drop !processed payouts in
+                  List.iter
+                    (fun (delegator, recipient, amount) ->
+                      processed := !processed + 1 ;
+                      let result =
+                        {
+                          Rewards.delegator;
+                          recipient;
+                          amount;
+                          op_hash = None;
+                          success = false;
+                          note = "aborted: consecutive batch failures";
+                        }
+                      in
+                      results := result :: !results ;
+                      match on_progress with
+                      | Some cb ->
+                          cb {current = !processed; total; delegator; result}
+                      | None -> ())
+                    remaining_payouts
+                end
+              end ;
+              let results = List.rev !results in
+              let succeeded =
+                List.filter
+                  (fun (r : Rewards.payout_result) -> r.success)
+                  results
+              in
+              let distributed =
+                List.fold_left
+                  (fun acc (r : Rewards.payout_result) ->
+                    if r.success then Int64.add acc r.amount else acc)
+                  0L
+                  results
+              in
+              let tx_fees_paid = blueprint.estimated_tx_fees in
+              let summary : Rewards.cycle_summary =
+                {
+                  cycle;
+                  delegators = blueprint.total_delegators;
+                  paid_delegators = List.length succeeded;
+                  own_staked_balance = 0L;
+                  own_delegated_balance = 0L;
+                  external_staked_balance = 0L;
+                  external_delegated_balance = 0L;
+                  earned_rewards = blueprint.earned_rewards;
+                  earned_block_fees = blueprint.earned_block_fees;
+                  distributed_rewards = distributed;
+                  bond_income = blueprint.baker_bond_income;
+                  fee_income = blueprint.baker_fee_income;
+                  tx_fees_paid;
+                  timestamp = timestamp_now ();
+                }
+              in
+              (* Write reports *)
+              let invalid =
+                List.filter
+                  (fun (r : Rewards.delegator_reward) ->
+                    match r.status with Rewards.Eligible -> false | _ -> true)
+                  blueprint.delegator_rewards
+              in
+              let summary =
+                if should_write_paid_summary ~dry_run ~total ~succeeded then
+                  Some summary
+                else None
+              in
+              match
+                write_reports
+                  ~report_dir
+                  ~baker:blueprint.baker
+                  ~cycle
+                  ~results
+                  ~invalid
+                  ?summary
+                  ()
+              with
+              | Error _ as e -> e
+              | Ok () -> (
+                  match summary with
+                  | Some summary -> Ok (results, summary)
+                  | None ->
+                      Error
+                        (Printf.sprintf
+                           "payout for cycle %d did not complete; payouts.csv \
+                            and invalid.csv written, summary.json not written"
+                           cycle)))
 
 module Internal_for_tests = struct
   let extract_op_hash = extract_op_hash

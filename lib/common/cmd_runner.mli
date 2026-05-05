@@ -95,6 +95,10 @@ val run_out_with_timeout_combined :
 val set_run_out_with_timeout_combined_hook :
   (timeout:float -> string list -> (string, [`Msg of string]) result) -> unit
 
+(** Clear the {!run_out_with_timeout_combined} override. Intended for tests that
+    temporarily replace command execution. *)
+val reset_run_out_with_timeout_combined_hook : unit -> unit
+
 (** Like {!run_out} but captures stderr to prevent it from leaking to
     the terminal.  Returns only stdout.  Useful for HTTP operations in
     the TUI where curl errors would corrupt the display. *)

@@ -299,6 +299,159 @@ let test_merge_payouts_different_recipients_same_delegator () =
     (Some 500L)
     alice_to_redirect
 
+let temp_counter = ref 0
+
+let with_temp_xdg f =
+  incr temp_counter ;
+  let old_xdg = Sys.getenv_opt "XDG_CONFIG_HOME" in
+  let dir =
+    Filename.concat
+      (Filename.get_temp_dir_name ())
+      (Printf.sprintf
+         "octez-manager-payout-test-%d-%d"
+         (Unix.getpid ())
+         !temp_counter)
+  in
+  Unix.mkdir dir 0o700 ;
+  Unix.putenv "XDG_CONFIG_HOME" dir ;
+  Fun.protect
+    ~finally:(fun () ->
+      Cmd_runner.reset_run_out_with_timeout_combined_hook () ;
+      match old_xdg with
+      | Some v -> Unix.putenv "XDG_CONFIG_HOME" v
+      | None -> Unix.putenv "XDG_CONFIG_HOME" "")
+    f
+
+let success_hash = "opVMd9YJV2tdkwDPN7CzXmEUmKYY27Phc8aRz3HEgFKUvW1ZBnp"
+
+let make_ctx ~instance =
+  {
+    Payout_executor.octez_client_bin = "octez-client";
+    endpoint = "http://localhost:8732";
+    base_dir = None;
+    password_file = None;
+    payout_key_alias = "payout-key";
+    instance;
+  }
+
+let blueprint_with_payouts ~cycle count =
+  let rewards =
+    List.init count (fun i ->
+        let delegator = Printf.sprintf "tz1delegator%02d" i in
+        make_delegator_reward
+          ~delegator
+          ~recipient:delegator
+          ~net_reward:1000L
+          ~status:Eligible)
+  in
+  make_blueprint
+    ~cycle
+    ~delegator_rewards:rewards
+    ~bond_payouts:[]
+    ~fee_payouts:[]
+
+let test_failed_real_payout_does_not_mark_paid () =
+  with_temp_xdg (fun () ->
+      Cmd_runner.set_run_out_with_timeout_combined_hook (fun ~timeout:_ _argv ->
+          Error (`Msg "simulated transfer failure")) ;
+      let instance = "failed-real" in
+      let cycle = 4242 in
+      let ctx = make_ctx ~instance in
+      let blueprint = blueprint_with_payouts ~cycle 1 in
+      match Payout_executor.execute ~ctx ~blueprint ~batch_size:1 () with
+      | Ok _ -> Alcotest.fail "failed real payout must return Error"
+      | Error _ ->
+          Alcotest.(check bool)
+            "cycle remains unpaid"
+            false
+            (Payout_report.cycle_is_paid ~instance ~cycle) ;
+          Alcotest.(check bool)
+            "diagnostic payouts.csv written"
+            true
+            (Sys.file_exists
+               (Filename.concat
+                  (Payout_report.report_dir ~instance ~cycle)
+                  "payouts.csv")))
+
+let test_no_op_hash_real_payout_does_not_mark_paid () =
+  with_temp_xdg (fun () ->
+      Cmd_runner.set_run_out_with_timeout_combined_hook (fun ~timeout:_ _argv ->
+          Ok "Injected operation but no operation hash was returned") ;
+      let instance = "no-op-hash" in
+      let cycle = 4243 in
+      let ctx = make_ctx ~instance in
+      let blueprint = blueprint_with_payouts ~cycle 1 in
+      match Payout_executor.execute ~ctx ~blueprint ~batch_size:1 () with
+      | Ok _ -> Alcotest.fail "real payout without op hash must return Error"
+      | Error _ ->
+          Alcotest.(check bool)
+            "cycle remains unpaid"
+            false
+            (Payout_report.cycle_is_paid ~instance ~cycle))
+
+let test_partial_real_payout_does_not_mark_paid () =
+  with_temp_xdg (fun () ->
+      let calls = ref 0 in
+      Cmd_runner.set_run_out_with_timeout_combined_hook (fun ~timeout:_ _argv ->
+          incr calls ;
+          if !calls = 1 then Ok ("Operation hash is '" ^ success_hash ^ "'")
+          else Error (`Msg "simulated second batch failure")) ;
+      let instance = "partial-real" in
+      let cycle = 4244 in
+      let ctx = make_ctx ~instance in
+      let blueprint = blueprint_with_payouts ~cycle 2 in
+      match Payout_executor.execute ~ctx ~blueprint ~batch_size:1 () with
+      | Ok _ -> Alcotest.fail "partial real payout must return Error"
+      | Error _ ->
+          Alcotest.(check int) "two batches attempted" 2 !calls ;
+          Alcotest.(check bool)
+            "cycle remains unpaid"
+            false
+            (Payout_report.cycle_is_paid ~instance ~cycle))
+
+let test_report_write_failure_returns_error () =
+  with_temp_xdg (fun () ->
+      Cmd_runner.set_run_out_with_timeout_combined_hook (fun ~timeout:_ _argv ->
+          Ok ("Operation hash is '" ^ success_hash ^ "'")) ;
+      let instance = "report-write-fails" in
+      let cycle = 4245 in
+      let ctx = make_ctx ~instance in
+      let blueprint = blueprint_with_payouts ~cycle 1 in
+      let report_dir = Payout_report.report_dir ~instance ~cycle in
+      let rec mkdir_p path =
+        if Sys.file_exists path then ()
+        else (
+          mkdir_p (Filename.dirname path) ;
+          Unix.mkdir path 0o755)
+      in
+      mkdir_p report_dir ;
+      Unix.mkdir (Filename.concat report_dir "payouts.csv") 0o755 ;
+      match Payout_executor.execute ~ctx ~blueprint ~batch_size:1 () with
+      | Ok _ -> Alcotest.fail "report write failure must return Error"
+      | Error msg ->
+          Alcotest.(check bool)
+            "mentions payouts.csv"
+            true
+            (String.contains msg 'p'))
+
+let test_rejects_zero_batch_size () =
+  with_temp_xdg (fun () ->
+      let instance = "zero-batch" in
+      let ctx = make_ctx ~instance in
+      let blueprint = blueprint_with_payouts ~cycle:4246 1 in
+      Alcotest.(check (result reject string))
+        "execute rejects zero batch"
+        (Error "batch_size must be > 0")
+        (Payout_executor.execute ~ctx ~blueprint ~batch_size:0 ()) ;
+      Alcotest.(check (result reject string))
+        "execute_merged rejects zero batch"
+        (Error "batch_size must be > 0")
+        (Payout_executor.execute_merged
+           ~ctx
+           ~payouts:[("tz1delegator", "tz1delegator", 1L)]
+           ~batch_size:0
+           ()))
+
 let () =
   Alcotest.run
     "payout_executor"
@@ -404,5 +557,28 @@ let () =
                 "should extract op-prefixed hash"
                 (Some hash)
                 result);
+        ] );
+      ( "execute",
+        [
+          Alcotest.test_case
+            "failed real payout does not mark paid"
+            `Quick
+            test_failed_real_payout_does_not_mark_paid;
+          Alcotest.test_case
+            "no op hash does not mark paid"
+            `Quick
+            test_no_op_hash_real_payout_does_not_mark_paid;
+          Alcotest.test_case
+            "partial real payout does not mark paid"
+            `Quick
+            test_partial_real_payout_does_not_mark_paid;
+          Alcotest.test_case
+            "report write failure returns error"
+            `Quick
+            test_report_write_failure_returns_error;
+          Alcotest.test_case
+            "rejects zero batch size"
+            `Quick
+            test_rejects_zero_batch_size;
         ] );
     ]

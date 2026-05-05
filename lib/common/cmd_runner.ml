@@ -282,6 +282,9 @@ let run_out_with_timeout_combined_hook :
 let set_run_out_with_timeout_combined_hook f =
   run_out_with_timeout_combined_hook := Some f
 
+let reset_run_out_with_timeout_combined_hook () =
+  run_out_with_timeout_combined_hook := None
+
 let run_out_combined_blocking argv =
   let cmd_str = cmd_to_string argv in
   let ic, oc, ec = Unix.open_process_full cmd_str (Unix.environment ()) in

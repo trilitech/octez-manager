@@ -1096,7 +1096,7 @@
 
 (test
  (name test_payout_executor)
- (libraries alcotest octez_manager_rewards)
+ (libraries alcotest octez_manager_common octez_manager_rewards unix)
  (modules test_payout_executor)
  (instrumentation
   (backend bisect_ppx)))
