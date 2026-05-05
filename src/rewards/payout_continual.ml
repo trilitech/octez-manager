@@ -30,6 +30,24 @@ let cycles_due ~instance ~current_cycle ~interval ~offset =
     collect_due_cycles ~current_cycle ~interval ~is_paid:(fun c ->
         Payout_report.cycle_is_paid ~instance ~cycle:c)
 
+let rec ensure_dir path =
+  if Sys.file_exists path then ()
+  else (
+    ensure_dir (Filename.dirname path) ;
+    try Unix.mkdir path 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
+
+let with_cycle_locks ~instance cycles f =
+  let cycles = List.sort_uniq Int.compare cycles in
+  let rec loop = function
+    | [] -> f ()
+    | cycle :: rest ->
+        let report_dir = Payout_report.report_dir ~instance ~cycle in
+        ensure_dir report_dir ;
+        let lock_path = Filename.concat report_dir ".lock" in
+        File_ops.with_file_lock lock_path (fun () -> loop rest)
+  in
+  loop cycles
+
 (* ── Execute due cycles ──────────────────────────────────── *)
 
 let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
@@ -114,7 +132,7 @@ let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
                          "Skipped due to failure in cycle %d"
                          failed_cycle) ) ))
             multiple_cycles
-      | Ok blueprints_with_cycles -> (
+      | Ok blueprints_with_cycles ->
           let blueprints_with_cycles : (int * Rewards.payout_blueprint) list =
             List.rev blueprints_with_cycles
           in
@@ -127,233 +145,299 @@ let pay_due_cycles ~ctx ~baker ~network ~current_cycle ~interval ~offset =
           (* Step 3: Merge payouts *)
           let merged_payouts = Payout_executor.merge_payouts all_payouts in
           (* Step 4: Execute merged payouts *)
-          match
-            Payout_executor.execute_merged
-              ~ctx
-              ~payouts:merged_payouts
-              ~batch_size:config.sim_batch_size
-              ()
-          with
-          | Error msg ->
-              (* All cycles failed *)
-              List.map (fun cycle -> (cycle, (0, Error msg))) multiple_cycles
-          | Ok merged_results ->
-              (* Step 5: Write per-cycle reports *)
-              (* Build a map of (delegator, recipient) -> result *)
-              let module PairMap = Map.Make (struct
-                type t = string * string
-
-                let compare (d1, r1) (d2, r2) =
-                  match String.compare d1 d2 with
-                  | 0 -> String.compare r1 r2
-                  | c -> c
-              end) in
-              let result_map =
-                List.fold_left
-                  (fun map (r : Rewards.payout_result) ->
-                    PairMap.add (r.delegator, r.recipient) r map)
-                  PairMap.empty
-                  merged_results
+          with_cycle_locks ~instance multiple_cycles (fun () ->
+              let paid_after_blueprint =
+                List.filter
+                  (fun cycle -> Payout_report.cycle_is_paid ~instance ~cycle)
+                  multiple_cycles
               in
-              (* For each cycle, create per-cycle reports *)
-              let per_cycle_results =
+              if paid_after_blueprint <> [] then
                 List.map
-                  (fun (cycle, blueprint) ->
-                    let cycle_payouts =
-                      Payout_executor.collect_payouts blueprint
-                    in
-                    (* Map each cycle payout to its execution result *)
-                    let cycle_payout_results =
-                      List.map
-                        (fun (delegator, recipient, cycle_amount) ->
-                          match
-                            PairMap.find_opt (delegator, recipient) result_map
-                          with
-                          | Some merged_result ->
-                              (* Use the merged result but with cycle amount *)
-                              {merged_result with Rewards.amount = cycle_amount}
-                          | None ->
-                              (* Should not happen, but handle gracefully *)
-                              {
-                                Rewards.delegator;
-                                recipient;
-                                amount = cycle_amount;
-                                op_hash = None;
-                                success = false;
-                                note = "missing from merged execution";
-                              })
-                        cycle_payouts
-                    in
-                    let report_dir =
-                      Payout_report.report_dir ~instance ~cycle
-                    in
-                    (* Ensure report directory exists *)
-                    let rec ensure_dir path =
-                      if Sys.file_exists path then ()
-                      else (
-                        ensure_dir (Filename.dirname path) ;
-                        try Unix.mkdir path 0o755
-                        with Unix.Unix_error (Unix.EEXIST, _, _) -> ())
-                    in
-                    ensure_dir report_dir ;
-                    let lock_path = Filename.concat report_dir ".lock" in
-                    File_ops.with_file_lock lock_path (fun () ->
-                        (* Write per-cycle reports *)
-                        let succeeded =
-                          List.filter
-                            (fun (r : Rewards.payout_result) -> r.success)
-                            cycle_payout_results
-                        in
-                        let distributed =
-                          List.fold_left
-                            (fun acc (r : Rewards.payout_result) ->
-                              if r.success then Int64.add acc r.amount else acc)
-                            0L
-                            cycle_payout_results
-                        in
-                        let summary : Rewards.cycle_summary =
-                          {
-                            cycle;
-                            delegators = blueprint.total_delegators;
-                            paid_delegators = List.length succeeded;
-                            own_staked_balance = 0L;
-                            own_delegated_balance = 0L;
-                            external_staked_balance = 0L;
-                            external_delegated_balance = 0L;
-                            earned_rewards = blueprint.earned_rewards;
-                            earned_block_fees = blueprint.earned_block_fees;
-                            distributed_rewards = distributed;
-                            bond_income = blueprint.baker_bond_income;
-                            fee_income = blueprint.baker_fee_income;
-                            tx_fees_paid = blueprint.estimated_tx_fees;
-                            timestamp =
-                              (let tm = Unix.gmtime (Unix.gettimeofday ()) in
-                               Printf.sprintf
-                                 "%04d-%02d-%02dT%02d:%02d:%02dZ"
-                                 (tm.Unix.tm_year + 1900)
-                                 (tm.Unix.tm_mon + 1)
-                                 tm.Unix.tm_mday
-                                 tm.Unix.tm_hour
-                                 tm.Unix.tm_min
-                                 tm.Unix.tm_sec);
-                          }
-                        in
-                        let invalid =
-                          List.filter
-                            (fun (r : Rewards.delegator_reward) ->
-                              match r.status with
-                              | Rewards.Eligible -> false
-                              | _ -> true)
-                            blueprint.delegator_rewards
-                        in
-                        let _ =
-                          Payout_report.write_payouts_csv
-                            ~dir:report_dir
-                            ~baker:blueprint.baker
-                            ~cycle
-                            cycle_payout_results
-                        in
-                        let _ =
-                          Payout_report.write_invalid_csv
-                            ~dir:report_dir
-                            ~baker:blueprint.baker
-                            ~cycle
-                            invalid
-                        in
-                        let _ =
-                          Payout_report.write_summary_json
-                            ~dir:report_dir
-                            summary
-                        in
-                        let paid = List.length succeeded in
-                        let total = List.length cycle_payout_results in
-                        if total > 0 && paid = 0 then
-                          (cycle, (0, Error "all payouts failed"))
-                        else (cycle, (paid, Ok ()))))
-                  blueprints_with_cycles
-              in
-              (* Step 6: Send one combined notification *)
-              let channels =
-                match Payout_config.load ~instance with
-                | Ok c -> c.notifications
-                | Error _ -> []
-              in
-              if channels <> [] then begin
-                (* Use the first cycle's summary for notification *)
-                match blueprints_with_cycles with
-                | (first_cycle, first_blueprint) :: _ ->
-                    let total_distributed =
+                  (fun cycle ->
+                    if List.mem cycle paid_after_blueprint then
+                      ( cycle,
+                        ( 0,
+                          Error
+                            (Printf.sprintf
+                               "Cycle %d has already been paid."
+                               cycle) ) )
+                    else
+                      ( cycle,
+                        ( 0,
+                          Error
+                            "Skipped because another due cycle was already paid"
+                        ) ))
+                  multiple_cycles
+              else
+                match
+                  Payout_executor.execute_merged
+                    ~ctx
+                    ~payouts:merged_payouts
+                    ~batch_size:config.sim_batch_size
+                    ()
+                with
+                | Error msg ->
+                    (* All cycles failed *)
+                    List.map
+                      (fun cycle -> (cycle, (0, Error msg)))
+                      multiple_cycles
+                | Ok merged_results ->
+                    (* Step 5: Write per-cycle reports *)
+                    (* Build a map of (delegator, recipient) -> result *)
+                    let module PairMap = Map.Make (struct
+                      type t = string * string
+
+                      let compare (d1, r1) (d2, r2) =
+                        match String.compare d1 d2 with
+                        | 0 -> String.compare r1 r2
+                        | c -> c
+                    end) in
+                    let result_map =
                       List.fold_left
-                        (fun acc (r : Rewards.payout_result) ->
-                          if r.success then Int64.add acc r.amount else acc)
-                        0L
+                        (fun map (r : Rewards.payout_result) ->
+                          PairMap.add (r.delegator, r.recipient) r map)
+                        PairMap.empty
                         merged_results
                     in
-                    let total_paid =
-                      List.filter
-                        (fun (r : Rewards.payout_result) -> r.success)
-                        merged_results
-                      |> List.length
+                    (* For each cycle, create per-cycle reports *)
+                    let per_cycle_results =
+                      List.map
+                        (fun (cycle, blueprint) ->
+                          let cycle_payouts =
+                            Payout_executor.collect_payouts blueprint
+                          in
+                          (* Map each cycle payout to its execution result *)
+                          let cycle_payout_results =
+                            List.map
+                              (fun (delegator, recipient, cycle_amount) ->
+                                match
+                                  PairMap.find_opt
+                                    (delegator, recipient)
+                                    result_map
+                                with
+                                | Some merged_result ->
+                                    (* Use the merged result but with cycle amount *)
+                                    {
+                                      merged_result with
+                                      Rewards.amount = cycle_amount;
+                                    }
+                                | None ->
+                                    (* Should not happen, but handle gracefully *)
+                                    {
+                                      Rewards.delegator;
+                                      recipient;
+                                      amount = cycle_amount;
+                                      op_hash = None;
+                                      success = false;
+                                      note = "missing from merged execution";
+                                    })
+                              cycle_payouts
+                          in
+                          let report_dir =
+                            Payout_report.report_dir ~instance ~cycle
+                          in
+                          ensure_dir report_dir ;
+                          (* Write per-cycle reports. The merged payout path already
+                         holds all relevant cycle locks while this runs. *)
+                          let succeeded =
+                            List.filter
+                              (fun (r : Rewards.payout_result) -> r.success)
+                              cycle_payout_results
+                          in
+                          let distributed =
+                            List.fold_left
+                              (fun acc (r : Rewards.payout_result) ->
+                                if r.success then Int64.add acc r.amount
+                                else acc)
+                              0L
+                              cycle_payout_results
+                          in
+                          let summary : Rewards.cycle_summary =
+                            {
+                              cycle;
+                              delegators = blueprint.total_delegators;
+                              paid_delegators = List.length succeeded;
+                              own_staked_balance = 0L;
+                              own_delegated_balance = 0L;
+                              external_staked_balance = 0L;
+                              external_delegated_balance = 0L;
+                              earned_rewards = blueprint.earned_rewards;
+                              earned_block_fees = blueprint.earned_block_fees;
+                              distributed_rewards = distributed;
+                              bond_income = blueprint.baker_bond_income;
+                              fee_income = blueprint.baker_fee_income;
+                              tx_fees_paid = blueprint.estimated_tx_fees;
+                              timestamp =
+                                (let tm = Unix.gmtime (Unix.gettimeofday ()) in
+                                 Printf.sprintf
+                                   "%04d-%02d-%02dT%02d:%02d:%02dZ"
+                                   (tm.Unix.tm_year + 1900)
+                                   (tm.Unix.tm_mon + 1)
+                                   tm.Unix.tm_mday
+                                   tm.Unix.tm_hour
+                                   tm.Unix.tm_min
+                                   tm.Unix.tm_sec);
+                            }
+                          in
+                          let invalid =
+                            List.filter
+                              (fun (r : Rewards.delegator_reward) ->
+                                match r.status with
+                                | Rewards.Eligible -> false
+                                | _ -> true)
+                              blueprint.delegator_rewards
+                          in
+                          let paid = List.length succeeded in
+                          let total = List.length cycle_payout_results in
+                          let write_cycle_reports ?summary () =
+                            match
+                              Payout_report.write_payouts_csv
+                                ~dir:report_dir
+                                ~baker:blueprint.baker
+                                ~cycle
+                                cycle_payout_results
+                            with
+                            | Error msg ->
+                                ( cycle,
+                                  ( 0,
+                                    Error
+                                      (Printf.sprintf
+                                         "failed to write payouts.csv: %s"
+                                         msg) ) )
+                            | Ok () -> (
+                                match
+                                  Payout_report.write_invalid_csv
+                                    ~dir:report_dir
+                                    ~baker:blueprint.baker
+                                    ~cycle
+                                    invalid
+                                with
+                                | Error msg ->
+                                    ( cycle,
+                                      ( 0,
+                                        Error
+                                          (Printf.sprintf
+                                             "failed to write invalid.csv: %s"
+                                             msg) ) )
+                                | Ok () -> (
+                                    match summary with
+                                    | None ->
+                                        ( cycle,
+                                          (paid, Error "summary not written") )
+                                    | Some summary -> (
+                                        match
+                                          Payout_report.write_summary_json
+                                            ~dir:report_dir
+                                            summary
+                                        with
+                                        | Error msg ->
+                                            ( cycle,
+                                              ( 0,
+                                                Error
+                                                  (Printf.sprintf
+                                                     "failed to write \
+                                                      summary.json: %s"
+                                                     msg) ) )
+                                        | Ok () -> (cycle, (paid, Ok ())))))
+                          in
+                          if total <> paid then write_cycle_reports ()
+                          else write_cycle_reports ~summary ())
+                        blueprints_with_cycles
                     in
-                    let combined_summary : Rewards.cycle_summary =
-                      {
-                        cycle = first_cycle;
-                        delegators = first_blueprint.total_delegators;
-                        paid_delegators = total_paid;
-                        own_staked_balance = 0L;
-                        own_delegated_balance = 0L;
-                        external_staked_balance = 0L;
-                        external_delegated_balance = 0L;
-                        earned_rewards =
-                          List.fold_left
-                            (fun acc (_c, (bp : Rewards.payout_blueprint)) ->
-                              Int64.add acc bp.earned_rewards)
-                            0L
-                            blueprints_with_cycles;
-                        earned_block_fees =
-                          List.fold_left
-                            (fun acc (_c, (bp : Rewards.payout_blueprint)) ->
-                              Int64.add acc bp.earned_block_fees)
-                            0L
-                            blueprints_with_cycles;
-                        distributed_rewards = total_distributed;
-                        bond_income =
-                          List.fold_left
-                            (fun acc (_c, (bp : Rewards.payout_blueprint)) ->
-                              Int64.add acc bp.baker_bond_income)
-                            0L
-                            blueprints_with_cycles;
-                        fee_income =
-                          List.fold_left
-                            (fun acc (_c, (bp : Rewards.payout_blueprint)) ->
-                              Int64.add acc bp.baker_fee_income)
-                            0L
-                            blueprints_with_cycles;
-                        tx_fees_paid =
-                          List.fold_left
-                            (fun acc (_c, (bp : Rewards.payout_blueprint)) ->
-                              Int64.add acc bp.estimated_tx_fees)
-                            0L
-                            blueprints_with_cycles;
-                        timestamp =
-                          (let tm = Unix.gmtime (Unix.gettimeofday ()) in
-                           Printf.sprintf
-                             "%04d-%02d-%02dT%02d:%02d:%02dZ"
-                             (tm.Unix.tm_year + 1900)
-                             (tm.Unix.tm_mon + 1)
-                             tm.Unix.tm_mday
-                             tm.Unix.tm_hour
-                             tm.Unix.tm_min
-                             tm.Unix.tm_sec);
-                      }
+                    (* Step 6: Send one combined notification *)
+                    let channels =
+                      match Payout_config.load ~instance with
+                      | Ok c -> c.notifications
+                      | Error _ -> []
                     in
-                    ignore
-                      (Payout_notifier.notify_all
-                         ~channels
-                         ~summary:combined_summary)
-                | [] -> ()
-              end ;
-              per_cycle_results))
+                    let all_success =
+                      List.for_all
+                        (fun (_cycle, (_paid, result)) ->
+                          match result with Ok () -> true | Error _ -> false)
+                        per_cycle_results
+                    in
+                    if all_success && channels <> [] then begin
+                      (* Use the first cycle's summary for notification *)
+                      match blueprints_with_cycles with
+                      | (first_cycle, first_blueprint) :: _ ->
+                          let total_distributed =
+                            List.fold_left
+                              (fun acc (r : Rewards.payout_result) ->
+                                if r.success then Int64.add acc r.amount
+                                else acc)
+                              0L
+                              merged_results
+                          in
+                          let total_paid =
+                            List.filter
+                              (fun (r : Rewards.payout_result) -> r.success)
+                              merged_results
+                            |> List.length
+                          in
+                          let combined_summary : Rewards.cycle_summary =
+                            {
+                              cycle = first_cycle;
+                              delegators = first_blueprint.total_delegators;
+                              paid_delegators = total_paid;
+                              own_staked_balance = 0L;
+                              own_delegated_balance = 0L;
+                              external_staked_balance = 0L;
+                              external_delegated_balance = 0L;
+                              earned_rewards =
+                                List.fold_left
+                                  (fun acc
+                                       (_c, (bp : Rewards.payout_blueprint))
+                                     -> Int64.add acc bp.earned_rewards)
+                                  0L
+                                  blueprints_with_cycles;
+                              earned_block_fees =
+                                List.fold_left
+                                  (fun acc
+                                       (_c, (bp : Rewards.payout_blueprint))
+                                     -> Int64.add acc bp.earned_block_fees)
+                                  0L
+                                  blueprints_with_cycles;
+                              distributed_rewards = total_distributed;
+                              bond_income =
+                                List.fold_left
+                                  (fun acc
+                                       (_c, (bp : Rewards.payout_blueprint))
+                                     -> Int64.add acc bp.baker_bond_income)
+                                  0L
+                                  blueprints_with_cycles;
+                              fee_income =
+                                List.fold_left
+                                  (fun acc
+                                       (_c, (bp : Rewards.payout_blueprint))
+                                     -> Int64.add acc bp.baker_fee_income)
+                                  0L
+                                  blueprints_with_cycles;
+                              tx_fees_paid =
+                                List.fold_left
+                                  (fun acc
+                                       (_c, (bp : Rewards.payout_blueprint))
+                                     -> Int64.add acc bp.estimated_tx_fees)
+                                  0L
+                                  blueprints_with_cycles;
+                              timestamp =
+                                (let tm = Unix.gmtime (Unix.gettimeofday ()) in
+                                 Printf.sprintf
+                                   "%04d-%02d-%02dT%02d:%02d:%02dZ"
+                                   (tm.Unix.tm_year + 1900)
+                                   (tm.Unix.tm_mon + 1)
+                                   tm.Unix.tm_mday
+                                   tm.Unix.tm_hour
+                                   tm.Unix.tm_min
+                                   tm.Unix.tm_sec);
+                            }
+                          in
+                          ignore
+                            (Payout_notifier.notify_all
+                               ~channels
+                               ~summary:combined_summary)
+                      | [] -> ()
+                    end ;
+                    per_cycle_results))
 
 module Internal_for_tests = struct
   let is_trigger_cycle = is_trigger_cycle
