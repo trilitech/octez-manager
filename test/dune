@@ -1047,7 +1047,11 @@
 
 (test
  (name test_rewards_pure)
- (libraries alcotest octez_manager_rewards octez_manager_ui)
+ (libraries
+  alcotest
+  octez_manager_common
+  octez_manager_rewards
+  octez_manager_ui)
  (modules test_rewards_pure)
  (instrumentation
   (backend bisect_ppx)))
@@ -1068,7 +1072,7 @@
 
 (test
  (name test_payout_config)
- (libraries alcotest octez_manager_rewards)
+ (libraries alcotest octez_manager_rewards unix)
  (modules test_payout_config)
  (instrumentation
   (backend bisect_ppx)))

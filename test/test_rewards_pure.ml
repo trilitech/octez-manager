@@ -195,6 +195,74 @@ let test_render_template_timestamp () =
   in
   Alcotest.(check string) "timestamp" "At 2026-01-01T00:00:00Z" result
 
+let argv_contains_secret argv secret =
+  List.exists
+    (fun arg ->
+      let len = String.length secret in
+      let rec loop i =
+        i + len <= String.length arg
+        && (String.equal (String.sub arg i len) secret || loop (i + 1))
+      in
+      loop 0)
+    argv
+
+let with_captured_run_out f =
+  let captured = ref [] in
+  Cmd_runner.set_run_out_with_timeout_hook (fun ~timeout:_ argv ->
+      captured := argv :: !captured ;
+      Ok "ok") ;
+  Fun.protect ~finally:Cmd_runner.reset_run_out_with_timeout_hook (fun () ->
+      f captured)
+
+let test_notifier_does_not_put_discord_secret_in_argv () =
+  with_captured_run_out (fun captured ->
+      let secret = "discord-secret-token" in
+      let channel =
+        Rewards.Discord
+          {
+            webhook_url = "https://example.invalid/" ^ secret;
+            message_template = "";
+            admin = false;
+          }
+      in
+      match Payout_notifier.send ~channel ~summary:(make_summary ()) with
+      | Error msg -> Alcotest.fail ("send failed: " ^ msg)
+      | Ok () ->
+          let leaked =
+            List.exists (fun argv -> argv_contains_secret argv secret) !captured
+          in
+          Alcotest.(check bool) "secret absent from argv" false leaked)
+
+let test_notifier_does_not_put_telegram_secret_in_argv () =
+  with_captured_run_out (fun captured ->
+      let secret = "telegram-secret-token" in
+      let channel =
+        Rewards.Telegram
+          {api_token = secret; receivers = [1234]; message_template = ""}
+      in
+      match Payout_notifier.send ~channel ~summary:(make_summary ()) with
+      | Error msg -> Alcotest.fail ("send failed: " ^ msg)
+      | Ok () ->
+          let leaked =
+            List.exists (fun argv -> argv_contains_secret argv secret) !captured
+          in
+          Alcotest.(check bool) "secret absent from argv" false leaked)
+
+let test_notifier_does_not_put_bearer_secret_in_argv () =
+  with_captured_run_out (fun captured ->
+      let secret = "bearer-secret-token" in
+      let channel =
+        Rewards.Webhook
+          {url = "https://example.invalid/hook"; auth = Rewards.Bearer secret}
+      in
+      match Payout_notifier.send ~channel ~summary:(make_summary ()) with
+      | Error msg -> Alcotest.fail ("send failed: " ^ msg)
+      | Ok () ->
+          let leaked =
+            List.exists (fun argv -> argv_contains_secret argv secret) !captured
+          in
+          Alcotest.(check bool) "secret absent from argv" false leaked)
+
 (* ── tez_of_mutez tests ───────────────────────────────────── *)
 
 let test_tez_of_mutez_zero () =
@@ -428,6 +496,21 @@ let () =
             `Quick
             test_render_template_no_placeholders;
           Alcotest.test_case "timestamp" `Quick test_render_template_timestamp;
+        ] );
+      ( "notifier_secrets",
+        [
+          Alcotest.test_case
+            "discord secret absent from argv"
+            `Quick
+            test_notifier_does_not_put_discord_secret_in_argv;
+          Alcotest.test_case
+            "telegram secret absent from argv"
+            `Quick
+            test_notifier_does_not_put_telegram_secret_in_argv;
+          Alcotest.test_case
+            "bearer secret absent from argv"
+            `Quick
+            test_notifier_does_not_put_bearer_secret_in_argv;
         ] );
       ( "tez_of_mutez",
         [

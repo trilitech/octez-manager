@@ -15,6 +15,28 @@ let valid_kt = "KT1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
 
 let default () = Payout_config.default ~baker_pkh
 
+let temp_counter = ref 0
+
+let with_temp_xdg f =
+  incr temp_counter ;
+  let old_xdg = Sys.getenv_opt "XDG_CONFIG_HOME" in
+  let dir =
+    Filename.concat
+      (Filename.get_temp_dir_name ())
+      (Printf.sprintf
+         "octez-manager-config-test-%d-%d"
+         (Unix.getpid ())
+         !temp_counter)
+  in
+  Unix.mkdir dir 0o700 ;
+  Unix.putenv "XDG_CONFIG_HOME" dir ;
+  Fun.protect
+    ~finally:(fun () ->
+      match old_xdg with
+      | Some v -> Unix.putenv "XDG_CONFIG_HOME" v
+      | None -> Unix.putenv "XDG_CONFIG_HOME" "")
+    f
+
 (* {1 Default values} *)
 
 let test_default_values () =
@@ -220,6 +242,32 @@ let test_json_roundtrip () =
         c2.overdelegation_protect
   | Error msg -> Alcotest.fail (Printf.sprintf "roundtrip failed: %s" msg)
 
+let test_save_writes_config_0600 () =
+  with_temp_xdg (fun () ->
+      let instance = "secret-config" in
+      let config =
+        {
+          (default ()) with
+          notifications =
+            [
+              Rewards.Telegram
+                {
+                  api_token = "secret-token";
+                  receivers = [1234];
+                  message_template = "";
+                };
+            ];
+        }
+      in
+      match Payout_config.save ~instance config with
+      | Error msg -> Alcotest.fail ("save failed: " ^ msg)
+      | Ok () ->
+          let path =
+            Filename.concat (Payout_config.rewards_dir ~instance) "config.json"
+          in
+          let mode = (Unix.stat path).Unix.st_perm land 0o777 in
+          Alcotest.(check int) "config mode" 0o600 mode)
+
 let test_json_roundtrip_with_overrides () =
   let c =
     {
@@ -294,6 +342,10 @@ let () =
       ( "json",
         [
           Alcotest.test_case "roundtrip" `Quick test_json_roundtrip;
+          Alcotest.test_case
+            "save writes 0600"
+            `Quick
+            test_save_writes_config_0600;
           Alcotest.test_case
             "roundtrip with overrides"
             `Quick

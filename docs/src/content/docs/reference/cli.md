@@ -1441,3 +1441,8 @@ sudo octez-manager install-node \
 # Services will run as dedicated users with proper isolation
 sudo octez-manager list
 ```
+
+`sudo octez-manager` is required for system-level management operations, but the
+managed services themselves run under the configured service user. Generated
+systemd units include `User=`, `Group=`, `NoNewPrivileges=yes`,
+`PrivateTmp=yes`, and `ProtectSystem=strict`.
