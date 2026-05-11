@@ -7,12 +7,11 @@ BISECT = $(OPAM_EXEC) bisect-ppx-report
 all: build
 
 update-miaou:
-	opam reinstall miaou-core miaou-driver-term miaou-runner miaou-tui miaou-driver-matrix
+	opam update
+	opam upgrade miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner miaou-registry --yes
 
 deps:
 	@opam switch list -s | grep -q "^$(CURDIR)$$" || opam switch create . 5.3.0 --no-install --yes
-	@opam pin add "https://github.com/atacama-dev/ppx_forbid.git" --yes
-	# @opam pin add "https://github.com/trilitech/miaou.git" --yes
 	@opam install . --deps-only --with-test --yes
 	@opam install sqlite3 dune-build-info ocamlformat --yes
 

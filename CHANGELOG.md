@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Build dependencies sourced from opam**: `miaou-*` (>= 0.5.2) and `ppx_forbid` / `ppx_enforce` (>= 0.1.0) are now installed from the regular opam repository instead of git pins. The `pin-depends` block, the `octez-manager.opam.template`, the per-package `opam pin add` steps in CI (`ci.yml`, `coverage.yml`, `integration-tests.yml`, `Dockerfile.ci-debian`, `test/integration/build-static.sh`, `Makefile`), and the `.github/miaou-version` cache-buster have all been removed. `opam install . --deps-only` is sufficient.
+
 ### Added
 
 - **Rewards page: Add custom baker**: The Rewards page now supports payouts for arbitrary baker keys via a new "Add custom baker" modal (press `a`). Custom bakers do not require a managed Octez service — only a PKH, network, RPC endpoint, octez-client base directory, and payout key alias are needed. The Add wizard offers list-based pickers backed by the same sources as the install flows (Teztnets networks, public + local node endpoints, registered base directories plus those discovered from baker/accuser env files, and keys read from the chosen base directory). The Configuration tab surfaces the custom-baker fields (Label / RPC Endpoint / Base Directory / Payout Key) for in-place editing; PKH and Network are read-only. Press `x` on a custom baker to remove it — the systemd payout timer, saved Payout_config, and registry entry are torn down together. CLI subcommands (`rewards status`, `pay`, `generate`, `history`, `continual …`, `notify test`, `config import`) accept custom-baker instances, and the systemd payout timer runs correctly against them.

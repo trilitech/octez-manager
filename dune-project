@@ -16,12 +16,12 @@
   yojson
   yaml
   bos
-   (miaou-core (>= 0.4.1))
-   (miaou-driver-term (>= 0.4.1))
-   (miaou-driver-matrix (>= 0.4.1))
-   (miaou-runner (>= 0.4.1))
-   (miaou-driver-web (>= 0.4.1))
-   (miaou-registry (>= 0.4.1))
+   (miaou-core (>= 0.5.2))
+   (miaou-driver-term (>= 0.5.2))
+   (miaou-driver-matrix (>= 0.5.2))
+   (miaou-runner (>= 0.5.2))
+   (miaou-driver-web (>= 0.5.2))
+   (miaou-registry (>= 0.5.2))
   eio
   eio_main
   eio_posix
@@ -35,8 +35,8 @@
   lambda-term
   linenoise
    (ppx_deriving :build)
-   (ppx_forbid :build)
-   (ppx_enforce :build)
+   (ppx_forbid (and :build (>= 0.1.0)))
+   (ppx_enforce (and :build (>= 0.1.0)))
   (ppxlib (>= 0.28.0))
   (sqlite3 :with-dev-setup)
   (alcotest :with-test)

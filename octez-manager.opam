@@ -16,12 +16,12 @@ depends: [
   "yojson"
   "yaml"
   "bos"
-  "miaou-core" {>= "0.4.1"}
-  "miaou-driver-term" {>= "0.4.1"}
-  "miaou-driver-matrix" {>= "0.4.1"}
-  "miaou-runner" {>= "0.4.1"}
-  "miaou-driver-web" {>= "0.4.1"}
-  "miaou-registry" {>= "0.4.1"}
+  "miaou-core" {>= "0.5.2"}
+  "miaou-driver-term" {>= "0.5.2"}
+  "miaou-driver-matrix" {>= "0.5.2"}
+  "miaou-runner" {>= "0.5.2"}
+  "miaou-driver-web" {>= "0.5.2"}
+  "miaou-registry" {>= "0.5.2"}
   "eio"
   "eio_main"
   "eio_posix"
@@ -35,8 +35,8 @@ depends: [
   "lambda-term"
   "linenoise"
   "ppx_deriving" {build}
-  "ppx_forbid" {build}
-  "ppx_enforce" {build}
+  "ppx_forbid" {build & >= "0.1.0"}
+  "ppx_enforce" {build & >= "0.1.0"}
   "ppxlib" {>= "0.28.0"}
   "sqlite3" {with-dev-setup}
   "alcotest" {with-test}
@@ -59,13 +59,3 @@ build: [
   ]
 ]
 dev-repo: "git+https://github.com/trilitech/octez-manager.git"
-pin-depends: [
-  ["ppx_forbid.dev" "git+https://github.com/atacama-dev/ppx_forbid.git"]
-  ["ppx_enforce.dev" "git+https://github.com/atacama-dev/ppx_forbid.git"]
-  ["miaou-core.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
-  ["miaou-driver-term.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
-  ["miaou-driver-matrix.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
-  ["miaou-runner.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
-  ["miaou-driver-web.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
-  ["miaou-registry.0.4.1" "git+https://github.com/trilitech/miaou.git#main"]
-]
