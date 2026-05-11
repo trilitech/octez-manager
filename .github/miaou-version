@@ -1,3 +1,0 @@
-# Bump this version to invalidate the miaou cache in CI
-# Format: YYYY-MM-DD or any string that changes when miaou needs updating
-2026-02-19-miaou-0.4.0-ppx-forbid

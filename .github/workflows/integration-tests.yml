@@ -25,8 +25,6 @@ jobs:
     env:
       OPAMYES: "true"
       OPAMROOT: /home/opam/.opam
-      MIAOU_GIT_URL: "https://github.com/trilitech/miaou.git"
-      PPX_FORBID_GIT_URL: "https://github.com/atacama-dev/ppx_forbid.git"
 
     steps:
       - name: Checkout
@@ -37,20 +35,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /home/opam/.opam
-          key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
+          key: opam-${{ hashFiles('octez-manager.opam') }}
           restore-keys: |
-            opam-miaou-
+            opam-
 
-      - name: Pin miaou and ppx_forbid packages
+      - name: Install dependencies
         if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
-          opam pin add ppx_forbid "$PPX_FORBID_GIT_URL" --no-action
-          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
-          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-          opam install ppx_forbid miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix
+          opam install eio_posix
+          opam install . --deps-only
 
       - name: Build static binary
         run: |

@@ -6,7 +6,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 OUTPUT_PATH="$SCRIPT_DIR/cli-tester/octez-manager"
 
-MIAOU_GIT_URL="https://github.com/trilitech/miaou.git"
 CI_IMAGE="ghcr.io/trilitech/octez-manager-ci:latest"
 
 echo "Building static octez-manager binary..."
@@ -29,16 +28,12 @@ echo "Building inside container..."
 docker run --rm \
     -v "$PROJECT_ROOT:/workspace" \
     -w /workspace \
-    -e MIAOU_GIT_URL="$MIAOU_GIT_URL" \
     -e OPAMYES=true \
     -e OPAMROOT=/home/opam/.opam \
     "$CI_IMAGE" \
     sh -c '
-        opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
-        opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
-        opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
-        opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
-        opam install miaou-core miaou-driver-term miaou-driver-matrix miaou-runner eio_posix
+        opam install eio_posix
+        opam install . --deps-only
         echo "(-ccopt -static)" > static_flags.sexp
         dune build --release
     '
