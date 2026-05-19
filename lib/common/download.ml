@@ -127,6 +127,8 @@ let download_file_with_progress_blocking ~url ~dest_path ~on_progress =
   close_out oc ;
   let buffer = Buffer.create 128 in
   let input_char_opt ch = try Some (input_char ch) with End_of_file -> None in
+  let parse_failure_count = ref 0 in
+  let max_logged_failures = 3 in
   let rec loop () =
     match input_char_opt ec with
     | None -> ()
@@ -160,9 +162,27 @@ let download_file_with_progress_blocking ~url ~dest_path ~on_progress =
                          Int64.to_int received_bytes |> max 0 |> min max_int
                        in
                        on_progress received_int (Some total_int)
-                   | _ -> ())
-               | _ -> ()
-           with _ -> ()) ;
+                   | _ ->
+                       if !parse_failure_count < max_logged_failures then (
+                         incr parse_failure_count ;
+                         Cmd_runner.append_debug_log
+                           (Printf.sprintf
+                              "DOWNLOAD_PROGRESS parse failure (size): %s"
+                              trimmed)))
+               | _ ->
+                   if !parse_failure_count < max_logged_failures then (
+                     incr parse_failure_count ;
+                     Cmd_runner.append_debug_log
+                       (Printf.sprintf
+                          "DOWNLOAD_PROGRESS parse failure (format): %s"
+                          trimmed))
+           with _ ->
+             if !parse_failure_count < max_logged_failures then (
+               incr parse_failure_count ;
+               Cmd_runner.append_debug_log
+                 (Printf.sprintf
+                    "DOWNLOAD_PROGRESS parse exception: %s"
+                    (String.trim line)))) ;
           loop ())
         else (
           Buffer.add_char buffer c ;
