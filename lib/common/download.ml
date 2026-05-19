@@ -170,12 +170,26 @@ let download_file_with_progress_blocking ~url ~dest_path ~on_progress =
   in
   loop () ;
   Mutex.protect active_download_lock (fun () -> active_download := None) ;
-  close_in_noerr ic ;
-  close_in_noerr ec ;
+  (* NOTE: We use Printf.sprintf + Error (`Msg ...) instead of R.error_msgf
+     because this function may be called from parallel domains, and
+     Format.kasprintf (used by R.error_msgf) is not domain-safe in OCaml 5. *)
   match Unix.close_process_full (ic, oc, ec) with
   | Unix.WEXITED 0 -> Ok ()
-  | Unix.WEXITED _ | Unix.WSIGNALED _ | Unix.WSTOPPED _ ->
-      R.error_msgf "curl download failed for %s" url
+  | Unix.WEXITED 22 ->
+      Error
+        (`Msg
+           (Printf.sprintf
+              "curl download failed for %s (HTTP error - file not found)"
+              url))
+  | Unix.WEXITED code ->
+      Error
+        (`Msg
+           (Printf.sprintf
+              "curl download failed for %s (exit code %d)"
+              url
+              code))
+  | Unix.WSIGNALED _ | Unix.WSTOPPED _ ->
+      Error (`Msg (Printf.sprintf "curl download failed for %s" url))
 
 let download_file_with_progress ~url ~dest_path ~on_progress =
   Cmd_runner.append_debug_log

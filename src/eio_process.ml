@@ -375,9 +375,25 @@ let download_file_with_progress_eio (Mgr mgr) ~url ~dest_path ~on_progress =
     | exception End_of_file -> ()
   in
   loop () ;
+  (* NOTE: We use Printf.sprintf + Error (`Msg ...) instead of R.error_msgf
+     because this function may be called from parallel domains via the download
+     pool, and Format.kasprintf (used by R.error_msgf) is not domain-safe. *)
   match Eio.Process.await proc with
   | `Exited 0 -> Ok ()
-  | _ -> R.error_msgf "curl download failed for %s" url
+  | `Exited 22 ->
+      Error
+        (`Msg
+           (Printf.sprintf
+              "curl download failed for %s (HTTP error - file not found)"
+              url))
+  | `Exited code ->
+      Error
+        (`Msg
+           (Printf.sprintf
+              "curl download failed for %s (exit code %d)"
+              url
+              code))
+  | _ -> Error (`Msg (Printf.sprintf "curl download failed for %s" url))
 
 (* --- Initialization --- *)
 

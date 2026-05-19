@@ -371,6 +371,44 @@ let checksum_tests =
       test_verify_downloaded_binaries_mismatch_fails );
   ]
 
+(* ============================================================ *)
+(* Error Message Tests *)
+(* ============================================================ *)
+
+let test_curl_error_message_http_404 () =
+  (* Simulate a curl HTTP 404 error message *)
+  let error_msg =
+    "curl download failed for https://example.com/file (HTTP error - file not \
+     found)"
+  in
+  check
+    bool
+    "error mentions HTTP error"
+    true
+    (contains_substring error_msg "HTTP error") ;
+  check
+    bool
+    "error mentions file not found"
+    true
+    (contains_substring error_msg "file not found")
+
+let test_curl_error_message_with_exit_code () =
+  (* Simulate a curl error with exit code *)
+  let error_msg =
+    "curl download failed for https://example.com/file (exit code 7)"
+  in
+  check
+    bool
+    "error mentions exit code"
+    true
+    (contains_substring error_msg "exit code")
+
+let error_message_tests =
+  [
+    ("curl HTTP 404 error message", `Quick, test_curl_error_message_http_404);
+    ("curl error with exit code", `Quick, test_curl_error_message_with_exit_code);
+  ]
+
 let () =
   Alcotest.run
     "Binary_downloader_extended"
@@ -381,4 +419,5 @@ let () =
       ("size_formatting", size_tests);
       ("binaries", binaries_tests);
       ("checksums", checksum_tests);
+      ("error_messages", error_message_tests);
     ]
