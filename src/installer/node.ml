@@ -10,6 +10,7 @@ open Installer_types
 include Helpers
 include Snapshot
 include Config
+include Zcash_params
 
 let install_node ?(quiet = false) ?on_log (request : node_request) =
   let log msg = match on_log with Some f -> f msg | None -> () in
@@ -102,6 +103,10 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~network:resolved_network
       ~history_mode:request.history_mode
       ()
+  in
+  log "Ensuring Zcash parameters...\n" ;
+  let* () =
+    ensure_params ~quiet ?on_log ~service_user:request.service_user ()
   in
   log "Performing bootstrap...\n" ;
   let* () =

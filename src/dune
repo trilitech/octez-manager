@@ -36,6 +36,7 @@
   helpers
   snapshot
   config
+  zcash_params
   node
   dal_node
   baker
