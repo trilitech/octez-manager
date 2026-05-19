@@ -116,6 +116,13 @@ jobs:
           opam install . --deps-only --with-test --jobs=4
           opam install ocamlformat.0.28.1
 
+      - name: Ensure correct ocamlformat version
+        run: |
+          eval $(opam env)
+          if ! ocamlformat --version | grep -q "0.28.1"; then
+            opam install ocamlformat.0.28.1 --jobs=4
+          fi
+
       - name: Cache dune build
         uses: actions/cache@v4
         with:
