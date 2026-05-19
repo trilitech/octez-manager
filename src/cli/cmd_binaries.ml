@@ -249,6 +249,25 @@ let download_octez_cmd =
         else version
       in
 
+      (* Verify the version exists before starting downloads *)
+      (match Binary_downloader.fetch_versions ~include_rc:true () with
+      | Ok versions ->
+          let exists =
+            List.exists
+              (fun (v : Binary_downloader.version_info) ->
+                String.equal v.version version)
+              versions
+          in
+          if not exists then (
+            Printf.eprintf
+              "Error: Version %s not found. Use 'octez-manager binaries \
+               list-remote' to see available versions.\n"
+              version ;
+            exit 1)
+      | Error _ ->
+          (* Can't fetch version list; proceed and let download fail *)
+          ()) ;
+
       Printf.printf "Downloading Octez v%s...\n\n" version ;
 
       (* Initialize multi-line progress display *)
@@ -282,14 +301,29 @@ let download_octez_cmd =
       in
 
       (* Perform download *)
-      match
+      let download_result =
         Binary_downloader.download_version
           ~version
           ~verify_checksums
           ~multi_progress
           ()
-      with
-      | Error (`Msg msg) -> Cli_helpers.cmdliner_error msg
+      in
+      match download_result with
+      | Error (`Msg msg) ->
+          (* Clear progress display *)
+          Printf.printf "\n%!" ;
+          (* Provide user-friendly error message *)
+          let user_msg =
+            if String_utils.string_contains ~needle:"curl download failed" msg
+            then
+              Printf.sprintf
+                "Error: Version %s not found or unavailable. The requested \
+                 binaries could not be downloaded. Use 'octez-manager binaries \
+                 list-remote' to see available versions."
+                version
+            else msg
+          in
+          Cli_helpers.cmdliner_error user_msg
       | Ok result ->
           (* Mark all binaries complete with their final sizes *)
           Mutex.lock display_mutex ;
