@@ -186,6 +186,7 @@ let is_due_for_refresh now instance =
 
 (** Start the scheduler in a background domain *)
 let start () =
+  Worker_queue.start worker ;
   Domain_pool.submit (fun () ->
       (* Simple polling loop *)
       while not (Atomic.get shutdown_requested) do
