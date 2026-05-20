@@ -7,7 +7,10 @@
 
 type log_source = Journald | DailyLogs
 
-let unit_name ~role ~instance = Printf.sprintf "octez-%s@%s" role instance
+let unit_name ~role ~instance =
+  match role with
+  | "signatory" -> Printf.sprintf "signatory@%s" instance
+  | _ -> Printf.sprintf "octez-%s@%s" role instance
 
 let get_daily_log_file ~role ~instance =
   (* Read the instance's env file to find the correct base directory *)
