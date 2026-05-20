@@ -165,10 +165,23 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
       (let s = network_short svc.Service.network in
        Printf.sprintf "%-12s" (if s = "" then "-" else s))
   in
+  (* Get version for display on first line *)
+  let version_str =
+    match
+      System_metrics_scheduler.get_version
+        ~role:svc.Service.role
+        ~instance:svc.Service.instance
+    with
+    | Some v ->
+        if String.equal svc.Service.role "index" then
+          System_metrics_scheduler.format_index_version_colored v
+        else System_metrics_scheduler.format_version_colored v
+    | None -> Widgets.themed_muted "-"
+  in
   let fold_indicator = if folded then "+" else "−" in
   let first_line =
     Printf.sprintf
-      "%s %s %s %s%s %s %s %s"
+      "%s %s %s %s%s %s %s %s %s"
       marker
       fold_indicator
       status
@@ -176,6 +189,7 @@ let line_for_service idx selected ~folded (st : Service_state.t) =
       failure_badge
       role_info
       network
+      version_str
       enabled
   in
   (* Indent for second line and extra lines - align under instance name.

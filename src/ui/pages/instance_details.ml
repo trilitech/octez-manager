@@ -268,6 +268,15 @@ let view_details ~box_width svc =
               | [] -> "(none)"
               | xs -> String.concat ", " xs)
         in
+        let version =
+          match
+            System_metrics_scheduler.get_version
+              ~role:svc.Service.role
+              ~instance:svc.Service.instance
+          with
+          | Some v -> v
+          | None -> "(not running)"
+        in
         [
           ("Instance", svc.Service.instance);
           ("Role", svc.Service.role);
@@ -283,6 +292,7 @@ let view_details ~box_width svc =
           ("DAL Config", dal_display);
           ("Service User", svc.Service.service_user);
           ("Bin Dir", svc.Service.app_bin_dir);
+          ("Version", version);
           ("Created At", svc.Service.created_at);
           ("Logging", logging);
           ("Extra Args", if extra_args = "" then "(none)" else extra_args);
@@ -303,6 +313,15 @@ let view_details ~box_width svc =
           | Some inst -> inst
           | None -> "(none)"
         in
+        let version =
+          match
+            System_metrics_scheduler.get_version
+              ~role:svc.Service.role
+              ~instance:svc.Service.instance
+          with
+          | Some v -> v
+          | None -> "(not running)"
+        in
         [
           ("Instance", svc.Service.instance);
           ("Role", svc.Service.role);
@@ -313,6 +332,7 @@ let view_details ~box_width svc =
           ("Depends On", depends_on);
           ("Service User", svc.Service.service_user);
           ("Bin Dir", svc.Service.app_bin_dir);
+          ("Version", version);
           ("Created At", svc.Service.created_at);
           ("Logging", Logging_mode.to_string svc.Service.logging_mode);
           ("Extra Args", if extra_args = "" then "(none)" else extra_args);
@@ -339,6 +359,15 @@ let view_details ~box_width svc =
           | [] -> "(none)"
           | deps -> String.concat ", " deps
         in
+        let version =
+          match
+            System_metrics_scheduler.get_version
+              ~role:svc.Service.role
+              ~instance:svc.Service.instance
+          with
+          | Some v -> v
+          | None -> "(not running)"
+        in
         [
           ("Instance", svc.Service.instance);
           ("Role", svc.Service.role);
@@ -351,6 +380,7 @@ let view_details ~box_width svc =
           ("DAL P2P Addr", if dal_net = "" then "(unset)" else dal_net);
           ("Service User", svc.Service.service_user);
           ("Bin Dir", svc.Service.app_bin_dir);
+          ("Version", version);
           ("Created At", svc.Service.created_at);
           ("Logging", Logging_mode.to_string svc.Service.logging_mode);
           ("Extra Args", if extra_args = "" then "(unset)" else extra_args);
@@ -376,6 +406,15 @@ let view_details ~box_width svc =
               | Signatory_metrics.Unknown -> Widgets.dim "Unknown")
           | None -> Widgets.dim "Not monitored"
         in
+        let version =
+          match
+            System_metrics_scheduler.get_version
+              ~role:svc.Service.role
+              ~instance:svc.Service.instance
+          with
+          | Some v -> v
+          | None -> "(not running)"
+        in
         [
           ("Instance", svc.Service.instance);
           ("Role", svc.Service.role);
@@ -388,6 +427,7 @@ let view_details ~box_width svc =
           ("Dependents", dependents);
           ("Service User", svc.Service.service_user);
           ("Bin Dir", svc.Service.app_bin_dir);
+          ("Version", version);
           ("Created At", svc.Service.created_at);
           ("Logging", Logging_mode.to_string svc.Service.logging_mode);
         ]
@@ -423,6 +463,15 @@ let view_details ~box_width svc =
           | [] -> "(none)"
           | deps -> String.concat ", " deps
         in
+        let version =
+          match
+            System_metrics_scheduler.get_version
+              ~role:svc.Service.role
+              ~instance:svc.Service.instance
+          with
+          | Some v -> v
+          | None -> "(not running)"
+        in
         [
           ("Instance", svc.Service.instance);
           ("Role", "indexer");
@@ -435,6 +484,7 @@ let view_details ~box_width svc =
           ("Dependents", dependents);
           ("Service User", svc.Service.service_user);
           ("Bin Dir", svc.Service.app_bin_dir);
+          ("Version", version);
           ("Created At", svc.Service.created_at);
           ("Logging", Logging_mode.to_string svc.Service.logging_mode);
           ("Extra Args", if extra_args = "" then "(none)" else extra_args);
@@ -446,6 +496,15 @@ let view_details ~box_width svc =
           | [] -> "(none)"
           | deps -> String.concat ", " deps
         in
+        let version =
+          match
+            System_metrics_scheduler.get_version
+              ~role:svc.Service.role
+              ~instance:svc.Service.instance
+          with
+          | Some v -> v
+          | None -> "(not running)"
+        in
         [
           ("Instance", svc.Service.instance);
           ("Role", svc.Service.role);
@@ -456,6 +515,7 @@ let view_details ~box_width svc =
           ("Dependents", dependents);
           ("Service User", svc.Service.service_user);
           ("Bin Dir", svc.Service.app_bin_dir);
+          ("Version", version);
           ("Created At", svc.Service.created_at);
           ("Logging", Logging_mode.to_string svc.Service.logging_mode);
           ("Extra Args", String.concat " " svc.Service.extra_args);
