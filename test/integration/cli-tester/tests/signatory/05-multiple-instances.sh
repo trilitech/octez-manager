@@ -116,8 +116,8 @@ if ! grep -q "file" "$CONFIG1"; then
 	exit 1
 fi
 
-if ! grep -q "memory" "$CONFIG2"; then
-	echo "ERROR: Signatory 2 should have memory watermark"
+if ! grep -q "driver: mem" "$CONFIG2"; then
+	echo "ERROR: Signatory 2 should have mem watermark driver"
 	cat "$CONFIG2"
 	exit 1
 fi
