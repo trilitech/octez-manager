@@ -32,6 +32,8 @@ om install-node \
 	--service-user tezos \
 	--no-enable 2>&1
 
+inject_identity "$NODE_INSTANCE"
+
 echo "==> Step 2: Start node to enable baker installation"
 om instance "$NODE_INSTANCE" start 2>&1
 
