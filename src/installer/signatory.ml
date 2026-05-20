@@ -74,16 +74,18 @@ let validate_backend = function
 
 (** Generate watermark section of YAML config *)
 let generate_watermark_section data_dir = function
-  | Memory -> "watermark:\n  type: memory\n"
+  | Memory -> "watermark:\n  driver: mem\n"
   | File_watermark path ->
       let actual_path =
         if String.trim path = "" then Filename.concat data_dir "watermark.json"
         else path
       in
-      Printf.sprintf "watermark:\n  type: file\n  path: %s\n" actual_path
+      Printf.sprintf
+        "watermark:\n  driver: file\n  config:\n    path: %s\n"
+        actual_path
   | AWS_DynamoDB _ | GCP_Firestore _ ->
       (* These are not yet implemented but are in the type system *)
-      "watermark:\n  type: memory\n"
+      "watermark:\n  driver: mem\n"
 
 (** Generate allow section for a key based on its permissions *)
 let generate_allow_section (permissions : signatory_operation list) =
@@ -652,3 +654,8 @@ let read_config instance =
         R.error_msgf
           "Failed to parse signatory config: %s"
           (Printexc.to_string e)
+
+(** Internal functions exposed for testing *)
+module Internal_for_tests = struct
+  let generate_watermark_section = generate_watermark_section
+end

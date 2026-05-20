@@ -67,3 +67,18 @@ type signatory_config = {
     @param instance the signatory instance name
     @return parsed configuration or error *)
 val read_config : string -> (signatory_config, Rresult.R.msg) result
+
+(**/**)
+
+(** Internal functions exposed for testing. *)
+module Internal_for_tests : sig
+  (** Generate watermark section of YAML config.
+      
+      @param data_dir data directory for default watermark path
+      @param watermark watermark backend configuration
+      @return YAML string for watermark section *)
+  val generate_watermark_section :
+    string -> Installer_types.watermark_backend -> string
+end
+
+(**/**)

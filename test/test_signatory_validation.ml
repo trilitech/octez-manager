@@ -240,6 +240,46 @@ let test_valid_request () =
   | Error (`Msg msg) ->
       Alcotest.failf "Expected request to be valid but got error: %s" msg
 
+(** Test that watermark YAML generation produces correct format for ECAD Labs signatory.
+    
+    The signatory binary expects:
+    - "driver:" instead of "type:"
+    - For file backend: path nested under "config:" section
+    
+    See https://github.com/ecadlabs/signatory/blob/main/pkg/config/config.go *)
+let test_watermark_yaml_memory () =
+  let yaml =
+    Signatory.Internal_for_tests.generate_watermark_section
+      "/data"
+      Installer_types.Memory
+  in
+  Alcotest.(check string)
+    "Memory watermark YAML"
+    "watermark:\n  driver: mem\n"
+    yaml
+
+let test_watermark_yaml_file_explicit_path () =
+  let yaml =
+    Signatory.Internal_for_tests.generate_watermark_section
+      "/data"
+      (Installer_types.File_watermark "/custom/watermark.json")
+  in
+  Alcotest.(check string)
+    "File watermark YAML with explicit path"
+    "watermark:\n  driver: file\n  config:\n    path: /custom/watermark.json\n"
+    yaml
+
+let test_watermark_yaml_file_default_path () =
+  let yaml =
+    Signatory.Internal_for_tests.generate_watermark_section
+      "/data"
+      (Installer_types.File_watermark "")
+  in
+  Alcotest.(check string)
+    "File watermark YAML with default path"
+    "watermark:\n  driver: file\n  config:\n    path: /data/watermark.json\n"
+    yaml
+
 let () =
   let open Alcotest in
   run
@@ -275,4 +315,16 @@ let () =
           test_case "invalid watermarks" `Quick test_invalid_watermarks;
         ] );
       ("Requests", [test_case "valid request" `Quick test_valid_request]);
+      ( "Watermark YAML Generation",
+        [
+          test_case "memory watermark YAML" `Quick test_watermark_yaml_memory;
+          test_case
+            "file watermark YAML with explicit path"
+            `Quick
+            test_watermark_yaml_file_explicit_path;
+          test_case
+            "file watermark YAML with default path"
+            `Quick
+            test_watermark_yaml_file_default_path;
+        ] );
     ]
