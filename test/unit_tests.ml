@@ -3782,6 +3782,18 @@ let log_viewer_journalctl_baker_unit_name () =
   | Ok cmd -> assert_contains ~msg:"baker unit name" cmd "octez-baker@my-baker"
   | Error (`Msg msg) -> Alcotest.failf "get_log_cmd failed: %s" msg
 
+let log_viewer_journalctl_signatory_unit_name () =
+  (* Test signatory unit name (no octez- prefix) *)
+  match
+    Log_viewer.get_log_cmd
+      ~role:"signatory"
+      ~instance:"my-signatory"
+      ~source:Journald
+  with
+  | Ok cmd ->
+      assert_contains ~msg:"signatory unit name" cmd "signatory@my-signatory"
+  | Error (`Msg msg) -> Alcotest.failf "get_log_cmd failed: %s" msg
+
 (* Unit state parsing tests *)
 let systemd_unit_state_active () =
   let output = "ActiveState=active\nSubState=running\nResult=success\n" in
@@ -6776,6 +6788,10 @@ let () =
             "baker unit name"
             `Quick
             log_viewer_journalctl_baker_unit_name;
+          Alcotest.test_case
+            "signatory unit name"
+            `Quick
+            log_viewer_journalctl_signatory_unit_name;
         ] );
       ( "systemd.unit_state",
         [

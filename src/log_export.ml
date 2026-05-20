@@ -86,7 +86,11 @@ let collect_daily_logs ~role ~instance ~days =
 (** Export journald logs for the last N days *)
 let export_journald_logs ~role ~instance ~days ~output_file =
   let user_flag = if Paths.is_root () then "" else "--user " in
-  let unit = Printf.sprintf "octez-%s@%s" role instance in
+  let unit =
+    match role with
+    | "signatory" -> Printf.sprintf "signatory@%s" instance
+    | _ -> Printf.sprintf "octez-%s@%s" role instance
+  in
   let since = Printf.sprintf "--since='%d days ago'" days in
   let cmd =
     Printf.sprintf
