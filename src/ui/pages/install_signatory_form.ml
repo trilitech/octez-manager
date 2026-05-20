@@ -765,7 +765,8 @@ let spec =
         if model.edit_mode && model.stopped_dependents <> [] then
           Context.set_pending_restart_dependents model.stopped_dependents ;
 
-        if model.core.start_now then
+        (* Start the service if requested, but only if not already started by enable *)
+        if model.core.start_now && not model.core.enable_on_boot then
           match Miaou_interfaces.Service_lifecycle.get () with
           | Some sl ->
               Miaou_interfaces.Service_lifecycle.start
