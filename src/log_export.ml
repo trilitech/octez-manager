@@ -155,6 +155,7 @@ let get_version_info ~svc =
     | "baker" -> "octez-baker"
     | "accuser" -> "octez-accuser"
     | "dal-node" | "dal" -> "octez-dal-node"
+    | "signatory" -> "signatory"
     | r -> "octez-" ^ r
   in
   (match get_binary_version ~app_bin_dir:svc.Service.app_bin_dir ~binary with
