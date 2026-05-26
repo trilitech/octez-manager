@@ -111,6 +111,7 @@ jobs:
       - name: Install project dependencies
         if: steps.cache-opam.outputs.cache-hit != 'true' || steps.opam-init.outputs.switch-valid != 'true'
         run: |
+          git config --global --add safe.directory '*'
           eval $(opam env)
           opam install eio_posix --jobs=4
           opam install . --deps-only --with-test --jobs=4
@@ -409,6 +410,7 @@ jobs:
       - name: Install dependencies
         if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
+          git config --global --add safe.directory '*'
           eval $(opam env)
           opam install eio_posix --jobs=4
           opam install . --deps-only --jobs=4
