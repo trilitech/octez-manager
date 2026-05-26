@@ -1,5 +1,6 @@
 (lang dune 3.13)
 (name octez-manager)
+(version 1.0.0-rc3)
 (generate_opam_files true)
 (license MIT)
 (source (github trilitech/octez-manager))

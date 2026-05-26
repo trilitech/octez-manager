@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.0-rc3] - 2026-05-26
+
 ### Changed
 
 - **Build dependencies sourced from opam**: `miaou-*` (>= 0.5.2) and `ppx_forbid` / `ppx_enforce` (>= 0.1.0) are now installed from the regular opam repository instead of git pins. The `pin-depends` block, the `octez-manager.opam.template`, the per-package `opam pin add` steps in CI (`ci.yml`, `coverage.yml`, `integration-tests.yml`, `Dockerfile.ci-debian`, `test/integration/build-static.sh`, `Makefile`), and the `.github/miaou-version` cache-buster have all been removed. `opam install . --deps-only` is sufficient.
