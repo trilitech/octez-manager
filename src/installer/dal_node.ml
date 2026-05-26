@@ -46,6 +46,33 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
   let* () = ensure_directories ~owner ~group directories in
   let* () = ensure_logging_base_directory ~owner ~group logging_mode in
   let* () = ensure_runtime_log_directory ~owner ~group logging_mode in
+  (* In edit mode, preserve existing dependents list *)
+  let existing_dependents =
+    if request.preserve_data then
+      match Service_registry.find ~instance:request.instance with
+      | Ok (Some existing) -> existing.Service.dependents
+      | _ -> []
+    else []
+  in
+  let service =
+    Service.make
+      ~instance:request.instance
+      ~role:request.role
+      ~network:request.network
+      ~history_mode:request.history_mode
+      ~data_dir:request.data_dir
+      ~rpc_addr:request.rpc_addr
+      ~net_addr:request.net_addr
+      ~service_user:request.service_user
+      ~app_bin_dir:request.app_bin_dir
+      ?bin_source:request.bin_source
+      ~logging_mode
+      ~extra_args:request.service_args
+      ~depends_on:request.depends_on
+      ~dependents:existing_dependents
+      ()
+  in
+  let* () = Service_registry.write service in
   let extra_env =
     let service_args = String.concat " " request.service_args |> String.trim in
     let args_entry =
@@ -105,33 +132,6 @@ let install_daemon ?(quiet = false) (request : daemon_request) =
     if request.preserve_data then Ok ()
     else reown_runtime_paths ~owner ~group ~paths:directories ~logging_mode
   in
-  (* In edit mode, preserve existing dependents list *)
-  let existing_dependents =
-    if request.preserve_data then
-      match Service_registry.find ~instance:request.instance with
-      | Ok (Some existing) -> existing.Service.dependents
-      | _ -> []
-    else []
-  in
-  let service =
-    Service.make
-      ~instance:request.instance
-      ~role:request.role
-      ~network:request.network
-      ~history_mode:request.history_mode
-      ~data_dir:request.data_dir
-      ~rpc_addr:request.rpc_addr
-      ~net_addr:request.net_addr
-      ~service_user:request.service_user
-      ~app_bin_dir:request.app_bin_dir
-      ?bin_source:request.bin_source
-      ~logging_mode
-      ~extra_args:request.service_args
-      ~depends_on:request.depends_on
-      ~dependents:existing_dependents
-      ()
-  in
-  let* () = Service_registry.write service in
   (* In edit mode, update dependent endpoints if RPC address changed (for DAL nodes) *)
   let* () =
     if

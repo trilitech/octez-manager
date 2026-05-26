@@ -306,6 +306,32 @@ Security:
     File_ops.write_file ~mode:0o644 ~owner ~group config_path yaml_content
   in
 
+  (* Parse RPC address for service registry *)
+  let rpc_addr = Rpc_addr.of_string validated_address in
+
+  (* Create service record *)
+  let service =
+    Service.make
+      ~instance:request.instance
+      ~role:"signatory"
+      ~network:"" (* Signatory is network-agnostic *)
+      ~history_mode:History_mode.default (* N/A for signatory *)
+      ~data_dir
+      ~rpc_addr
+      ~net_addr:"" (* N/A for signatory *)
+      ~service_user:request.service_user
+      ~app_bin_dir:request.app_bin_dir
+      ?bin_source:request.bin_source
+      ~logging_mode
+      ~extra_args:[] (* Signatory args are in config file *)
+      ~depends_on:None
+      ~dependents:[]
+      ()
+  in
+
+  (* Register service *)
+  let* () = Service_registry.write service in
+
   (* Write environment file *)
   let backend_kind_str =
     match request.backend with
@@ -360,32 +386,6 @@ Security:
         ~paths:[data_dir; keys_path]
         ~logging_mode
   in
-
-  (* Parse RPC address for service registry *)
-  let rpc_addr = Rpc_addr.of_string validated_address in
-
-  (* Create service record *)
-  let service =
-    Service.make
-      ~instance:request.instance
-      ~role:"signatory"
-      ~network:"" (* Signatory is network-agnostic *)
-      ~history_mode:History_mode.default (* N/A for signatory *)
-      ~data_dir
-      ~rpc_addr
-      ~net_addr:"" (* N/A for signatory *)
-      ~service_user:request.service_user
-      ~app_bin_dir:request.app_bin_dir
-      ?bin_source:request.bin_source
-      ~logging_mode
-      ~extra_args:[] (* Signatory args are in config file *)
-      ~depends_on:None
-      ~dependents:[]
-      ()
-  in
-
-  (* Register service *)
-  let* () = Service_registry.write service in
 
   (* Enable and start if requested *)
   let* () =

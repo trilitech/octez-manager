@@ -62,6 +62,46 @@ let install ?(quiet = false) (request : index_request) =
     | _ -> []
   in
   let all_service_args = watched_args @ db_args @ request.extra_args in
+  (* Resolve parent service for network and dependencies *)
+  let parent_svc_opt =
+    match request.depends_on with
+    | None -> None
+    | Some parent_instance -> (
+        match Service_registry.find ~instance:parent_instance with
+        | Ok (Some parent_svc) -> Some parent_svc
+        | _ -> None)
+  in
+  let network =
+    match parent_svc_opt with
+    | Some parent_svc -> parent_svc.Service.network
+    | None -> ""
+  in
+  let existing_dependents =
+    if request.preserve_data then
+      match Service_registry.find ~instance:request.instance with
+      | Ok (Some existing) -> existing.Service.dependents
+      | _ -> []
+    else []
+  in
+  let service =
+    Service.make
+      ~instance:request.instance
+      ~role:"index"
+      ~network
+      ~history_mode:History_mode.default
+      ~data_dir:request.base_dir
+      ~rpc_addr:request.rpc_addr
+      ~net_addr:""
+      ~service_user:request.service_user
+      ~app_bin_dir:request.app_bin_dir
+      ?bin_source:request.bin_source
+      ~logging_mode
+      ~extra_args:all_service_args
+      ~depends_on:request.depends_on
+      ~dependents:existing_dependents
+      ()
+  in
+  let* () = Service_registry.write service in
   let service_args_str = String.concat " " all_service_args |> String.trim in
   (* Convert node_endpoint host:port to full URI *)
   let node_endpoint = endpoint_of_rpc request.node_endpoint in
@@ -91,24 +131,11 @@ let install ?(quiet = false) (request : index_request) =
       ~user:request.service_user
       ()
   in
-  let parent_svc_opt =
-    match request.depends_on with
-    | None -> None
-    | Some parent_instance -> (
-        match Service_registry.find ~instance:parent_instance with
-        | Ok (Some parent_svc) -> Some parent_svc
-        | _ -> None)
-  in
   let depends_on_for_systemd =
     match parent_svc_opt with
     | Some parent_svc ->
         Some [(parent_svc.Service.role, parent_svc.Service.instance)]
     | None -> None
-  in
-  let network =
-    match parent_svc_opt with
-    | Some parent_svc -> parent_svc.Service.network
-    | None -> ""
   in
   let* () =
     Systemd.write_dropin
@@ -125,32 +152,6 @@ let install ?(quiet = false) (request : index_request) =
     if request.preserve_data then Ok ()
     else reown_runtime_paths ~owner ~group ~paths:directories ~logging_mode
   in
-  let existing_dependents =
-    if request.preserve_data then
-      match Service_registry.find ~instance:request.instance with
-      | Ok (Some existing) -> existing.Service.dependents
-      | _ -> []
-    else []
-  in
-  let service =
-    Service.make
-      ~instance:request.instance
-      ~role:"index"
-      ~network
-      ~history_mode:History_mode.default
-      ~data_dir:request.base_dir
-      ~rpc_addr:request.rpc_addr
-      ~net_addr:""
-      ~service_user:request.service_user
-      ~app_bin_dir:request.app_bin_dir
-      ?bin_source:request.bin_source
-      ~logging_mode
-      ~extra_args:all_service_args
-      ~depends_on:request.depends_on
-      ~dependents:existing_dependents
-      ()
-  in
-  let* () = Service_registry.write service in
   (* Register as dependent on parent if depends_on is set *)
   let* () =
     match request.depends_on with

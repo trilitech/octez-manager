@@ -182,6 +182,8 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~dependents:existing_dependents
       ()
   in
+  log "Writing service registry...\n" ;
+  let* () = Service_registry.write service in
   log "Installing systemd unit...\n" ;
   let* () =
     Systemd.install_unit
@@ -225,8 +227,6 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~app_bin_dir:request.app_bin_dir
       ()
   in
-  log "Writing service registry...\n" ;
-  let* () = Service_registry.write service in
   (* In edit mode, update dependent endpoints if RPC address changed *)
   let* () =
     if request.preserve_data then (
