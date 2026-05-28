@@ -452,6 +452,137 @@ let test_rejects_zero_batch_size () =
            ~batch_size:0
            ()))
 
+(* ── TC-1: successful full payout writes summary.json ─────────────────────── *)
+
+let test_successful_payout_marks_paid () =
+  with_temp_xdg (fun () ->
+      Cmd_runner.set_run_out_with_timeout_combined_hook (fun ~timeout:_ _argv ->
+          Ok ("Operation hash is '" ^ success_hash ^ "'")) ;
+      let instance = "full-success" in
+      let cycle = 5001 in
+      let ctx = make_ctx ~instance in
+      let blueprint = blueprint_with_payouts ~cycle 1 in
+      match Payout_executor.execute ~ctx ~blueprint ~batch_size:1 () with
+      | Error msg -> Alcotest.fail ("expected Ok, got Error: " ^ msg)
+      | Ok _ ->
+          Alcotest.(check bool)
+            "cycle is marked paid"
+            true
+            (Payout_report.cycle_is_paid ~instance ~cycle) ;
+          Alcotest.(check bool)
+            "summary.json written"
+            true
+            (Sys.file_exists
+               (Filename.concat
+                  (Payout_report.report_dir ~instance ~cycle)
+                  "summary.json")))
+
+(* ── TC-2: consecutive batch abort after 2 failures ──────────────────────── *)
+
+let test_consecutive_batch_abort () =
+  with_temp_xdg (fun () ->
+      let calls = ref 0 in
+      Cmd_runner.set_run_out_with_timeout_combined_hook (fun ~timeout:_ _argv ->
+          incr calls ;
+          if !calls = 1 then Ok ("Operation hash is '" ^ success_hash ^ "'")
+          else Error (`Msg "simulated batch failure")) ;
+      let instance = "consec-abort" in
+      let cycle = 5002 in
+      let ctx = make_ctx ~instance in
+      (* 4 delegators, batch_size=1 → 4 separate batches.
+         Batch 1 succeeds; batches 2 and 3 fail (consecutive=2 → abort);
+         batch 4 is never sent. *)
+      let blueprint = blueprint_with_payouts ~cycle 4 in
+      match Payout_executor.execute ~ctx ~blueprint ~batch_size:1 () with
+      | Ok _ -> Alcotest.fail "consecutive abort must return Error"
+      | Error _ ->
+          Alcotest.(check int) "3 batches attempted (4th aborted)" 3 !calls ;
+          Alcotest.(check bool)
+            "cycle remains unpaid"
+            false
+            (Payout_report.cycle_is_paid ~instance ~cycle))
+
+(* ── TC-3: dry-run does not mark paid and writes to dry dir ──────────────── *)
+
+let test_dry_run_does_not_mark_paid () =
+  with_temp_xdg (fun () ->
+      (* Hook returns Ok so the batch command path runs without calling a real
+         octez-client binary (which is unavailable in the test environment). *)
+      Cmd_runner.set_run_out_with_timeout_combined_hook (fun ~timeout:_ _argv ->
+          Ok "dry-run") ;
+      let instance = "dry-run-test" in
+      let cycle = 5003 in
+      let ctx = make_ctx ~instance in
+      let blueprint = blueprint_with_payouts ~cycle 2 in
+      match
+        Payout_executor.execute ~ctx ~blueprint ~dry_run:true ~batch_size:1 ()
+      with
+      | Error msg -> Alcotest.fail ("dry-run returned Error: " ^ msg)
+      | Ok (results, _summary) ->
+          Alcotest.(check bool)
+            "real cycle not marked paid"
+            false
+            (Payout_report.cycle_is_paid ~instance ~cycle) ;
+          Alcotest.(check bool)
+            "dry report dir created"
+            true
+            (Sys.file_exists (Payout_report.dry_report_dir ~instance ~cycle)) ;
+          List.iter
+            (fun (r : Rewards.payout_result) ->
+              Alcotest.(check bool)
+                ("dry-run result success=true for " ^ r.delegator)
+                true
+                r.success ;
+              Alcotest.(check (option string))
+                ("dry-run op_hash=None for " ^ r.delegator)
+                None
+                r.op_hash)
+            results)
+
+(* ── TC-4: empty payout_key_alias returns early Error ────────────────────── *)
+
+let test_empty_payout_key_alias_rejected () =
+  with_temp_xdg (fun () ->
+      let call_count = ref 0 in
+      Cmd_runner.set_run_out_with_timeout_combined_hook (fun ~timeout:_ _argv ->
+          incr call_count ;
+          Ok "should not be called") ;
+      let instance = "empty-key" in
+      let cycle = 5004 in
+      let blueprint = blueprint_with_payouts ~cycle 1 in
+      let check_alias alias =
+        let ctx =
+          {
+            Payout_executor.octez_client_bin = "octez-client";
+            endpoint = "http://localhost:8732";
+            base_dir = None;
+            password_file = None;
+            payout_key_alias = alias;
+            instance;
+          }
+        in
+        match Payout_executor.execute ~ctx ~blueprint () with
+        | Ok _ ->
+            Alcotest.fail (Printf.sprintf "expected Error for alias %S" alias)
+        | Error msg ->
+            Alcotest.(check bool)
+              (Printf.sprintf "error mentions payout_key_alias for %S" alias)
+              true
+              (let low = String.lowercase_ascii msg in
+               String.length low > 0
+               &&
+               let rec contains s sub i =
+                 if i + String.length sub > String.length s then false
+                 else if String.sub s i (String.length sub) = sub then true
+                 else contains s sub (i + 1)
+               in
+               contains low "payout_key_alias" 0
+               || contains low "not configured" 0)
+      in
+      check_alias "" ;
+      check_alias "   " ;
+      Alcotest.(check int) "no batch calls made" 0 !call_count)
+
 let () =
   Alcotest.run
     "payout_executor"
@@ -580,5 +711,21 @@ let () =
             "rejects zero batch size"
             `Quick
             test_rejects_zero_batch_size;
+          Alcotest.test_case
+            "successful payout marks paid"
+            `Quick
+            test_successful_payout_marks_paid;
+          Alcotest.test_case
+            "consecutive batch abort"
+            `Quick
+            test_consecutive_batch_abort;
+          Alcotest.test_case
+            "dry run does not mark paid"
+            `Quick
+            test_dry_run_does_not_mark_paid;
+          Alcotest.test_case
+            "empty payout key alias rejected"
+            `Quick
+            test_empty_payout_key_alias_rejected;
         ] );
     ]
