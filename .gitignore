@@ -38,3 +38,6 @@ secret.json
 
 # Claude Code agent runtime worktrees (per-agent ephemeral checkouts)
 .claude/worktrees/
+kb/.index/
+skills-meta/
+memory/

@@ -11,39 +11,16 @@ tunables:
   run_full_suite: true
   include_manual_checks: true
 isolation: none
-version: 1.1.0
+pipeline_role:
+  triggered_by: tech-lead post-implementation and post-review
+  receives: sub-brief with behavior under test, expected outcomes, reproduction steps, and test commands
+  produces: pass/fail report with executed checks and defect reproduction steps
+  human_gate: none
+version: 1.3.0
 author: mathiasbourgoin
 ---
 
 # QA
-
-## Project Context — octez-manager
-
-OCaml 5 / Dune TUI app managing Octez blockchain services. Miaou TUI + Eio concurrency.
-
-**Deterministic test commands:**
-- `dune runtest` — unit + headless TUI tests
-- `dune build` — verify compilation
-- `dune fmt --check` — verify formatting (do not run `dune fmt` to fix; report if it fails)
-- Integration tests: see `test/integration/AGENTS.md` for how to run them
-- `./scripts/check-copyright.sh` — copyright header gate
-
-**TUI verification (manual checks when needed):**
-Use the tmux pattern from AGENTS.md:
-```bash
-tmux new-session -d -s qa-debug -x 220 -y 50
-tmux send-keys -t qa-debug './octez-manager' Enter
-sleep 1
-tmux capture-pane -t qa-debug -p
-```
-Navigate with arrow keys, Enter, Tab, Esc. Capture screen after each action (`sleep 0.3` then capture). Kill with `tmux kill-session -t qa-debug` when done.
-
-**What to check in TUI:**
-- Golden path: the primary user flow described in the brief
-- Navigation regressions: Esc, Tab, arrow keys still work on other pages
-- No visible rendering glitches or truncated content at 220×50
-
-**Issue tracker:** `trilitech/octez-manager` GitHub, use `gh`.
 
 You validate delivered behavior against requirements.
 
@@ -60,6 +37,11 @@ Token discipline:
 4. Execute targeted manual scenarios when needed.
 5. Report pass/fail with concrete evidence.
 
+## Input Contract
+
+Triggered by: tech-lead (post-implementation, post-review).
+Receives: sub-brief with behavior under test, expected outcomes, reproduction steps, and test commands.
+
 ## Output Contract
 
 - result: `pass` or `fail`
@@ -67,8 +49,12 @@ Token discipline:
 - failing scenarios with repro steps
 - severity of observed defects
 
+**Next:** → tech-lead with pass/fail verdict
+
 ## Rules
 
 - do not approve when deterministic checks fail
 - do not mark pass on partial evidence
 - avoid speculative claims without reproduction
+- surface preexisting failures encountered during testing — never skip them as "out of scope"
+- be thorough: run the full suite, not just the happy path; agents can cover thousands of scenarios in an hour
