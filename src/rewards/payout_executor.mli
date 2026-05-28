@@ -124,6 +124,13 @@ module Internal_for_tests : sig
     payouts:(string * string * Int64.t) list ->
     dry_run:bool ->
     Rewards.payout_result list
+
+  val build_batch_cmd :
+    ctx:context ->
+    batch_file:string ->
+    batch_len:int ->
+    dry_run:bool ->
+    string list
 end
 
 (**/**)
