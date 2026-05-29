@@ -128,6 +128,12 @@ let install_node_cmd =
           ?bin_dir_alias
           app_bin_dir
       in
+      let* () =
+        Result.map_error (fun (`Msg m) -> m)
+        @@ Systemd.validate_binary_access
+             ~user:service_user
+             ~binary_path:(Filename.concat app_bin_dir "octez-node")
+      in
       (* When preserve_data is set, require data_dir to be specified *)
       let* data_dir =
         match (preserve_data, data_dir) with
