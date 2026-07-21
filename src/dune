@@ -90,6 +90,7 @@
   eio_main
   eio_posix
   eio
+  dune-build-info
   miaou-core.lib)
  (instrumentation
   (backend bisect_ppx)))

@@ -116,11 +116,18 @@ let test_current_version () =
     "current version is not empty"
     true
     (String.length ver > 0) ;
-  (* Version should be in format X.Y.Z *)
+  (* The version comes from dune-build-info: stamped builds (the released
+     binary) report the package version in X.Y.Z format; unstamped builds
+     (dev, test executables) report "dev". Regression test for #967: the
+     version must never be a hardcoded constant again. *)
   Alcotest.(check bool)
-    "current version contains dots"
+    "current version is the build-info version or dev"
     true
-    (String.contains ver '.')
+    (String.equal ver "dev" || String.contains ver '.') ;
+  Alcotest.(check bool)
+    "current version is not the stale hardcoded 0.3.0"
+    true
+    (not (String.equal ver "0.3.0"))
 
 let () =
   let open Alcotest in
