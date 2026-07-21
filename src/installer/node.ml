@@ -53,6 +53,16 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
   let* () =
     System_user.ensure_service_account ~quiet ~name:request.service_user ()
   in
+  log "Validating binary access...\n" ;
+  (* Fail before any state is written: a failure after the service registry
+     entry is created (e.g. inside Systemd.install_unit) would leave a stale
+     record occupying the instance name and RPC port. *)
+  let* () =
+    Systemd.validate_bin_dir
+      ~user:request.service_user
+      ~app_bin_dir:request.app_bin_dir
+      ~role:"node"
+  in
   log "Ensuring system directories...\n" ;
   let* () =
     if Paths.is_root () then
