@@ -104,10 +104,27 @@ let network_field =
 
 let sandbox_name_field =
   Form_builder.(
-    text
+    validated_text
       ~label:"Sandbox Name"
       ~get:(fun m -> m.sandbox_name)
       ~set:(fun sandbox_name m -> {m with sandbox_name})
+      ~validate:(fun m ->
+        (* Must satisfy Sandbox_config_registry.is_safe_name, which rejects
+           the name with an exception at creation time otherwise. *)
+        let name = m.sandbox_name in
+        let is_valid_char = function
+          | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_' -> true
+          | _ -> false
+        in
+        if not (Form_builder_common.is_nonempty name) then
+          Error "Sandbox name is required"
+        else if String.length name > 64 then
+          Error "Sandbox name must be at most 64 characters"
+        else if not (String.for_all is_valid_char name) then
+          Error
+            "Only alphanumeric characters (a-z, A-Z, 0-9), hyphens (-), and \
+             underscores (_) are allowed"
+        else Ok ())
     |> with_hint
          "Unique name for this sandbox. Auto-generated if left as default.")
 

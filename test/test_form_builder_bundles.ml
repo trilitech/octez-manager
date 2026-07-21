@@ -397,6 +397,67 @@ let test_combined_core_and_client_fields () =
     (List.length combined)
 
 (******************************************************************************)
+(*                    INSTANCE NAME SYNTAX VALIDATION                        *)
+(******************************************************************************)
+
+(* Regression tests for #966: the install wizards accepted instance names
+   with spaces and punctuation and reported the form as valid, deferring the
+   failure to systemd at install time. *)
+
+let check_syntax_result name expected_ok =
+  let result = FBC.validate_instance_name_syntax name in
+  check
+    bool
+    (Printf.sprintf
+       "%S is %s"
+       name
+       (if expected_ok then "valid" else "invalid"))
+    expected_ok
+    (Result.is_ok result)
+
+let test_instance_name_syntax_valid () =
+  List.iter
+    (fun name -> check_syntax_result name true)
+    ["node-mainnet"; "baker_1"; "a.b.c"; "NODE-2"; "n"]
+
+let test_instance_name_syntax_invalid () =
+  List.iter
+    (fun name -> check_syntax_result name false)
+    [
+      "";
+      "   ";
+      "my node";
+      "node-mainnetmy node!";
+      "node@mainnet";
+      "node/mainnet";
+      "node$";
+      "nœud";
+    ]
+
+let test_instance_name_syntax_error_messages () =
+  (match FBC.validate_instance_name_syntax "" with
+  | Error msg ->
+      check string "empty name message" "Instance name is required" msg
+  | Ok () -> fail "empty name must be rejected") ;
+  let contains_substring haystack needle =
+    let hl = String.length haystack and nl = String.length needle in
+    let rec loop i =
+      if i + nl > hl then false
+      else if String.equal (String.sub haystack i nl) needle then true
+      else loop (i + 1)
+    in
+    loop 0
+  in
+  match FBC.validate_instance_name_syntax "my node!" with
+  | Error msg ->
+      check
+        bool
+        "invalid chars message names the problem"
+        true
+        (contains_substring msg "invalid characters")
+  | Ok () -> fail "name with space and '!' must be rejected"
+
+(******************************************************************************)
 (*                              TEST SUITE                                   *)
 (******************************************************************************)
 
@@ -418,6 +479,15 @@ let () =
             `Quick
             test_core_service_skip_service_fields;
           test_case "edit_mode" `Quick test_core_service_edit_mode;
+        ] );
+      ( "Instance Name Syntax",
+        [
+          test_case "valid names" `Quick test_instance_name_syntax_valid;
+          test_case "invalid names" `Quick test_instance_name_syntax_invalid;
+          test_case
+            "error messages"
+            `Quick
+            test_instance_name_syntax_error_messages;
         ] );
       ( "Client Bundle",
         [

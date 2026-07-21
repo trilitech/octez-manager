@@ -62,6 +62,11 @@ type node_config = {
 (** Check if string is non-empty after trimming *)
 val is_nonempty : string -> bool
 
+(** Validate an instance name for inline form display: non-empty and only
+    characters valid in systemd unit names (a-z, A-Z, 0-9, '-', '_', '.').
+    Returns the message to show next to the field on error. *)
+val validate_instance_name_syntax : string -> (unit, string) result
+
 (** Lowercase and trim a string *)
 val normalize : string -> string
 
