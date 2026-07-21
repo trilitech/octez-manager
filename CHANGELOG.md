@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Node installation now validates that the service user can execute the Octez binaries *before* writing any state. Previously a failed install (e.g. binaries in a directory the service user cannot access) left a stale service registry entry that kept the instance name and RPC port occupied (#987)
+
 ## [1.0.0-rc3] - 2026-05-26
 
 ### Changed
