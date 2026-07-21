@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Node installation now validates that the service user can execute the Octez binaries *before* writing any state. Previously a failed install (e.g. binaries in a directory the service user cannot access) left a stale service registry entry that kept the instance name and RPC port occupied (#987)
 - Install wizards (node, baker, DAL node, accuser) now reject instance names containing spaces or punctuation with an inline validation error, instead of reporting the form as valid and failing at install time; the sandbox creation wizard likewise validates the sandbox name (fixes #966)
+- `octez-manager baker list --json` now emits an empty JSON array (`[]`) instead of a plain-text hint when no baker instances exist, keeping the output machine-readable for scripts (fixes #968)
 
 ## [1.0.0-rc3] - 2026-05-26
 

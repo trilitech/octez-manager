@@ -46,4 +46,13 @@ if [[ "$json_output" == *"capability missing"* ]] || [[ "$json_output" == *"Fail
   exit 1
 fi
 
+# --json must emit machine-readable output even when the list is empty
+# (regression test for https://github.com/trilitech/octez-manager/issues/968
+# where it printed a plain-text hint instead of a JSON document).
+if ! echo "$json_output" | jq -e 'type == "array"' >/dev/null 2>&1; then
+  echo "ERROR: 'baker list --json' did not emit a JSON array"
+  echo "Output: $json_output"
+  exit 1
+fi
+
 echo "Baker list no-instances test passed"
