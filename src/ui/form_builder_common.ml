@@ -56,6 +56,13 @@ type node_config = {
 
 let is_nonempty s = String.trim s <> ""
 
+let validate_instance_name_syntax name =
+  if not (is_nonempty name) then Error "Instance name is required"
+  else
+    match Config.validate_instance_name_chars ~instance:name with
+    | Ok () -> Ok ()
+    | Error (`Msg msg) -> Error msg
+
 let normalize s = String.lowercase_ascii (String.trim s)
 
 let instance_in_use ~states name =

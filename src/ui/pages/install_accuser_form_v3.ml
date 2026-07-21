@@ -338,13 +338,16 @@ let spec =
                   Form_builder_common.cached_service_states_nonblocking ()
                 in
                 let name = m.core.instance_name in
-                if not (Form_builder_common.is_nonempty name) then
-                  Error "Instance name is required"
-                else if
-                  Form_builder_common.instance_in_use ~states name
-                  && not (m.edit_mode && m.original_instance = Some name)
-                then Error "Instance name already exists"
-                else Ok ());
+                match
+                  Form_builder_common.validate_instance_name_syntax name
+                with
+                | Error e -> Error e
+                | Ok () ->
+                    if
+                      Form_builder_common.instance_in_use ~states name
+                      && not (m.edit_mode && m.original_instance = Some name)
+                    then Error "Instance name already exists"
+                    else Ok ());
           ]
         (* 10. Group *)
         @ [

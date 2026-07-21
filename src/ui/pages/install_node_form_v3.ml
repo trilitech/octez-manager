@@ -878,17 +878,21 @@ let spec =
                 let states =
                   Form_builder_common.cached_service_states_nonblocking ()
                 in
-                if not (Form_builder_common.is_nonempty m.core.instance_name)
-                then Error "Instance name is required"
-                else if
-                  Form_builder_common.instance_in_use
-                    ~states
+                match
+                  Form_builder_common.validate_instance_name_syntax
                     m.core.instance_name
-                  && not
-                       (m.edit_mode
-                       && m.original_instance = Some m.core.instance_name)
-                then Error "Instance name already exists"
-                else Ok ())
+                with
+                | Error e -> Error e
+                | Ok () ->
+                    if
+                      Form_builder_common.instance_in_use
+                        ~states
+                        m.core.instance_name
+                      && not
+                           (m.edit_mode
+                           && m.original_instance = Some m.core.instance_name)
+                    then Error "Instance name already exists"
+                    else Ok ())
             |> with_hint
                  "Unique identifier for this node. Used in systemd unit and \
                   default paths.";

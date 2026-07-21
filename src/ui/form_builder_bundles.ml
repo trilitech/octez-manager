@@ -159,12 +159,14 @@ let core_service_fields ~get_core ~set_core ~binary ~subcommand ?baker_mode
               Form_builder_common.cached_service_states_nonblocking ()
             in
             let name = (get_core m).instance_name in
-            if not (is_nonempty name) then Error "Instance name is required"
-            else if
-              instance_in_use ~states name
-              && not (edit_mode && original_instance = Some name)
-            then Error "Instance name already exists"
-            else Ok ());
+            match validate_instance_name_syntax name with
+            | Error e -> Error e
+            | Ok () ->
+                if
+                  instance_in_use ~states name
+                  && not (edit_mode && original_instance = Some name)
+                then Error "Instance name already exists"
+                else Ok ());
       ]
   in
   (* Service User - readonly in edit mode *)

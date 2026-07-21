@@ -860,17 +860,21 @@ let spec =
                   if base_dir_changed then {m' with delegates = []} else m')
               ~validate:(fun m ->
                 let states = Form_builder_common.cached_service_states () in
-                if not (Form_builder_common.is_nonempty m.core.instance_name)
-                then Error "Instance name is required"
-                else if
-                  Form_builder_common.instance_in_use
-                    ~states
+                match
+                  Form_builder_common.validate_instance_name_syntax
                     m.core.instance_name
-                  && not
-                       (m.edit_mode
-                       && m.original_instance = Some m.core.instance_name)
-                then Error "Instance name already exists"
-                else Ok ());
+                with
+                | Error e -> Error e
+                | Ok () ->
+                    if
+                      Form_builder_common.instance_in_use
+                        ~states
+                        m.core.instance_name
+                      && not
+                           (m.edit_mode
+                           && m.original_instance = Some m.core.instance_name)
+                    then Error "Instance name already exists"
+                    else Ok ());
           ]
         (* 10. Group *)
         @ [

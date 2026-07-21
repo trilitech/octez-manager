@@ -590,13 +590,16 @@ let test_instance_name_with_spaces () =
   TH.with_test_env (fun () ->
       HD.Stateful.init (module Install_node_form.Page) ;
 
-      TH.navigate_down 10 ;
+      (* Navigate to the Instance Name field. *)
+      TH.navigate_down 14 ;
       Unix.sleepf 0.02 ;
 
       ignore (TH.send_key_and_wait "Enter") ;
       Unix.sleepf 0.02 ;
 
-      (* Instance names with spaces are problematic for systemd *)
+      (* Instance names with spaces break systemd unit naming. Appending to
+         the valid default produces e.g. "node-shadownetmy node name".
+         Regression test for #966: this used to be accepted as valid. *)
       TH.type_string "my node name" ;
       Unix.sleepf 0.02 ;
 
@@ -604,13 +607,19 @@ let test_instance_name_with_spaces () =
       Unix.sleepf 0.02 ;
 
       let screen = TH.get_screen_text () in
-
-      (* Should either reject or replace spaces *)
+      (* The editor must stay open (star-prefixed modal title) and show the
+         inline validation warning. The full message may be truncated by the
+         80-column test terminal, so match its stable prefix. *)
       check
         bool
-        "form handles spaces in instance name"
+        "editor stays open on invalid instance name"
         true
-        (String.length screen > 0))
+        (TH.contains_substring screen "★ Instance Name") ;
+      check
+        bool
+        "instance name with spaces shows inline validation error"
+        true
+        (TH.contains_substring screen "⚠ Instance name"))
 
 let test_reserved_instance_names () =
   TH.with_test_env (fun () ->
