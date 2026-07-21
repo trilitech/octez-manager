@@ -116,10 +116,13 @@ let list_run json =
   in
   match baker_states with
   | [] ->
-      Printf.printf
-        "No baker instances found. Use 'octez-manager install-baker' to create \
-         one.\n\
-         %!" ;
+      (* With --json the output must stay machine-readable even when empty. *)
+      if json then Printf.printf "[]\n%!"
+      else
+        Printf.printf
+          "No baker instances found. Use 'octez-manager install-baker' to \
+           create one.\n\
+           %!" ;
       `Ok ()
   | _ ->
       if json then (
