@@ -172,7 +172,8 @@ let self_update_cmd =
 let version_cmd =
   let term =
     let run () =
-      Printf.printf "octez-manager v%s\n" Self_update_checker.current_version ;
+      (* Same output as cmdliner's --version flag: the bare version string. *)
+      Printf.printf "%s\n" Self_update_checker.current_version ;
       (* Quick check for updates *)
       match Self_update_checker.check_for_updates () with
       | Self_update_checker.Update_available info ->

@@ -129,11 +129,7 @@ let ui_cmd =
 
 let root_cmd =
   let doc = "Terminal UI for managing Octez services" in
-  let version =
-    match Build_info.V1.version () with
-    | None -> "dev"
-    | Some v -> Build_info.V1.Version.to_string v
-  in
+  let version = Self_update_checker.current_version in
   let info = Cmd.info "octez-manager" ~doc ~version in
   Cmd.group
     info

@@ -7,8 +7,13 @@
 
 open Rresult
 
-(** Current version - kept in sync with main.ml *)
-let current_version = "0.3.0"
+(** Current version, stamped by dune-build-info at link time from the
+    project version. Single source of truth for both `--version` and the
+    `version` subcommand. *)
+let current_version =
+  match Build_info.V1.version () with
+  | None -> "dev"
+  | Some v -> Build_info.V1.Version.to_string v
 
 (** GitHub repository info *)
 let github_owner = "trilitech"
