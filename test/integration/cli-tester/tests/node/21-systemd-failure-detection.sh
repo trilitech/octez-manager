@@ -16,7 +16,7 @@ register_instance "$NODE_INSTANCE"
 echo "Installing node..."
 om install-node \
 	--instance "$NODE_INSTANCE" \
-	--network tallinnnet \
+	--network shadownet \
 	--rpc-addr "$RPC_ADDR" \
 	--net-addr "$NET_ADDR" \
 	--service-user tezos \

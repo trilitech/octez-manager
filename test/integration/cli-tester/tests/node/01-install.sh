@@ -50,10 +50,14 @@ if [ ! -d "$DATA_DIR" ]; then
 fi
 echo "Data directory created: $DATA_DIR"
 
-# Verify registry entry
-if ! om list 2>&1 | grep -q "$TEST_INSTANCE"; then
+# Verify registry entry.
+# Capture the output instead of piping into grep -q: with pipefail, grep -q
+# exiting at the first match can SIGPIPE octez-manager (exit 141) and turn a
+# successful match into a spurious failure.
+LIST_OUTPUT=$(om list 2>&1)
+if [[ "$LIST_OUTPUT" != *"$TEST_INSTANCE"* ]]; then
 	echo "ERROR: Instance not in registry"
-	om list 2>&1 || true
+	echo "$LIST_OUTPUT"
 	exit 1
 fi
 echo "Instance registered successfully"

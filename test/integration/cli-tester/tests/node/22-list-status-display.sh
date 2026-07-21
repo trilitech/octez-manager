@@ -17,7 +17,7 @@ register_instance "$NODE_INSTANCE"
 echo "Installing node..."
 om install-node \
 	--instance "$NODE_INSTANCE" \
-	--network tallinnnet \
+	--network shadownet \
 	--rpc-addr "$RPC_ADDR" \
 	--net-addr "$NET_ADDR" \
 	--service-user tezos \
@@ -42,7 +42,7 @@ else
 	exit 1
 fi
 
-if echo "$LIST_OUTPUT" | grep "$NODE_INSTANCE" | grep -q "tallinnnet"; then
+if echo "$LIST_OUTPUT" | grep "$NODE_INSTANCE" | grep -q "shadownet"; then
 	echo "Network appears correctly"
 else
 	echo "ERROR: Network not in output"
