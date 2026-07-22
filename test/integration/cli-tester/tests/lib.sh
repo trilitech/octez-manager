@@ -67,7 +67,7 @@ _OM_USER_LOCK="/tmp/om-service-user.lock"
 instance_exists() {
 	local instance="$1"
 	# Primary check: ask octez-manager
-	if om list 2>&1 | grep -q "$instance"; then
+	if om list 2>&1 | grep "$instance" >/dev/null; then
 		return 0
 	fi
 	# Fallback: check the service registry file directly.
@@ -109,7 +109,7 @@ service_exists() {
 	# fully propagated through systemd's internal state
 	while [ $retry -lt $max_retries ]; do
 		# Template units are listed as role@.service, not role@instance.service
-		if systemctl list-unit-files "octez-${role}@.service" 2>/dev/null | grep -q "octez-${role}@"; then
+		if systemctl list-unit-files "octez-${role}@.service" 2>/dev/null | grep "octez-${role}@" >/dev/null; then
 			return 0
 		fi
 
@@ -429,7 +429,7 @@ SERVICE
 # Check if external service is detected
 external_service_detected() {
 	local service_name="$1"
-	om list --external 2>&1 | grep -q "$service_name"
+	om list --external 2>&1 | grep "$service_name" >/dev/null
 }
 
 # Wait for external service to be detected (with retries)
@@ -455,7 +455,7 @@ wait_for_external_service() {
 service_is_managed() {
 	local instance="$1"
 	# Check that instance appears in list but NOT in external services section
-	om list 2>&1 | grep -v "External Octez Services" | grep -q "$instance"
+	om list 2>&1 | grep -v "External Octez Services" | grep "$instance" >/dev/null
 }
 
 # Verify external service is disabled

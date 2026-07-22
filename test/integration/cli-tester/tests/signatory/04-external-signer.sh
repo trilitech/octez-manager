@@ -58,7 +58,7 @@ om install-baker \
 
 echo "==> Step 4: Verify baker installation succeeded"
 # Baker is installed successfully if registry entry exists
-if ! om list 2>&1 | grep -q "$BAKER_INSTANCE"; then
+if ! om list 2>&1 | grep "$BAKER_INSTANCE" >/dev/null; then
 	echo "ERROR: Baker instance '$BAKER_INSTANCE' not found in om list"
 	om list 2>&1
 	exit 1
@@ -106,13 +106,13 @@ echo "==> Step 7: Verify systemd dependencies"
 systemctl daemon-reload
 
 # Should depend on node only, not signatory
-if ! systemctl list-dependencies "$BAKER_UNIT" | grep -q "octez-node@${NODE_INSTANCE}.service"; then
+if ! systemctl list-dependencies "$BAKER_UNIT" | grep "octez-node@${NODE_INSTANCE}.service" >/dev/null; then
 	echo "ERROR: Baker not dependent on node"
 	systemctl list-dependencies "$BAKER_UNIT"
 	exit 1
 fi
 
-if systemctl list-dependencies "$BAKER_UNIT" | grep -q "signatory@"; then
+if systemctl list-dependencies "$BAKER_UNIT" | grep "signatory@" >/dev/null; then
 	echo "ERROR: Baker with external URI should not depend on local signatory"
 	systemctl list-dependencies "$BAKER_UNIT"
 	exit 1

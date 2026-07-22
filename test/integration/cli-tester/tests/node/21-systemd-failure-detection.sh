@@ -74,7 +74,7 @@ else
 fi
 
 # Verify om list shows the instance (it should still exist)
-if om list | grep -q "$NODE_INSTANCE"; then
+if om list | grep "$NODE_INSTANCE" >/dev/null; then
 	echo "Instance still visible in om list"
 else
 	echo "ERROR: Instance disappeared from list"
@@ -85,7 +85,7 @@ fi
 LIST_OUTPUT=$(om list)
 echo "om list output:"
 echo "$LIST_OUTPUT"
-if echo "$LIST_OUTPUT" | grep -q "$NODE_INSTANCE"; then
+if echo "$LIST_OUTPUT" | grep "$NODE_INSTANCE" >/dev/null; then
 	echo "om list shows the instance"
 else
 	echo "ERROR: Instance not in om list"
