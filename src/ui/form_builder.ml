@@ -436,7 +436,13 @@ module Make (S : sig
   val spec : model spec
 end) =
 struct
-  type state = {model_ref : S.model ref; focus : Focus_ring.t}
+  type state = {
+    model_ref : S.model ref;
+    focus : Focus_ring.t;
+    initial_values : (string * string) list;
+        (** Per-field (label, display value) snapshot taken at init, used to
+            detect unsaved edits when leaving the form. *)
+  }
 
   type msg = unit
 
@@ -454,10 +460,22 @@ struct
   let cursor_of_focus s =
     match Focus_ring.current_index s.focus with Some i -> i | None -> 0
 
+  (** Snapshot of every field's (label, display value), used to detect
+      unsaved edits. *)
+  let field_values model =
+    S.spec.fields model
+    |> List.map (fun (Field f) -> (f.label, f.to_string (f.get model)))
+
+  let is_dirty s =
+    let pair_equal (l1, v1) (l2, v2) =
+      String.equal l1 l2 && String.equal v1 v2
+    in
+    not (List.equal pair_equal s.initial_values (field_values !(s.model_ref)))
+
   let init () =
     let model_ref = ref (S.spec.initial_model ()) in
     let focus = build_focus_ring !model_ref in
-    let s = {model_ref; focus} in
+    let s = {model_ref; focus; initial_values = field_values !model_ref} in
     (* Call on_init hook if provided *)
     (match S.spec.on_init with Some f -> f !model_ref | None -> ()) ;
     Navigation.make s
@@ -706,6 +724,18 @@ struct
     Themed_page.render_layout ~size ~header ~footer ~child:(fun _ ->
         Table_widget.Table.render table)
 
+  (** Leave the form via Esc. If the user has unsaved edits, ask for
+      confirmation instead of silently discarding them. *)
+  let leave ps =
+    if is_dirty ps.Navigation.s then (
+      Modal_helpers.confirm_modal
+        ~title:"Discard changes?"
+        ~message:"You have unsaved changes. Leave and discard them?"
+        ~on_result:(fun confirmed -> if confirmed then Context.navigate_back ())
+        () ;
+      refresh ps)
+    else Navigation.back ps
+
   let handle_modal_key ps key ~size:_ =
     Miaou.Core.Modal_manager.handle_key key ;
     refresh ps
@@ -722,7 +752,7 @@ struct
       | `Handled -> Navigation.update (fun s -> {s with focus}) ps
       | `Bubble -> (
           match Miaou.Core.Keys.of_string key with
-          | Some Miaou.Core.Keys.Escape -> Navigation.back ps
+          | Some Miaou.Core.Keys.Escape -> leave ps
           | Some Miaou.Core.Keys.Up ->
               Navigation.update (fun s -> move_state s (-1)) ps
           | Some Miaou.Core.Keys.Down ->
@@ -773,7 +803,7 @@ struct
           | `Bubble -> (
               match key with
               | Miaou.Core.Keys.Escape ->
-                  (Navigation.back ps, Miaou_interfaces.Key_event.Handled)
+                  (leave ps, Miaou_interfaces.Key_event.Handled)
               | Miaou.Core.Keys.Up ->
                   ( Navigation.update (fun s -> move_state s (-1)) ps,
                     Miaou_interfaces.Key_event.Handled )

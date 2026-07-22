@@ -779,6 +779,75 @@ let validation_tests =
   ]
 
 (* ============================================================ *)
+(* Regression tests for issue #975: Esc discards edits silently *)
+(* ============================================================ *)
+
+(** A pristine form must exit on Esc without asking for confirmation. *)
+let test_esc_pristine_form_no_confirmation () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_node_form.Page) ;
+
+      ignore (TH.send_key_and_wait "Escape") ;
+      Unix.sleepf 0.02 ;
+
+      let screen = TH.get_screen_text () in
+      check
+        bool
+        "pristine form exits without a discard prompt"
+        false
+        (TH.contains_substring screen "Discard changes?"))
+
+(** A form with unsaved edits must ask for confirmation on Esc, and
+    cancelling the prompt must keep the form (and the edit) intact. *)
+let test_esc_dirty_form_asks_confirmation () =
+  TH.with_test_env (fun () ->
+      HD.Stateful.init (module Install_node_form.Page) ;
+
+      (* Edit History Mode: rolling -> full (second choice in the picker). *)
+      TH.navigate_down 1 ;
+      Unix.sleepf 0.02 ;
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+      ignore (TH.send_key_and_wait "Down") ;
+      ignore (TH.send_key_and_wait "Enter") ;
+      Unix.sleepf 0.02 ;
+      TH.assert_screen_contains "full" ;
+
+      (* Esc on the dirty form must open the confirmation modal
+         (regression test for #975: it used to leave silently). *)
+      ignore (TH.send_key_and_wait "Escape") ;
+      Unix.sleepf 0.02 ;
+      TH.assert_screen_contains "Discard changes?" ;
+
+      (* Cancelling the prompt keeps the form and the edit. The choice
+         modal recognizes the normalized "Esc" key name, which is what a
+         real terminal delivers. *)
+      ignore (TH.send_key_and_wait "Esc") ;
+      Unix.sleepf 0.02 ;
+      let screen = TH.get_screen_text () in
+      check
+        bool
+        "prompt dismissed"
+        false
+        (TH.contains_substring screen "Discard changes?") ;
+      check
+        bool
+        "form still shown with the edit"
+        true
+        (TH.contains_substring screen "Install Node"
+        && TH.contains_substring screen "full"))
+
+let esc_confirmation_tests =
+  [
+    ( "pristine form exits without prompt",
+      `Quick,
+      test_esc_pristine_form_no_confirmation );
+    ( "dirty form asks for confirmation",
+      `Quick,
+      test_esc_dirty_form_asks_confirmation );
+  ]
+
+(* ============================================================ *)
 (* Regression tests for issue #113: snapshot kind duplication  *)
 (* ============================================================ *)
 
@@ -819,5 +888,6 @@ let () =
     [
       ("node_form", form_tests);
       ("validation", validation_tests);
+      ("esc_confirmation", esc_confirmation_tests);
       ("snapshot_display", snapshot_display_tests);
     ]
