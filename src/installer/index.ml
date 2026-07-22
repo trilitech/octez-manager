@@ -26,6 +26,15 @@ let install ?(quiet = false) (request : index_request) =
   let* () =
     System_user.ensure_service_account ~quiet ~name:request.service_user ()
   in
+  (* Fail before any state is written: a failure after the service registry
+     entry is created (e.g. inside Systemd.install_unit) would leave a stale
+     record occupying the instance name and RPC port. *)
+  let* () =
+    Systemd.validate_bin_dir
+      ~user:request.service_user
+      ~app_bin_dir:request.app_bin_dir
+      ~role:"index"
+  in
   let* () =
     if Paths.is_root () then
       System_user.ensure_system_directories

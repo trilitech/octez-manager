@@ -2,7 +2,7 @@
   "metadata": {
     "generated_at": "2026-04-09T00:00:00.000000",
     "generated_by": "Rebase: merge main (101 tests) + install-index test",
-    "total_tests": 103,
+    "total_tests": 104,
     "total_duration": 819.05,
     "shard_count": 5,
     "mean_shard_duration": 163.81,
@@ -58,10 +58,11 @@
       "import/55-import-node-identity-preservation.sh",
       "import/56-import-node-missing-config-created.sh",
       "install/01-verified-release.sh",
-      "cli/01-version-consistency.sh"
+      "cli/01-version-consistency.sh",
+      "signatory/06-binary-access-no-stale-registry.sh"
     ],
-    "test_count": 19,
-    "total_duration": 146.78
+    "test_count": 20,
+    "total_duration": 152.78
   },
   "shard-3": {
     "tests": [
