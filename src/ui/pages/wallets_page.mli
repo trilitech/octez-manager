@@ -37,6 +37,11 @@ module Internal_for_tests : sig
 
   (** Get all base directories to scan for keys (default + managed, deduplicated). *)
   val get_all_base_dirs : unit -> string list
+
+  (** Format a network-selection modal entry from a label, an optional
+      spendable balance in mutez, and the syncing flag. *)
+  val format_network_choice :
+    label:string -> balance:string option -> syncing:bool -> string
 end
 
 (**/**)
