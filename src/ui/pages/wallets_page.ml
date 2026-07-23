@@ -2083,6 +2083,19 @@ type network_choice = {
     prompting — sandbox keys must not be used on other networks.
     When a network has both local and public endpoints, shows both as separate
     choices, allowing the user to select which endpoint to use. *)
+
+(** Format one entry of the network-selection modal, e.g.
+    "shadownet (public)  1.500000 ꜩ  (syncing..)". The formatted balance
+    already carries the ꜩ symbol — no extra unit suffix. *)
+let format_network_choice ~label ~balance ~syncing =
+  let balance_str =
+    match balance with
+    | Some b -> Printf.sprintf "  %s" (Baker_wallet_data.format_tez b)
+    | None -> ""
+  in
+  let sync_str = if syncing then "  (syncing..)" else "" in
+  Printf.sprintf "%s%s%s" label balance_str sync_str
+
 let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
     ~action =
   match group.sandbox_name with
@@ -2180,22 +2193,16 @@ let with_network (key : Keys_reader.key_metadata) ~(group : enriched_group)
             ~title:"Select network"
             ~items:multiple
             ~to_string:(fun c ->
-              let balance_str =
-                match
-                  List.find_opt
-                    (fun (wd : Keys_scheduler.wallet_data) ->
-                      String.equal wd.network c.network)
-                    wallet_data
-                with
-                | Some wd ->
-                    Printf.sprintf
-                      "  %s tez"
-                      (Baker_wallet_data.format_tez wd.spendable_balance)
-                | None -> ""
+              let balance =
+                List.find_opt
+                  (fun (wd : Keys_scheduler.wallet_data) ->
+                    String.equal wd.network c.network)
+                  wallet_data
+                |> Option.map (fun (wd : Keys_scheduler.wallet_data) ->
+                    wd.spendable_balance)
               in
-              let sync_str = if c.syncing then "  (syncing..)" else "" in
               let label =
-                Printf.sprintf "%s%s%s" c.label balance_str sync_str
+                format_network_choice ~label:c.label ~balance ~syncing:c.syncing
               in
               if String.equal c.network "mainnet" then
                 Widgets.themed_warning label
@@ -2644,6 +2651,8 @@ module Internal_for_tests = struct
   let default_client_base_dir = default_client_base_dir
 
   let get_all_base_dirs = get_all_base_dirs
+
+  let format_network_choice = format_network_choice
 end
 
 module Page = Page_Impl

@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The transfer flow's "Select network" picker no longer shows a redundant double unit ("0.000000 ꜩ tez" → "0.000000 ꜩ") (fixes #971)
+
 - `octez-manager instance` without arguments now fails with a usage error (non-zero exit) instead of printing the top-level help page with exit 0, and `octez-manager instance --help` now documents all available actions (start, stop, restart, remove, purge, show, show-service, logs, export-logs, edit, set-env, get-env) with examples (fixes #969)
 
 - The RPC browser now derives a public endpoint's network from its teztnets hostname (e.g. `rpc.ushuaianet.teztnets.com` → Ushuaianet) instead of showing "Unknown" for testnets missing from a static list (fixes #970)

@@ -474,6 +474,48 @@ let scheduler_tests =
       test_scheduler_proactive_fetch );
   ]
 
+(* ============================================================ *)
+(* Network choice formatting (#971)                              *)
+(* ============================================================ *)
+
+(* Regression tests for #971: the transfer flow's "Select network" picker
+   displayed "0.000000 ꜩ tez" — format_tez already appends the ꜩ symbol
+   and the entry wrapped it in an extra " tez" suffix. *)
+
+let format_choice = Keys_page.Internal_for_tests.format_network_choice
+
+let test_network_choice_no_double_unit () =
+  let entry =
+    format_choice ~label:"mainnet (public)" ~balance:(Some "0") ~syncing:false
+  in
+  check string "single ꜩ unit" "mainnet (public)  0.000000 ꜩ" entry ;
+  check
+    bool
+    "no trailing 'tez' word"
+    false
+    (TH.contains_substring entry "tez\n" || TH.contains_substring entry " tez")
+
+let test_network_choice_variants () =
+  check
+    string
+    "no balance"
+    "shadownet (public)"
+    (format_choice ~label:"shadownet (public)" ~balance:None ~syncing:false) ;
+  check
+    string
+    "syncing suffix"
+    "shadownet (public)  1.500000 ꜩ  (syncing..)"
+    (format_choice
+       ~label:"shadownet (public)"
+       ~balance:(Some "1500000")
+       ~syncing:true)
+
+let network_choice_tests =
+  [
+    Alcotest.test_case "no double unit" `Quick test_network_choice_no_double_unit;
+    Alcotest.test_case "variants" `Quick test_network_choice_variants;
+  ]
+
 let () =
   Alcotest.run
     "Wallets_page"
@@ -482,4 +524,5 @@ let () =
       ("fold_unfold", fold_tests);
       ("refresh_on_dirty_flag", refresh_tests);
       ("scheduler_initial_fetch", scheduler_tests);
+      ("network_choice_format", network_choice_tests);
     ]
