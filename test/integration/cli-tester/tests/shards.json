@@ -2,7 +2,7 @@
   "metadata": {
     "generated_at": "2026-04-09T00:00:00.000000",
     "generated_by": "Rebase: merge main (101 tests) + install-index test",
-    "total_tests": 103,
+    "total_tests": 105,
     "total_duration": 819.05,
     "shard_count": 5,
     "mean_shard_duration": 163.81,
@@ -83,10 +83,11 @@
       "node/09-install-no-snapshot.sh",
       "import/53-import-cascade-accuser.sh",
       "import/61-import-cascade-all-configs-preserved.sh",
-      "index/01-install.sh"
+      "index/01-install.sh",
+      "cli/02-instance-no-args.sh"
     ],
-    "test_count": 18,
-    "total_duration": 149.0
+    "test_count": 19,
+    "total_duration": 151.0
   },
   "shard-4": {
     "tests": [
