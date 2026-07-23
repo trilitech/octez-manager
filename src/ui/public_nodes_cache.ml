@@ -56,13 +56,56 @@ let extract_network_from_url (url : string) : string option =
       (* Note: rpc.tzkt.io removed - it has network in path: rpc.tzkt.io/mainnet *)
     ]
   in
+  (* Derive the network slug from a teztnets hostname such as
+     "rpc.<slug>.teztnets.com" or "<slug>.teztnets.com". Teztnets rotate, so
+     this keeps working for networks that postdate the static list below. *)
+  let teztnets_hostname_slug () =
+    let host =
+      let without_scheme =
+        match String.index_opt lower_url ':' with
+        | Some i
+          when i + 2 < String.length lower_url
+               && String.sub lower_url i 3 = "://" ->
+            String.sub lower_url (i + 3) (String.length lower_url - i - 3)
+        | _ -> lower_url
+      in
+      match String.index_opt without_scheme '/' with
+      | Some i -> String.sub without_scheme 0 i
+      | None -> without_scheme
+    in
+    let suffix = ".teztnets.com" in
+    if
+      String.length host > String.length suffix
+      && String.sub
+           host
+           (String.length host - String.length suffix)
+           (String.length suffix)
+         = suffix
+    then
+      let prefix =
+        String.sub host 0 (String.length host - String.length suffix)
+      in
+      let slug =
+        match String.rindex_opt prefix '.' with
+        | Some i -> String.sub prefix (i + 1) (String.length prefix - i - 1)
+        | None -> prefix
+      in
+      let is_slug_char = function
+        | 'a' .. 'z' | '0' .. '9' | '-' -> true
+        | _ -> false
+      in
+      if slug <> "" && slug <> "rpc" && String.for_all is_slug_char slug then
+        Some slug
+      else None
+    else None
+  in
   match
     List.find_opt
       (fun (pattern, _) -> contains_substring lower_url pattern)
       known_url_mappings
   with
   | Some (_, network) -> Some network
-  | None ->
+  | None -> (
       (* Fall back to searching for network name in URL *)
       let known_networks =
         [
@@ -74,7 +117,13 @@ let extract_network_from_url (url : string) : string option =
           "mondaynet";
         ]
       in
-      List.find_opt (fun net -> contains_substring lower_url net) known_networks
+      match
+        List.find_opt
+          (fun net -> contains_substring lower_url net)
+          known_networks
+      with
+      | Some net -> Some net
+      | None -> teztnets_hostname_slug ())
 
 (** Parse Taquito JSON format to extract public nodes *)
 let parse_taquito_json (txt : string) : node_info list =

@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The RPC browser now derives a public endpoint's network from its teztnets hostname (e.g. `rpc.ushuaianet.teztnets.com` → Ushuaianet) instead of showing "Unknown" for testnets missing from a static list (fixes #970)
+
 - Install wizards now ask for confirmation before discarding unsaved edits: pressing Esc on a modified form opens a "Discard changes?" prompt instead of silently dropping everything; untouched forms still exit immediately (fixes #975)
 
 - Node installation now validates that the service user can execute the Octez binaries *before* writing any state. Previously a failed install (e.g. binaries in a directory the service user cannot access) left a stale service registry entry that kept the instance name and RPC port occupied (#987)
