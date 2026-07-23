@@ -16,6 +16,16 @@
     @return Escaped value, quoted if necessary *)
 val escape_env_value : string -> string
 
+(** Unescape a value read from a shell environment file.
+    This is the inverse of [escape_env_value]. Removes surrounding double quotes
+    and unescapes backslash sequences.
+    
+    Values without surrounding quotes are returned unchanged.
+    
+    @param v The escaped value from the env file
+    @return Unescaped plain value *)
+val unescape_env_value : string -> string
+
 (** Write environment variable pairs to the instance's node.env file.
     If [with_comments] is true, includes documentation comments for each variable. *)
 val write_pairs :

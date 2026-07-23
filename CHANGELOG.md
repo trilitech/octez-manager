@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Node and DAL node edit operations no longer corrupt dependent env files through quote accumulation. Previously, `Node_env.read` returned values with surrounding quotes intact while `Node_env.write_pairs` escaped them again, causing a new layer of escaping on every edit cycle. A baker with `OCTEZ_BAKER_DELEGATES_ARGS="tz1a tz1b"` would fail to start after an unrelated node edit because the value became `\"tz1a tz1b\"` with literal inner quotes. `Node_env.read` now unescapes values symmetrically with how `write_pairs` escapes them, ensuring round-trip stability (fixes #995)
+
 - The transfer flow's "Select network" picker no longer shows a redundant double unit ("0.000000 ꜩ tez" → "0.000000 ꜩ") (fixes #971)
 
 - `octez-manager instance` without arguments now fails with a usage error (non-zero exit) instead of printing the top-level help page with exit 0, and `octez-manager instance --help` now documents all available actions (start, stop, restart, remove, purge, show, show-service, logs, export-logs, edit, set-env, get-env) with examples (fixes #969)
