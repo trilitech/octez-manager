@@ -67,6 +67,33 @@ let escape_env_value v =
     in
     "\"" ^ escaped ^ "\""
 
+(** Unescape a value read from a shell environment file.
+    This is the inverse of [escape_env_value]. Removes surrounding double quotes
+    and unescapes backslash sequences that were added during escaping.
+    
+    Values without surrounding quotes are returned as-is (they didn't need escaping). *)
+let unescape_env_value v =
+  let len = String.length v in
+  (* If not wrapped in quotes, return as-is *)
+  if len < 2 || v.[0] <> '"' || v.[len - 1] <> '"' then v
+  else
+    (* Remove surrounding quotes *)
+    let inner = String.sub v 1 (len - 2) in
+    (* Unescape: \\ -> \, \" -> ", \$ -> $, \` -> ` *)
+    let buf = Buffer.create (String.length inner) in
+    let rec process i =
+      if i >= String.length inner then Buffer.contents buf
+      else if inner.[i] = '\\' && i + 1 < String.length inner then (
+        (* Escaped character *)
+        let next = inner.[i + 1] in
+        Buffer.add_char buf next ;
+        process (i + 2))
+      else (
+        Buffer.add_char buf inner.[i] ;
+        process (i + 1))
+    in
+    process 0
+
 let write_pairs ?(with_comments = false) ~inst pairs =
   let base = Paths.env_instances_base_dir () in
   let path = Filename.concat (Filename.concat base inst) "node.env" in
@@ -121,7 +148,9 @@ let read ~inst =
             match String.split_on_char '=' trimmed with
             | key :: rest ->
                 let value = String.concat "=" rest in
-                loop ((key, value) :: acc)
+                (* Unescape the value to get back the original plain text *)
+                let unescaped_value = unescape_env_value value in
+                loop ((key, unescaped_value) :: acc)
             | [] -> loop acc
         with End_of_file ->
           close_in ic ;

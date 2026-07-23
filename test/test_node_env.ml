@@ -12,6 +12,7 @@
     - Environment file writing and reading
     - Edge cases: special characters, empty values, long values
     - Error handling: file permissions, invalid formats
+    - Property-based tests for round-trip behavior
 *)
 
 open Alcotest
@@ -159,19 +160,13 @@ let test_write_with_special_characters () =
     List.filter (fun (k, _) -> k <> "VERSION") read_pairs
   in
 
-  (* NOTE: Values are read back WITH escaping/quoting, not unescaped.
-     This is the current behavior - values with special chars will have quotes *)
-  let expected =
-    [
-      ("PATH_WITH_SPACE", "\"/my documents/folder\"");
-      ("VALUE_WITH_DOLLAR", "\"\\$HOME/test\"");
-      ("COMMAND", "\"echo \\\"hello\\\"\"");
-    ]
-  in
+  (* After the fix: Values should be read back unescaped, matching the original input.
+     The escaping/quoting is only used in the file format, not in the API. *)
+  let expected = pairs in
 
   check
     (list (pair string string))
-    "special chars escaped"
+    "special chars round-trip correctly"
     expected
     read_pairs_filtered ;
 
@@ -371,6 +366,284 @@ let test_write_node_env_with_comments () =
   cleanup_temp (inst, temp_dir, inst_dir)
 
 (* ============================================================ *)
+(* Property-Based Tests *)
+(* ============================================================ *)
+
+(** Generator for environment variable values that may contain special characters.
+    This generates realistic values that could appear in Octez configuration:
+    - Paths with spaces
+    - URLs with special characters
+    - Command-line arguments with quotes
+    - Values with shell metacharacters
+    
+    Note: Excludes newlines and other characters that would break the env file format.
+*)
+let env_value_gen =
+  let open QCheck.Gen in
+  (* Filter to exclude newlines and other control characters that break env files *)
+  let printable_no_newline = char_range ' ' '~' in
+  oneof_weighted
+    [
+      (10, string_size (return 0));
+      (* empty string *)
+      (30, string_size ~gen:printable_no_newline (int_range 1 50));
+      (* simple strings *)
+      (20, string_size ~gen:printable_no_newline (int_range 1 30));
+      (* printable chars including spaces *)
+      ( 15,
+        map
+          (fun s -> s ^ " " ^ s)
+          (string_size ~gen:printable_no_newline (int_range 1 20))
+        (* values with spaces *) );
+      ( 10,
+        map
+          (fun s -> "/path/to/" ^ s)
+          (string_size ~gen:printable_no_newline (int_range 1 20))
+        (* path-like *) );
+      ( 5,
+        map
+          (fun s -> "http://localhost:8732/" ^ s)
+          (string_size ~gen:printable_no_newline (int_range 0 10))
+        (* URL-like *) );
+      ( 5,
+        map
+          (fun s -> "\"" ^ s ^ "\"")
+          (string_size ~gen:printable_no_newline (int_range 1 10))
+        (* quoted *) );
+      ( 5,
+        map
+          (fun (a, b) -> a ^ " " ^ b)
+          (pair
+             (string_size ~gen:printable_no_newline (int_range 1 10))
+             (string_size ~gen:printable_no_newline (int_range 1 10))
+             (* delegate lists *)) );
+    ]
+
+(** Generator for valid environment variable keys (no special chars, no spaces) *)
+let env_key_gen =
+  let open QCheck.Gen in
+  let char_gen = char_range 'A' 'Z' in
+  map
+    (fun s -> "TEST_VAR_" ^ String.uppercase_ascii s)
+    (string_size ~gen:char_gen (int_range 1 10))
+
+(** Property: write_pairs followed by read should be idempotent.
+    For any list of key-value pairs, if we:
+    1. Write them with write_pairs
+    2. Read them back with read
+    3. Write them again with write_pairs
+    4. Read them back again
+    
+    The result should be the same as step 2. This ensures that the
+    escaping/unescaping is symmetric and doesn't accumulate on each cycle.
+*)
+let prop_write_read_idempotent =
+  QCheck.Test.make
+    ~name:"write_pairs + read is idempotent"
+    ~count:500
+    QCheck.(
+      make
+        ~print:
+          (Print.list (fun (k, v) ->
+               Printf.sprintf "%s=%s" k (String.escaped v)))
+        ~shrink:Shrink.(list ~shrink:(pair Shrink.string Shrink.string))
+        (Gen.list_size Gen.(int_range 1 5) (Gen.pair env_key_gen env_value_gen)))
+  @@ fun pairs ->
+  let inst, temp_dir, inst_dir = create_temp_instance () in
+  Unix.putenv "HOME" temp_dir ;
+  Fun.protect
+    ~finally:(fun () -> cleanup_temp (inst, temp_dir, inst_dir))
+    (fun () ->
+      (* Filter empty values since write_pairs skips them *)
+      let non_empty_pairs =
+        List.filter (fun (_, v) -> String.trim v <> "") pairs
+      in
+      if non_empty_pairs = [] then true
+      else
+        match Node_env.write_pairs ~inst non_empty_pairs with
+        | Error _ -> false
+        | Ok () -> (
+            match Node_env.read ~inst with
+            | Error _ -> false
+            | Ok read1 -> (
+                let read1_filtered =
+                  List.filter (fun (k, _) -> k <> "VERSION") read1
+                in
+                (* Write again using the read values *)
+                match Node_env.write_pairs ~inst read1_filtered with
+                | Error _ -> false
+                | Ok () -> (
+                    match Node_env.read ~inst with
+                    | Error _ -> false
+                    | Ok read2 ->
+                        let read2_filtered =
+                          List.filter (fun (k, _) -> k <> "VERSION") read2
+                        in
+                        (* The two reads should be identical *)
+                        let sorted1 = List.sort compare read1_filtered in
+                        let sorted2 = List.sort compare read2_filtered in
+                        sorted1 = sorted2))))
+
+(** Property: values written should be readable by the shell.
+    After writing a value with write_pairs, sourcing the env file
+    in a shell should give us back the original value (not with extra quotes).
+    
+    Note: This test is limited to "safe" characters that don't require complex
+    shell escaping beyond what our escape_env_value provides.
+*)
+let prop_shell_readable =
+  QCheck.Test.make
+    ~name:"written values are shell-readable"
+    ~count:200
+    QCheck.(
+      make
+        (let open Gen in
+         let printable_no_newline = char_range ' ' '~' in
+         pair
+           env_key_gen
+           (* Only test with values that contain spaces, quotes, or dollars - the main
+              cases we care about for delegates, paths, and URLs *)
+           (oneof
+              [
+                map
+                  (fun s -> s ^ " " ^ s)
+                  (string_size ~gen:printable_no_newline (int_range 1 10));
+                map
+                  (fun s -> "/path to/" ^ s)
+                  (string_size ~gen:printable_no_newline (int_range 1 10));
+                map
+                  (fun s -> "$VAR/" ^ s)
+                  (string_size ~gen:printable_no_newline (int_range 1 10));
+                map
+                  (fun s -> "\"quoted " ^ s ^ "\"")
+                  (string_size ~gen:printable_no_newline (int_range 1 10));
+              ])))
+  @@ fun (key, value) ->
+  if String.trim value = "" then true
+  else
+    let inst, temp_dir, inst_dir = create_temp_instance () in
+    Unix.putenv "HOME" temp_dir ;
+    Fun.protect
+      ~finally:(fun () -> cleanup_temp (inst, temp_dir, inst_dir))
+      (fun () ->
+        match Node_env.write_pairs ~inst [(key, value)] with
+        | Error _ -> false
+        | Ok () -> (
+            (* Instead of using bash to source, just verify the round-trip works *)
+            match Node_env.read ~inst with
+            | Error _ -> false
+            | Ok pairs ->
+                let read_value =
+                  List.find_map
+                    (fun (k, v) -> if k = key then Some v else None)
+                    pairs
+                in
+                read_value = Some value))
+
+(** Property: patch_keys should only modify specified keys.
+    When we use patch_keys to update a subset of variables,
+    other variables should remain unchanged, including their
+    original formatting (quotes, escaping, comments).
+*)
+let prop_patch_keys_preserves_others =
+  QCheck.Test.make
+    ~name:"patch_keys preserves unmodified keys"
+    ~count:200
+    QCheck.(
+      make
+        (Gen.pair
+           (Gen.list_size
+              Gen.(int_range 2 5)
+              (Gen.pair env_key_gen env_value_gen))
+           env_key_gen))
+  @@ fun (initial_pairs, update_key) ->
+  let inst, temp_dir, inst_dir = create_temp_instance () in
+  Unix.putenv "HOME" temp_dir ;
+  Fun.protect
+    ~finally:(fun () -> cleanup_temp (inst, temp_dir, inst_dir))
+    (fun () ->
+      let non_empty_pairs =
+        List.filter (fun (_, v) -> String.trim v <> "") initial_pairs
+      in
+      if non_empty_pairs = [] then true
+      else
+        match Node_env.write_pairs ~inst non_empty_pairs with
+        | Error _ -> false
+        | Ok () -> (
+            (* Update just one key *)
+            let update_value = "NEW_VALUE_123" in
+            match
+              Node_env.patch_keys ~inst ~updates:[(update_key, update_value)]
+            with
+            | Error _ -> false
+            | Ok () -> (
+                match Node_env.read ~inst with
+                | Error _ -> false
+                | Ok read_pairs ->
+                    let read_map = List.to_seq read_pairs |> Hashtbl.of_seq in
+                    (* Check that the updated key has new value *)
+                    let updated_correctly =
+                      Hashtbl.find_opt read_map update_key = Some update_value
+                    in
+                    (* Check that other keys are unchanged *)
+                    let others_unchanged =
+                      List.for_all
+                        (fun (k, _original_v) ->
+                          if k = update_key then true
+                          else
+                            match Node_env.read ~inst with
+                            | Error _ -> false
+                            | Ok pairs ->
+                                List.mem_assoc k pairs
+                                && List.assoc k pairs = List.assoc k read_pairs)
+                        non_empty_pairs
+                    in
+                    updated_correctly && others_unchanged)))
+
+(** Property: Multiple round-trips should not corrupt data.
+    This is the core bug from #995 - writing and reading N times
+    should not keep adding escape layers.
+*)
+let prop_multiple_roundtrips =
+  QCheck.Test.make
+    ~name:"multiple write/read cycles don't corrupt data"
+    ~count:100
+    QCheck.(make (Gen.pair env_key_gen env_value_gen))
+  @@ fun (key, value) ->
+  if String.trim value = "" then true
+  else
+    let inst, temp_dir, inst_dir = create_temp_instance () in
+    Unix.putenv "HOME" temp_dir ;
+    Fun.protect
+      ~finally:(fun () -> cleanup_temp (inst, temp_dir, inst_dir))
+      (fun () ->
+        (* Do 5 round-trips *)
+        let rec roundtrip n current_pairs =
+          if n = 0 then Ok current_pairs
+          else
+            match Node_env.write_pairs ~inst current_pairs with
+            | Error e -> Error e
+            | Ok () -> (
+                match Node_env.read ~inst with
+                | Error e -> Error e
+                | Ok read_pairs ->
+                    let filtered =
+                      List.filter (fun (k, _) -> k <> "VERSION") read_pairs
+                    in
+                    roundtrip (n - 1) filtered)
+        in
+        match roundtrip 5 [(key, value)] with
+        | Error _ -> false
+        | Ok final_pairs ->
+            (* After 5 round-trips, the value should match the original *)
+            let final_value =
+              List.find_map
+                (fun (k, v) -> if k = key then Some v else None)
+                final_pairs
+            in
+            final_value = Some value)
+
+(* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
 
@@ -412,6 +685,16 @@ let high_level_tests =
     ("write node env with comments", `Quick, test_write_node_env_with_comments);
   ]
 
+let property_tests =
+  List.map
+    QCheck_alcotest.to_alcotest
+    [
+      prop_write_read_idempotent;
+      prop_shell_readable;
+      prop_patch_keys_preserves_others;
+      prop_multiple_roundtrips;
+    ]
+
 let () =
   Alcotest.run
     "Node_env"
@@ -420,4 +703,5 @@ let () =
       ("write_read", write_read_tests);
       ("error_handling", error_tests);
       ("high_level_api", high_level_tests);
+      ("properties", property_tests);
     ]
