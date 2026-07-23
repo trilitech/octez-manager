@@ -124,6 +124,63 @@ let test_to_service_no_network () =
     svc.Octez_manager_lib.Service.network
 
 (* ============================================================ *)
+(* Network extraction from URLs                                  *)
+(* ============================================================ *)
+
+(* Regression tests for #970: RPC endpoints of teztnets networks missing
+   from the static known-network list (e.g. ushuaianet) were grouped under
+   "Unknown" in the RPC browser. The network slug is now derived from the
+   teztnets hostname itself. *)
+
+let check_network url expected =
+  Alcotest.(check (option string))
+    url
+    expected
+    (Public_nodes_cache.extract_network_from_url url)
+
+let test_extract_known_static_networks () =
+  check_network "https://mainnet.smartpy.io" (Some "mainnet") ;
+  check_network "https://tezos-shadownet.octez.io" (Some "shadownet") ;
+  check_network "https://rpc.tzbeta.net" (Some "mainnet") ;
+  check_network "https://rpc.tzkt.io/mainnet" (Some "mainnet")
+
+let test_extract_teztnets_hostname_slug () =
+  (* Networks absent from the static list resolve via the hostname. *)
+  check_network "https://rpc.ushuaianet.teztnets.com" (Some "ushuaianet") ;
+  check_network "https://rpc.bakingnet.teztnets.com" (Some "bakingnet") ;
+  check_network "https://futurenet.teztnets.com" (Some "futurenet")
+
+let test_extract_teztnets_static_list_precedence () =
+  (* Networks in the static list keep their current (prefix-free) name even
+     when the hostname carries a rotation suffix. *)
+  check_network
+    "https://rpc.weeklynet-2026-07-15.teztnets.com"
+    (Some "weeklynet")
+
+let test_extract_unknown_urls () =
+  check_network "https://rpc.example.org" None ;
+  (* A bare teztnets host without a network slug stays unknown. *)
+  check_network "https://teztnets.com" None ;
+  check_network "https://rpc.teztnets.com" None
+
+let extraction_tests =
+  [
+    Alcotest.test_case
+      "static networks"
+      `Quick
+      test_extract_known_static_networks;
+    Alcotest.test_case
+      "teztnets hostname slug"
+      `Quick
+      test_extract_teztnets_hostname_slug;
+    Alcotest.test_case
+      "static list precedence"
+      `Quick
+      test_extract_teztnets_static_list_precedence;
+    Alcotest.test_case "unknown urls" `Quick test_extract_unknown_urls;
+  ]
+
+(* ============================================================ *)
 (* Test Runner                                                   *)
 (* ============================================================ *)
 
@@ -145,4 +202,5 @@ let () =
           Alcotest.test_case "basic" `Quick test_to_service;
           Alcotest.test_case "no network" `Quick test_to_service_no_network;
         ] );
+      ("extract_network_from_url", extraction_tests);
     ]

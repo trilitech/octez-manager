@@ -1,0 +1,25 @@
+SIZE:240x24
+ Install Node                                                                   
+ ✓ Form is valid - ready to install!                                            
+--------------------------------------------------------------------------------
+┌───────────────────────┬──────────────────────────────────────────────┬───────┐
+│ Parameter             │ Value                                        │ S     │
+├───────────────────────┼──────────────────────────────────────────────┼───────┤
+│ Network               │ Shadownet                                    │ ✓     │
+│ History Mode          │ archive                                      │ ✓     │
+│ App Bin Dir           │ /usr/bin                                     │ ✓     │
+│ Data Dir              │ …ocal/share/octez/node-shadownet-archive     │ ✓     │
+│ RPC Address           │ 127.0.0.1:8732                               │ ✓     │
+│ P2P Address           │ 0.0.0.0:9732                                 │ ✓     │
+│ Extra Args            │ (none)                                       │ ✓     │
+│ Service User          │ valentin                                     │ ✓     │
+│ Enable on Boot        │ true                                         │ ✓     │
+│ Start Now             │ true                                         │ ✓     │
+│ Instance Name         │ node-shadownet-archive                       │ ✓     │
+│ Group                 │ None                                         │ ✓     │
+│ Confirm & Install     │ Ready                                        │ ✓     │
+└───────────────────────┴──────────────────────────────────────────────┴───────┘
+                                                                                
+                                                                                
+--------------------------------------------------------------------------------
+  Rolling: minimal disk (~50GB). Full: all blocks. Archive: all states (1TB+).  
