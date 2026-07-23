@@ -200,7 +200,13 @@ let instance_term =
   in
   let run instance action delete_data_dir force_purge extra_args =
     match (instance, action) with
-    | None, _ -> `Help (`Pager, None)
+    | None, _ ->
+        (* A usage error with non-zero exit, consistent with the other
+           command groups — not the top-level help page with exit 0. *)
+        Cli_helpers.cmdliner_error
+          "INSTANCE required. Run 'octez-manager list' to see available \
+           instances, or 'octez-manager instance --help' for the list of \
+           actions."
     | Some inst, None -> (
         match Service_registry.find ~instance:inst with
         | Ok None ->
@@ -927,5 +933,41 @@ let instance_term =
      $ extra_args))
 
 let instance_cmd =
-  let info = Cmd.info "instance" ~doc:"Manage existing Octez services." in
+  let info =
+    Cmd.info
+      "instance"
+      ~doc:"Manage existing Octez services."
+      ~man:
+        [
+          `S Manpage.s_description;
+          `P
+            "Operate on a registered service instance. INSTANCE is the name \
+             shown by 'octez-manager list'; ACTION is one of the actions \
+             below.";
+          `S "ACTIONS";
+          `I ("start", "Start the service (and its stopped dependencies).");
+          `I ("stop", "Stop the service.");
+          `I ("restart", "Restart the service.");
+          `I
+            ( "remove",
+              "Remove the service. Use $(b,--delete-data-dir) to also delete \
+               the recorded data directory." );
+          `I
+            ( "purge",
+              "Remove the service and delete its data. Use $(b,--force-purge) \
+               to skip the confirmation prompt." );
+          `I ("show", "Show the instance configuration and status.");
+          `I ("show-service", "Show the generated systemd service definition.");
+          `I ("logs", "Show the service logs.");
+          `I ("export-logs", "Export logs and diagnostics to an archive.");
+          `I ("edit", "Edit the instance configuration.");
+          `I ("set-env", "Set an environment variable: set-env KEY VALUE.");
+          `I ("get-env", "Print environment variables (or one: get-env KEY).");
+          `S Manpage.s_examples;
+          `P "Start an instance:";
+          `Pre "  octez-manager instance node-mainnet start";
+          `P "Follow its logs:";
+          `Pre "  octez-manager instance node-mainnet logs";
+        ]
+  in
   Cmd.v info instance_term
