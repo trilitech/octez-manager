@@ -61,7 +61,13 @@ assert_contains "$output" "dependents" \
 assert_contains "$output" "--yes" \
 	"Expected refusal message to mention --yes"
 
-if ! instance_exists "$NODE_INSTANCE"; then
+# NOTE: we assert on the registry file rather than instance_exists:
+# the baker shares the node's data dir, so the baker's `om list` row
+# contains the node instance name and instance_exists would
+# false-positive on it even after the node is removed.
+NODE_REGISTRY_FILE="/etc/octez_manager/services/${NODE_INSTANCE}.json"
+
+if [ ! -f "$NODE_REGISTRY_FILE" ]; then
 	echo "ERROR: Node instance was removed even though removal was refused"
 	exit 1
 fi
@@ -71,7 +77,7 @@ echo "Refused as expected (exit $rc), instance still present"
 echo "Attempting remove with --yes (should proceed)..."
 om instance "$NODE_INSTANCE" remove --yes 2>&1
 
-if instance_exists "$NODE_INSTANCE"; then
+if [ -f "$NODE_REGISTRY_FILE" ]; then
 	echo "ERROR: Node instance still exists after 'remove --yes'"
 	exit 1
 fi
