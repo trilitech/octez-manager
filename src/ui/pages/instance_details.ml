@@ -238,7 +238,11 @@ let view_details ~box_width svc =
           else dal_config
         in
         let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
-        let env_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
+        let env_args =
+          Helpers.join_baker_extra_args
+            ~global:(lookup "OCTEZ_BAKER_GLOBAL_ARGS")
+            ~command:(lookup "OCTEZ_BAKER_COMMAND_ARGS")
+        in
         let svc_args = String.concat " " svc.Service.extra_args in
         let extra_args =
           match (env_args, svc_args) with
@@ -300,7 +304,11 @@ let view_details ~box_width svc =
     | "accuser" ->
         let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
         let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
-        let env_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
+        let env_args =
+          Helpers.join_baker_extra_args
+            ~global:(lookup "OCTEZ_BAKER_GLOBAL_ARGS")
+            ~command:(lookup "OCTEZ_BAKER_COMMAND_ARGS")
+        in
         let svc_args = String.concat " " svc.Service.extra_args in
         let extra_args =
           match (env_args, svc_args) with

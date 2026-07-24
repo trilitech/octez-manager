@@ -78,4 +78,6 @@ module For_tests : sig
 
   val split_baker_extra_args :
     app_bin_dir:string -> string list -> string list * string list
+
+  val join_baker_extra_args : global:string -> command:string -> string
 end

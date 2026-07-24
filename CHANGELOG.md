@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Editing a baker or accuser instance no longer silently drops global CLI options (e.g. `--media-type`, `--endpoint`, `--password-filename`) on save. The edit form's "Extra Args" field previously prefilled only from the command-args half of the split, so re-submitting an otherwise-unchanged edit erased the global-args half from the env file; the field now prefills from both halves (fixes #996)
+
 - The import wizard no longer carries over a previously selected service's network override, custom instance name, or cascade settings when the user backs out of the configure step and selects a *different* external service. Previously, choosing a manual network override (or custom name / cascade mode) for one service and then going back to pick another service would silently apply the first service's settings to the second (fixes #999)
 
 - `octez-manager instance <name> remove` on an instance with dependents now has a working `--yes`/`-y` flag to confirm removal non-interactively. Previously the command told users to "Use --yes to confirm" but that flag did not exist (it was a usage error), and without it the command silently exited 0 without removing anything; it now exits non-zero when refused (fixes #998)

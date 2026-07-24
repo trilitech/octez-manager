@@ -103,7 +103,11 @@ let make_initial_model () =
       in
       let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
       let base_dir = lookup "OCTEZ_BAKER_BASE_DIR" in
-      let extra_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
+      let extra_args =
+        Helpers.join_baker_extra_args
+          ~global:(lookup "OCTEZ_BAKER_GLOBAL_ARGS")
+          ~command:(lookup "OCTEZ_BAKER_COMMAND_ARGS")
+      in
       let dal_config = lookup "OCTEZ_DAL_CONFIG" in
       let dal_instance = lookup "OCTEZ_DAL_INSTANCE" in
       let dal =

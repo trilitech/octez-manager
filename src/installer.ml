@@ -55,4 +55,6 @@ module For_tests = struct
   let known_baker_global_options = known_baker_global_options
 
   let split_baker_extra_args = split_baker_extra_args
+
+  let join_baker_extra_args = join_baker_extra_args
 end
