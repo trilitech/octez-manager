@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `octez-manager instance <name> remove` on an instance with dependents now has a working `--yes`/`-y` flag to confirm removal non-interactively. Previously the command told users to "Use --yes to confirm" but that flag did not exist (it was a usage error), and without it the command silently exited 0 without removing anything; it now exits non-zero when refused (fixes #998)
+
 - Node and DAL node edit operations no longer corrupt dependent env files through quote accumulation. Previously, `Node_env.read` returned values with surrounding quotes intact while `Node_env.write_pairs` escaped them again, causing a new layer of escaping on every edit cycle. A baker with `OCTEZ_BAKER_DELEGATES_ARGS="tz1a tz1b"` would fail to start after an unrelated node edit because the value became `\"tz1a tz1b\"` with literal inner quotes. `Node_env.read` now unescapes values symmetrically with how `write_pairs` escapes them, ensuring round-trip stability (fixes #995)
 
 - The transfer flow's "Select network" picker no longer shows a redundant double unit ("0.000000 ꜩ tez" → "0.000000 ꜩ") (fixes #971)
