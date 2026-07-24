@@ -18,7 +18,7 @@ _octez-manager() {
     'install-node:Install an octez-node systemd instance'
     'install-signatory:Install an octez-signatory service'
     'instance'
-    '[ACTION]:Manage existing Octez services.'
+    '[INSTANCE]:Manage existing Octez services.'
     'list:Show services'
     'list-available-networks:Show networks advertised on teztnets.com (with fallbacks).'
     'list-snapshots:List downloads published on snapshots.tzinit.org for a network.'
@@ -70,8 +70,8 @@ _octez-manager() {
     'pass:Abstain from voting (default)'
   )
 
-  local -a opts__ACTION_
-  opts__ACTION_=(
+  local -a opts__INSTANCE_
+  opts__INSTANCE_=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -253,6 +253,8 @@ _octez-manager() {
   opts_instance=(
     '--delete-data-dir[Also delete the recorded data directory when removing.]'
     '--force-purge[Skip confirmation prompt when purging base directory.]'
+    '-y[Assume yes to confirmation prompts (e.g. removing an instance with dependents).]'
+    '--yes[Assume yes to confirmation prompts (e.g. removing an instance with dependents).]'
     '--help[Show this help in format FMT. The value FMT must be one of auto, pager, groff or plain. With auto, the format is pager or plain whenever the TERM env var is dumb or undefined.]:FMT:'
     '--version[Show version information.]'
   )
@@ -353,8 +355,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__baker
-  opts__ACTION__baker=(
+  local -a opts__INSTANCE__baker
+  opts__INSTANCE__baker=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -367,8 +369,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__binaries
-  opts__ACTION__binaries=(
+  local -a opts__INSTANCE__binaries
+  opts__INSTANCE__binaries=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -381,8 +383,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__cleanup_dependencies
-  opts__ACTION__cleanup_dependencies=(
+  local -a opts__INSTANCE__cleanup_dependencies
+  opts__INSTANCE__cleanup_dependencies=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -395,8 +397,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__cleanup_orphans
-  opts__ACTION__cleanup_orphans=(
+  local -a opts__INSTANCE__cleanup_orphans
+  opts__INSTANCE__cleanup_orphans=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -409,8 +411,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__group
-  opts__ACTION__group=(
+  local -a opts__INSTANCE__group
+  opts__INSTANCE__group=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -423,8 +425,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__import
-  opts__ACTION__import=(
+  local -a opts__INSTANCE__import
+  opts__INSTANCE__import=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -437,8 +439,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__install_accuser
-  opts__ACTION__install_accuser=(
+  local -a opts__INSTANCE__install_accuser
+  opts__INSTANCE__install_accuser=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -451,8 +453,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__install_baker
-  opts__ACTION__install_baker=(
+  local -a opts__INSTANCE__install_baker
+  opts__INSTANCE__install_baker=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -465,8 +467,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__install_dal_node
-  opts__ACTION__install_dal_node=(
+  local -a opts__INSTANCE__install_dal_node
+  opts__INSTANCE__install_dal_node=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -479,8 +481,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__install_index
-  opts__ACTION__install_index=(
+  local -a opts__INSTANCE__install_index
+  opts__INSTANCE__install_index=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -493,8 +495,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__install_node
-  opts__ACTION__install_node=(
+  local -a opts__INSTANCE__install_node
+  opts__INSTANCE__install_node=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -507,8 +509,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__install_signatory
-  opts__ACTION__install_signatory=(
+  local -a opts__INSTANCE__install_signatory
+  opts__INSTANCE__install_signatory=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -521,8 +523,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__instance
-  opts__ACTION__instance=(
+  local -a opts__INSTANCE__instance
+  opts__INSTANCE__instance=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -535,8 +537,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__list
-  opts__ACTION__list=(
+  local -a opts__INSTANCE__list
+  opts__INSTANCE__list=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -549,8 +551,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__list_available_networks
-  opts__ACTION__list_available_networks=(
+  local -a opts__INSTANCE__list_available_networks
+  opts__INSTANCE__list_available_networks=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -563,8 +565,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__list_snapshots
-  opts__ACTION__list_snapshots=(
+  local -a opts__INSTANCE__list_snapshots
+  opts__INSTANCE__list_snapshots=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -577,8 +579,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__purge_all
-  opts__ACTION__purge_all=(
+  local -a opts__INSTANCE__purge_all
+  opts__INSTANCE__purge_all=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -591,8 +593,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__rewards
-  opts__ACTION__rewards=(
+  local -a opts__INSTANCE__rewards
+  opts__INSTANCE__rewards=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -605,8 +607,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__rpc
-  opts__ACTION__rpc=(
+  local -a opts__INSTANCE__rpc
+  opts__INSTANCE__rpc=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -619,8 +621,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__sandbox
-  opts__ACTION__sandbox=(
+  local -a opts__INSTANCE__sandbox
+  opts__INSTANCE__sandbox=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -633,8 +635,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__self_update
-  opts__ACTION__self_update=(
+  local -a opts__INSTANCE__self_update
+  opts__INSTANCE__self_update=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -647,8 +649,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__ui
-  opts__ACTION__ui=(
+  local -a opts__INSTANCE__ui
+  opts__INSTANCE__ui=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -661,8 +663,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__version
-  opts__ACTION__version=(
+  local -a opts__INSTANCE__version
+  opts__INSTANCE__version=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -675,8 +677,8 @@ _octez-manager() {
     '--version[Show version information.]'
   )
 
-  local -a opts__ACTION__web
-  opts__ACTION__web=(
+  local -a opts__INSTANCE__web
+  opts__INSTANCE__web=(
     '--compare-indexers[When a local indexer is registered, also query public TzKT on every fetch and log divergences.]'
     '--indexer-network[Network the local indexer serves (default\: mainnet). Only relevant when --local-indexer is set.]:NETWORK:'
     '--local-indexer[Register a local TzKT-compatible indexer endpoint. This URL is tried before the public TzKT API.]:URL:'
@@ -1118,9 +1120,9 @@ _octez-manager() {
               $opts_instance
           fi
           ;;
-        [ACTION])
-          local -a subcmds__ACTION_
-          subcmds__ACTION_=(
+        [INSTANCE])
+          local -a subcmds__INSTANCE_
+          subcmds__INSTANCE_=(
             'baker:Baker wallet operations'
             'binaries:Manage Octez and Signatory binaries'
             'cleanup-dependencies:Remove stale dependency entries from service configurations. This cleans up references to services that have been removed.'
@@ -1149,107 +1151,107 @@ _octez-manager() {
           if (( CURRENT == 2 )); then
             if [[ $cur == -* ]]; then
               _arguments \
-                $opts__ACTION_
+                $opts__INSTANCE_
             else
-              _describe -t subcommands '[ACTION] subcommands' subcmds__ACTION_
+              _describe -t subcommands '[INSTANCE] subcommands' subcmds__INSTANCE_
             fi
           else
             case $words[2] in
               baker)
                 _arguments \
-                  $opts__ACTION__baker
+                  $opts__INSTANCE__baker
                 ;;
               binaries)
                 _arguments \
-                  $opts__ACTION__binaries
+                  $opts__INSTANCE__binaries
                 ;;
               cleanup-dependencies)
                 _arguments \
-                  $opts__ACTION__cleanup_dependencies
+                  $opts__INSTANCE__cleanup_dependencies
                 ;;
               cleanup-orphans)
                 _arguments \
-                  $opts__ACTION__cleanup_orphans
+                  $opts__INSTANCE__cleanup_orphans
                 ;;
               group)
                 _arguments \
-                  $opts__ACTION__group
+                  $opts__INSTANCE__group
                 ;;
               import)
                 _arguments \
-                  $opts__ACTION__import
+                  $opts__INSTANCE__import
                 ;;
               install-accuser)
                 _arguments \
-                  $opts__ACTION__install_accuser
+                  $opts__INSTANCE__install_accuser
                 ;;
               install-baker)
                 _arguments \
-                  $opts__ACTION__install_baker
+                  $opts__INSTANCE__install_baker
                 ;;
               install-dal-node)
                 _arguments \
-                  $opts__ACTION__install_dal_node
+                  $opts__INSTANCE__install_dal_node
                 ;;
               install-index)
                 _arguments \
-                  $opts__ACTION__install_index
+                  $opts__INSTANCE__install_index
                 ;;
               install-node)
                 _arguments \
-                  $opts__ACTION__install_node
+                  $opts__INSTANCE__install_node
                 ;;
               install-signatory)
                 _arguments \
-                  $opts__ACTION__install_signatory
+                  $opts__INSTANCE__install_signatory
                 ;;
               instance)
                 _arguments \
-                  $opts__ACTION__instance
+                  $opts__INSTANCE__instance
                 ;;
               list)
                 _arguments \
-                  $opts__ACTION__list
+                  $opts__INSTANCE__list
                 ;;
               list-available-networks)
                 _arguments \
-                  $opts__ACTION__list_available_networks
+                  $opts__INSTANCE__list_available_networks
                 ;;
               list-snapshots)
                 _arguments \
-                  $opts__ACTION__list_snapshots
+                  $opts__INSTANCE__list_snapshots
                 ;;
               purge-all)
                 _arguments \
-                  $opts__ACTION__purge_all
+                  $opts__INSTANCE__purge_all
                 ;;
               rewards)
                 _arguments \
-                  $opts__ACTION__rewards
+                  $opts__INSTANCE__rewards
                 ;;
               rpc)
                 _arguments \
-                  $opts__ACTION__rpc
+                  $opts__INSTANCE__rpc
                 ;;
               sandbox)
                 _arguments \
-                  $opts__ACTION__sandbox
+                  $opts__INSTANCE__sandbox
                 ;;
               self-update)
                 _arguments \
-                  $opts__ACTION__self_update
+                  $opts__INSTANCE__self_update
                 ;;
               ui)
                 _arguments \
-                  $opts__ACTION__ui
+                  $opts__INSTANCE__ui
                 ;;
               version)
                 _arguments \
-                  $opts__ACTION__version
+                  $opts__INSTANCE__version
                 ;;
               web)
                 _arguments \
-                  $opts__ACTION__web
+                  $opts__INSTANCE__web
                 ;;
             esac
           fi

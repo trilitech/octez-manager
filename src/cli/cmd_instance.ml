@@ -194,11 +194,20 @@ let instance_term =
           ["force-purge"]
           ~doc:"Skip confirmation prompt when purging base directory.")
   in
+  let yes =
+    Arg.(
+      value & flag
+      & info
+          ["yes"; "y"]
+          ~doc:
+            "Assume yes to confirmation prompts (e.g. removing an instance \
+             with dependents).")
+  in
   let extra_args =
     (* Additional positional args after ACTION (used by set-env) *)
     Arg.(value & pos_right 1 string [] & info [] ~docv:"ARGS")
   in
-  let run instance action delete_data_dir force_purge extra_args =
+  let run instance action delete_data_dir force_purge yes extra_args =
     match (instance, action) with
     | None, _ ->
         (* A usage error with non-zero exit, consistent with the other
@@ -243,29 +252,36 @@ let instance_term =
               ()
         | Remove ->
             with_service ~instance:inst (fun svc ->
-                let proceed =
-                  if svc.S.dependents = [] then true
-                  else if Cli_helpers.is_interactive () then (
-                    Format.printf
-                      "This will stop dependent instances: %s@."
-                      (String.concat ", " svc.S.dependents) ;
-                    Cli_helpers.prompt_yes_no
-                      "Proceed with removal?"
-                      ~default:false)
-                  else (
-                    Format.printf
-                      "Instance has dependents: %s. Use --yes to confirm.@."
-                      (String.concat ", " svc.S.dependents) ;
-                    false)
-                in
-                if proceed then
+                if svc.S.dependents = [] || yes then
                   Cli_helpers.run_result
                     (Removal.remove_service
                        ~quiet:false
                        ~delete_data_dir
                        ~instance:inst
                        ())
-                else `Ok ())
+                else if Cli_helpers.is_interactive () then (
+                  Format.printf
+                    "This will stop dependent instances: %s@."
+                    (String.concat ", " svc.S.dependents) ;
+                  if
+                    Cli_helpers.prompt_yes_no
+                      "Proceed with removal?"
+                      ~default:false
+                  then
+                    Cli_helpers.run_result
+                      (Removal.remove_service
+                         ~quiet:false
+                         ~delete_data_dir
+                         ~instance:inst
+                         ())
+                  else `Ok ())
+                else
+                  let msg =
+                    Printf.sprintf
+                      "Instance has dependents: %s. Use --yes to confirm."
+                      (String.concat ", " svc.S.dependents)
+                  in
+                  Cli_helpers.cmdliner_error msg)
         | Purge ->
             Cli_helpers.run_result
               (Removal.purge_service
@@ -929,7 +945,7 @@ let instance_term =
   in
   Term.(
     ret
-      (const run $ instance $ action $ delete_data_dir $ force_purge
+      (const run $ instance $ action $ delete_data_dir $ force_purge $ yes
      $ extra_args))
 
 let instance_cmd =
@@ -951,7 +967,9 @@ let instance_cmd =
           `I
             ( "remove",
               "Remove the service. Use $(b,--delete-data-dir) to also delete \
-               the recorded data directory." );
+               the recorded data directory. If the instance has dependents, \
+               removal is refused (non-zero exit) unless $(b,--yes) is given, \
+               or you confirm interactively." );
           `I
             ( "purge",
               "Remove the service and delete its data. Use $(b,--force-purge) \
