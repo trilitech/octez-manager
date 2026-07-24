@@ -129,7 +129,18 @@ let back ps =
   | SelectService -> Navigation.back ps
   | ConfigureImport ->
       Navigation.update
-        (fun s -> {s with step = SelectService; error = None})
+        (fun s ->
+          {
+            s with
+            step = SelectService;
+            error = None;
+            selected_service = None;
+            network_override = None;
+            custom_name = None;
+            cascade = false;
+            cascade_chain = [];
+            cascade_analysis = None;
+          })
         ps
   | ReviewImport ->
       Navigation.update
