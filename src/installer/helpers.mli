@@ -40,6 +40,12 @@ val known_baker_global_options : string list
 val split_baker_extra_args :
   app_bin_dir:string -> string list -> string list * string list
 
+(** Reconstruct a single Extra Args field value from the global and command
+    halves persisted by {!split_baker_extra_args} (e.g. the
+    OCTEZ_BAKER_GLOBAL_ARGS / OCTEZ_BAKER_COMMAND_ARGS env pair). Used to
+    prefill the baker/accuser edit forms without losing global options. *)
+val join_baker_extra_args : global:string -> command:string -> string
+
 (** Check if string is an HTTP/HTTPS URL *)
 val is_http_url : string -> bool
 

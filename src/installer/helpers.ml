@@ -91,6 +91,17 @@ let split_baker_extra_args ~app_bin_dir extra_args =
     in
     Help_parser.split_extra_args ~global_options extra_args
 
+(** Reconstruct a single Extra Args field value from the [global] and
+    [command] halves persisted by {!split_baker_extra_args} (e.g. the
+    OCTEZ_BAKER_GLOBAL_ARGS / OCTEZ_BAKER_COMMAND_ARGS env pair). Used when
+    prefilling the baker/accuser edit forms so global options are not
+    silently dropped on save. Globals come first; either half may be empty
+    without introducing leading, trailing, or doubled spaces. *)
+let join_baker_extra_args ~global ~command =
+  [global; command] |> List.map String.trim
+  |> List.filter (fun s -> not (String.equal s ""))
+  |> String.concat " "
+
 let is_http_url s =
   let trimmed = String.trim s |> String.lowercase_ascii in
   String.starts_with ~prefix:"http://" trimmed

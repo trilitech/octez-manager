@@ -3099,6 +3099,156 @@ let installer_known_baker_global_options () =
     true
     (List.mem "--base-dir" opts)
 
+(* Regression tests for #996: baker/accuser edit-mode prefill only read
+   OCTEZ_BAKER_COMMAND_ARGS, so submitting an edit silently dropped every
+   option stored in OCTEZ_BAKER_GLOBAL_ARGS (e.g. --media-type,
+   --endpoint, --password-filename). [join_baker_extra_args] is the
+   inverse of [split_baker_extra_args] and is what the forms now call to
+   reconstruct the Extra Args field from both env keys. *)
+let installer_join_baker_extra_args () =
+  Alcotest.(check string)
+    "both empty"
+    ""
+    (Installer.For_tests.join_baker_extra_args ~global:"" ~command:"") ;
+  Alcotest.(check string)
+    "only command"
+    "--extra x"
+    (Installer.For_tests.join_baker_extra_args ~global:"" ~command:"--extra x") ;
+  Alcotest.(check string)
+    "only global"
+    "--media-type json"
+    (Installer.For_tests.join_baker_extra_args
+       ~global:"--media-type json"
+       ~command:"") ;
+  Alcotest.(check string)
+    "both halves joined, globals first"
+    "--media-type json --extra x"
+    (Installer.For_tests.join_baker_extra_args
+       ~global:"--media-type json"
+       ~command:"--extra x") ;
+  Alcotest.(check string)
+    "trims whitespace without doubling the separator"
+    "--media-type json --extra x"
+    (Installer.For_tests.join_baker_extra_args
+       ~global:"  --media-type json  "
+       ~command:"  --extra x  ")
+
+(* Round-trip property: for any (global, command) pair, joining then
+   re-splitting recovers the original halves. This is the exact property
+   the edit form relies on: prefill joins the two env values, and
+   submitting the form re-splits via [split_baker_extra_args]. *)
+let installer_join_split_baker_extra_args_round_trip () =
+  let app_bin_dir = "/nonexistent/path/that/does/not/exist" in
+  let words_of s =
+    match String.trim s with "" -> [] | s -> String.split_on_char ' ' s
+  in
+  let check_round_trip ~label ~global ~command =
+    let joined = Installer.For_tests.join_baker_extra_args ~global ~command in
+    let global_args, command_args =
+      Installer.For_tests.split_baker_extra_args ~app_bin_dir (words_of joined)
+    in
+    Alcotest.(check (list string))
+      (label ^ ": global half round-trips")
+      (words_of global)
+      global_args ;
+    Alcotest.(check (list string))
+      (label ^ ": command half round-trips")
+      (words_of command)
+      command_args
+  in
+  check_round_trip
+    ~label:"issue #996 repro (global + command)"
+    ~global:"--media-type json"
+    ~command:"--extra x" ;
+  check_round_trip
+    ~label:"only global"
+    ~global:"--endpoint http://127.0.0.1:8732"
+    ~command:"" ;
+  check_round_trip ~label:"only command" ~global:"" ~command:"--keep-alive" ;
+  check_round_trip ~label:"both empty" ~global:"" ~command:""
+
+(* Regression test for #996: the baker edit form must prefill Extra Args
+   from BOTH OCTEZ_BAKER_GLOBAL_ARGS and OCTEZ_BAKER_COMMAND_ARGS, not just
+   the command half. Without the fix, [extra_args] below would be
+   "--extra x" instead of "--media-type json --extra x", silently losing
+   --media-type on the next save. *)
+let install_baker_form_v3_edit_prefill_preserves_global_args () =
+  if is_ci () then Alcotest.skip ()
+  else
+    with_fake_xdg (fun _env ->
+        let inst = "baker-issue-996" in
+        let () =
+          expect_ok
+            (Node_env.write_pairs
+               ~inst
+               [
+                 ("OCTEZ_BAKER_GLOBAL_ARGS", "--media-type json");
+                 ("OCTEZ_BAKER_COMMAND_ARGS", "--extra x");
+               ])
+        in
+        let service =
+          Service.make
+            ~instance:inst
+            ~role:"baker"
+            ~network:"mainnet"
+            ~history_mode:History_mode.Rolling
+            ~data_dir:"/tmp/octez/baker-issue-996"
+            ~rpc_addr:(Rpc_addr.of_string "127.0.0.1:8732")
+            ~net_addr:""
+            ~service_user:"octez"
+            ~app_bin_dir:"/usr/bin"
+            ~logging_mode:Logging_mode.Journald
+            ()
+        in
+        Octez_manager_ui.Context.set_pending_edit_service
+          ~service
+          ~stopped_dependents:[] ;
+        let model = Install_baker_form_v3.For_tests.initial_model () in
+        Alcotest.(check string)
+          "extra_args prefilled from both global and command args"
+          "--media-type json --extra x"
+          model.core.extra_args)
+
+(* Same regression as above, for the accuser edit form. *)
+let install_accuser_form_v3_edit_prefill_preserves_global_args () =
+  if is_ci () then Alcotest.skip ()
+  else
+    with_fake_xdg (fun _env ->
+        let inst = "accuser-issue-996" in
+        let () =
+          expect_ok
+            (Node_env.write_pairs
+               ~inst
+               [
+                 ("OCTEZ_BAKER_GLOBAL_ARGS", "--media-type json");
+                 ("OCTEZ_BAKER_COMMAND_ARGS", "--extra x");
+               ])
+        in
+        let service =
+          Service.make
+            ~instance:inst
+            ~role:"accuser"
+            ~network:"mainnet"
+            ~history_mode:History_mode.Rolling
+            ~data_dir:"/tmp/octez/accuser-issue-996"
+            ~rpc_addr:(Rpc_addr.of_string "127.0.0.1:8732")
+            ~net_addr:""
+            ~service_user:"octez"
+            ~app_bin_dir:"/usr/bin"
+            ~logging_mode:Logging_mode.Journald
+            ()
+        in
+        Octez_manager_ui.Context.set_pending_edit_service
+          ~service
+          ~stopped_dependents:[] ;
+        let model =
+          Octez_manager_ui.Install_accuser_form_v3.For_tests.initial_model ()
+        in
+        Alcotest.(check string)
+          "extra_args prefilled from both global and command args"
+          "--media-type json --extra x"
+          model.core.extra_args)
+
 let system_user_validate_missing () =
   match
     System_user.validate_user_for_service ~user:"__missing_octez_user__"
@@ -6359,6 +6509,22 @@ let () =
             "known global options"
             `Quick
             installer_known_baker_global_options;
+          Alcotest.test_case
+            "join baker extra args"
+            `Quick
+            installer_join_baker_extra_args;
+          Alcotest.test_case
+            "join/split round-trip"
+            `Quick
+            installer_join_split_baker_extra_args_round_trip;
+          Alcotest.test_case
+            "baker edit form preserves global args (#996)"
+            `Quick
+            install_baker_form_v3_edit_prefill_preserves_global_args;
+          Alcotest.test_case
+            "accuser edit form preserves global args (#996)"
+            `Quick
+            install_accuser_form_v3_edit_prefill_preserves_global_args;
         ] );
       ( "snapshots.basic",
         [

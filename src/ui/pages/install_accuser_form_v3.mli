@@ -7,6 +7,19 @@
 
 (** Accuser installation form using field bundles *)
 
+(** Form model holding accuser configuration fields. *)
+type model = {
+  core : Form_builder_common.core_service_config;
+      (** Shared service config (name, bin dir, user, etc.). *)
+  client : Form_builder_common.client_config;
+      (** Client-side config (base dir, node endpoint). *)
+  edit_mode : bool;  (** [true] when editing an existing accuser instance. *)
+  original_instance : string option;
+      (** Original instance name in edit mode. *)
+  stopped_dependents : string list;
+      (** Services that were stopped for the edit. *)
+}
+
 (** Page identifier for registration *)
 val name : string
 
@@ -20,6 +33,10 @@ val register : unit -> unit
 module Page : Miaou.Core.Tui_page.PAGE_SIG
 
 module For_tests : sig
+  (** Build the model as it would be constructed on page entry, including
+      edit-mode prefill from a pending edit context, if any. *)
+  val initial_model : unit -> model
+
   val initial_base_dir : string
 
   (** Test helper: simulate setting instance name and return resulting base_dir *)

@@ -71,7 +71,11 @@ let make_initial_model () =
       in
       let base_dir = lookup "OCTEZ_CLIENT_BASE_DIR" in
       let node_endpoint = lookup "OCTEZ_NODE_ENDPOINT" in
-      let extra_args = lookup "OCTEZ_BAKER_COMMAND_ARGS" in
+      let extra_args =
+        Helpers.join_baker_extra_args
+          ~global:(lookup "OCTEZ_BAKER_GLOBAL_ARGS")
+          ~command:(lookup "OCTEZ_BAKER_COMMAND_ARGS")
+      in
       {
         core =
           {
@@ -543,6 +547,8 @@ module Page = Form_builder.Make (struct
 end)
 
 module For_tests = struct
+  let initial_model = make_initial_model
+
   let initial_base_dir = (make_initial_model ()).client.base_dir
 
   (** Simulate setting instance name and return the resulting base_dir.
