@@ -61,6 +61,13 @@ val toggle_strategy : pstate -> pstate
 (** Toggle cascade import on/off and recompute dependency chain. *)
 val toggle_cascade : pstate -> pstate
 
+(** Navigate back one step in the wizard. Going from [ConfigureImport] to
+    [SelectService] resets the per-service configuration (selected service,
+    network override, custom name, cascade settings) so a subsequently
+    selected service doesn't inherit stale overrides. Going from
+    [ReviewImport] to [ConfigureImport] preserves the current configuration. *)
+val back : pstate -> pstate
+
 (** Return the header lines for the current wizard step. *)
 val header : state -> string list
 

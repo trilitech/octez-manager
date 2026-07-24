@@ -149,6 +149,91 @@ let test_toggle_round_trip () =
     (strategy_to_string ps''.Navigation.s.strategy)
 
 (* ============================================================ *)
+(* back Tests (issue #999 - stale overrides on service reselect) *)
+(* ============================================================ *)
+
+(* Regression test for #999: selecting service A, setting a network
+   override / custom name / cascade while configuring it, then going back
+   to the service list must clear that per-service state. Otherwise picking
+   a different service B inherits A's stale overrides (e.g. B gets imported
+   with A's manually-chosen network). *)
+let test_back_from_configure_resets_overrides () =
+  let svc_a = make_ext_svc "service-a" in
+  let analysis =
+    Import_cascade.analyze_dependencies
+      ~services:[svc_a]
+      ~target_services:[svc_a]
+  in
+  let ps =
+    wrap_state
+      (make_state
+         ~step:Import_wizard.ConfigureImport
+         ~external_services:[svc_a]
+         ~selected_service:svc_a
+         ~network_override:"mainnet"
+         ~custom_name:"my-custom-name"
+         ~cascade:true
+         ~cascade_chain:[svc_a]
+         ~cascade_analysis:analysis
+         ())
+  in
+  let ps' = Import_wizard.back ps in
+  let s = ps'.Navigation.s in
+  Alcotest.(check bool)
+    "step is SelectService"
+    true
+    (match s.step with Import_wizard.SelectService -> true | _ -> false) ;
+  Alcotest.(check bool)
+    "selected_service reset"
+    true
+    (Option.is_none s.selected_service) ;
+  Alcotest.(check (option string))
+    "network_override reset"
+    None
+    s.network_override ;
+  Alcotest.(check (option string)) "custom_name reset" None s.custom_name ;
+  Alcotest.(check bool) "cascade reset" false s.cascade ;
+  Alcotest.(check int) "cascade_chain reset" 0 (List.length s.cascade_chain) ;
+  Alcotest.(check bool)
+    "cascade_analysis reset"
+    true
+    (Option.is_none s.cascade_analysis)
+
+let test_back_from_review_preserves_configuration () =
+  let svc_a = make_ext_svc "service-a" in
+  let ps =
+    wrap_state
+      (make_state
+         ~step:Import_wizard.ReviewImport
+         ~external_services:[svc_a]
+         ~selected_service:svc_a
+         ~network_override:"mainnet"
+         ~custom_name:"my-custom-name"
+         ~cascade:true
+         ~cascade_chain:[svc_a]
+         ())
+  in
+  let ps' = Import_wizard.back ps in
+  let s = ps'.Navigation.s in
+  Alcotest.(check bool)
+    "step is ConfigureImport"
+    true
+    (match s.step with Import_wizard.ConfigureImport -> true | _ -> false) ;
+  Alcotest.(check bool)
+    "selected_service preserved"
+    true
+    (Option.is_some s.selected_service) ;
+  Alcotest.(check (option string))
+    "network_override preserved"
+    (Some "mainnet")
+    s.network_override ;
+  Alcotest.(check (option string))
+    "custom_name preserved"
+    (Some "my-custom-name")
+    s.custom_name ;
+  Alcotest.(check bool) "cascade preserved" true s.cascade
+
+(* ============================================================ *)
 (* header Tests                                                  *)
 (* ============================================================ *)
 
@@ -316,6 +401,17 @@ let () =
             "no selected service"
             `Quick
             test_toggle_cascade_no_selected_service;
+        ] );
+      ( "back",
+        [
+          Alcotest.test_case
+            "configure -> select resets overrides"
+            `Quick
+            test_back_from_configure_resets_overrides;
+          Alcotest.test_case
+            "review -> configure preserves configuration"
+            `Quick
+            test_back_from_review_preserves_configuration;
         ] );
       ( "header",
         [
