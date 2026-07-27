@@ -190,6 +190,7 @@ let install_node ?(quiet = false) ?on_log (request : node_request) =
       ~snapshot_no_check:snapshot_meta.no_check
       ~extra_args:request.extra_args
       ~dependents:existing_dependents
+      ~enabled_on_boot:(Some request.auto_enable)
       ()
   in
   log "Writing service registry...\n" ;

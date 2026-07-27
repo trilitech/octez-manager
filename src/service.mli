@@ -30,6 +30,10 @@ type t = {
       (** Remote signer configuration for bakers (None = Local_keys for backward compat) *)
   signer_uri : string option;  (** Resolved URI for display/metrics *)
   group : string option;  (** Group this service belongs to, if any *)
+  enabled_on_boot : bool option;
+      (** Last enable-on-boot state octez-manager applied to the systemd unit.
+          [None] means unknown (legacy service.json predating this field);
+          callers should treat [None] as [true] to preserve prior behavior. *)
 }
 
 (** Create a service configuration record.
@@ -57,6 +61,7 @@ val make :
   ?signer_mode:Signer_types.signer_mode option ->
   ?signer_uri:string option ->
   ?group:string option ->
+  ?enabled_on_boot:bool option ->
   unit ->
   t
 

@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Editing a node, baker, accuser, DAL node, indexer, or signatory instance that was intentionally disabled from starting at boot no longer silently re-enables it on save. Previously, the edit form's "Enable on boot" toggle always started at "enabled" regardless of the instance's actual state, because that state was never persisted; it is now recorded and restored on edit (fixes #1001)
+
 - The node install wizard no longer submits a snapshot import for archive nodes. Previously, manually selecting a snapshot and then switching History Mode to "archive" kept the hidden selection in the form state, producing an install that tried to bootstrap an archive node from a snapshot (fixes #1000)
 
 - Editing a baker or accuser instance no longer silently drops global CLI options (e.g. `--media-type`, `--endpoint`, `--password-filename`) on save. The edit form's "Extra Args" field previously prefilled only from the command-args half of the split, so re-submitting an otherwise-unchanged edit erased the global-args half from the env file; the field now prefills from both halves (fixes #996)

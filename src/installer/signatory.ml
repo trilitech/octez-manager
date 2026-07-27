@@ -326,6 +326,7 @@ Security:
       ~extra_args:[] (* Signatory args are in config file *)
       ~depends_on:None
       ~dependents:[]
+      ~enabled_on_boot:(Some request.auto_enable)
       ()
   in
 
