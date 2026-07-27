@@ -68,6 +68,46 @@ let test_archive_clears_manual_snapshot_issue_1000 () =
     "`None"
     (describe (Install_node_form.For_tests.snapshot_of after))
 
+(** Same invariant through the other branch of [set_node_with_autoname]:
+    when the user has renamed the instance away from the auto-generated
+    name, the autoname branch is skipped, but switching to archive must
+    still clear a manually-selected snapshot. *)
+let test_archive_clears_manual_snapshot_renamed_instance () =
+  let manual_snapshot =
+    `Tzinit
+      Install_node_form.
+        {
+          network_slug = "shadownet";
+          kind_slug = "rolling";
+          label = "Tzinit \xc2\xb7 2026-07-20";
+        }
+  in
+  let before =
+    Install_node_form.For_tests.(
+      fresh_model ()
+      |> with_snapshot manual_snapshot
+      |> with_instance_name "my-custom-name")
+  in
+  let archive_node =
+    {
+      (Install_node_form.For_tests.node_of before) with
+      Octez_manager_ui.Form_builder_common.history_mode = "archive";
+    }
+  in
+  let after =
+    Install_node_form.For_tests.set_node_with_autoname archive_node before
+  in
+  let is_none =
+    match Install_node_form.For_tests.snapshot_of after with
+    | `None -> true
+    | `Url _ | `Tzinit _ -> false
+  in
+  check
+    bool
+    "archive must clear manual snapshot even for renamed instances"
+    true
+    is_none
+
 let () =
   Alcotest.run
     "Install Node Form (pure)"
@@ -78,5 +118,9 @@ let () =
             "archive clears manual snapshot (#1000)"
             `Quick
             test_archive_clears_manual_snapshot_issue_1000;
+          Alcotest.test_case
+            "archive clears manual snapshot on renamed instance (#1000)"
+            `Quick
+            test_archive_clears_manual_snapshot_renamed_instance;
         ] );
     ]

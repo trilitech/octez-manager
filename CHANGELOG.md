@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The node install wizard no longer submits a snapshot import for archive nodes. Previously, manually selecting a snapshot and then switching History Mode to "archive" kept the hidden selection in the form state, producing an install that tried to bootstrap an archive node from a snapshot (fixes #1000)
+
 - Editing a baker or accuser instance no longer silently drops global CLI options (e.g. `--media-type`, `--endpoint`, `--password-filename`) on save. The edit form's "Extra Args" field previously prefilled only from the command-args half of the split, so re-submitting an otherwise-unchanged edit erased the global-args half from the env file; the field now prefills from both halves (fixes #996)
 
 - The import wizard no longer carries over a previously selected service's network override, custom instance name, or cascade settings when the user backs out of the configure step and selects a *different* external service. Previously, choosing a manual network override (or custom name / cascade mode) for one service and then going back to pick another service would silently apply the first service's settings to the second (fixes #999)
