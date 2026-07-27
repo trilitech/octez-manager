@@ -2,8 +2,8 @@
   "metadata": {
     "generated_at": "2026-04-09T00:00:00.000000",
     "generated_by": "Rebase: merge main (101 tests) + install-index test",
-    "total_tests": 107,
-    "total_duration": 844.05,
+    "total_tests": 108,
+    "total_duration": 852.05,
     "shard_count": 5,
     "mean_shard_duration": 163.81,
     "max_shard_duration": 190.61,
@@ -59,10 +59,11 @@
       "import/56-import-node-missing-config-created.sh",
       "install/01-verified-release.sh",
       "cli/01-version-consistency.sh",
-      "node/27-remove-with-dependents-requires-yes.sh"
+      "node/27-remove-with-dependents-requires-yes.sh",
+      "baker/49-purge-missing-base-dir.sh"
     ],
-    "test_count": 20,
-    "total_duration": 156.78
+    "test_count": 21,
+    "total_duration": 164.78
   },
   "shard-3": {
     "tests": [
