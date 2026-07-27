@@ -1163,6 +1163,18 @@ module For_tests = struct
   let generate_instance_name = generate_instance_name
 
   let format_selected_snapshot = format_selected_snapshot
+
+  type nonrec model = model
+
+  let fresh_model = base_initial_model
+
+  let with_snapshot snapshot m = {m with snapshot}
+
+  let node_of m = m.node
+
+  let snapshot_of m = m.snapshot
+
+  let set_node_with_autoname = set_node_with_autoname
 end
 
 let page : Miaou.Core.Registry.page = (module Page)

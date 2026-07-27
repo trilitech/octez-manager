@@ -989,6 +989,13 @@
   (backend bisect_ppx)))
 
 (test
+ (name test_install_node_form_pure)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_install_node_form_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_log_viewer_page_pure)
  (libraries alcotest octez_manager_lib octez-manager.ui)
  (modules test_log_viewer_page_pure)

@@ -58,4 +58,28 @@ module For_tests : sig
       Shows "tzinit · {label}" using the human-readable label (or the
       kind slug as fallback), without duplicating the slug in parentheses. *)
   val format_selected_snapshot : tzinit_snapshot -> string
+
+  (** Opaque form model, exposed only to drive {!set_node_with_autoname}
+      from tests. Fields are intentionally not revealed. *)
+  type model
+
+  (** A model as the wizard produces it for a fresh (non-edit) install:
+      network = ["shadownet"], history_mode = ["rolling"], with the
+      instance name auto-generated to match. *)
+  val fresh_model : unit -> model
+
+  (** Test-only setter overriding the model's snapshot selection directly,
+      bypassing any field on-change logic. *)
+  val with_snapshot : snapshot_selection -> model -> model
+
+  (** Read back the model's node configuration. *)
+  val node_of : model -> Form_builder_common.node_config
+
+  (** Read back the model's current snapshot selection. *)
+  val snapshot_of : model -> snapshot_selection
+
+  (** The autoname/autosnapshot transition applied whenever the Network or
+      History Mode field changes value (this is the [~set_node] callback
+      wired into the History Mode field). *)
+  val set_node_with_autoname : Form_builder_common.node_config -> model -> model
 end
