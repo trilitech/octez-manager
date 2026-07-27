@@ -73,6 +73,46 @@ let test_to_endpoint_with_path () =
     "http://127.0.0.1:8732/some/path"
     endpoint
 
+(* ============================================================ *)
+(* IPv6 host/port tests (see #1006) *)
+(* ============================================================ *)
+
+let test_host_bracketed_ipv6 () =
+  let addr = Rpc_addr.of_string "[::1]:8732" in
+  Alcotest.(check (option string))
+    "host keeps its brackets"
+    (Some "[::1]")
+    (Rpc_addr.host addr)
+
+let test_port_bracketed_ipv6 () =
+  let addr = Rpc_addr.of_string "[::1]:8732" in
+  Alcotest.(check (option int))
+    "port extracted"
+    (Some 8732)
+    (Rpc_addr.port addr)
+
+let test_host_bare_ipv6_rejected () =
+  let addr = Rpc_addr.of_string "fe80::1:9732" in
+  Alcotest.(check (option string))
+    "bare IPv6 host rejected (ambiguous)"
+    None
+    (Rpc_addr.host addr)
+
+let test_port_bare_ipv6_rejected () =
+  let addr = Rpc_addr.of_string "fe80::1:9732" in
+  Alcotest.(check (option int))
+    "bare IPv6 port rejected (ambiguous)"
+    None
+    (Rpc_addr.port addr)
+
+let test_round_trip_preserves_bracketed_ipv6 () =
+  let raw = "[::1]:8732" in
+  let addr = Rpc_addr.of_string raw in
+  Alcotest.(check string)
+    "of_string / to_string round-trip preserves brackets"
+    raw
+    (Rpc_addr.to_string addr)
+
 let () =
   let open Alcotest in
   run
@@ -100,5 +140,16 @@ let () =
           test_case "empty string" `Quick test_to_endpoint_empty_string;
           test_case "whitespace only" `Quick test_to_endpoint_whitespace_only;
           test_case "with path" `Quick test_to_endpoint_with_path;
+        ] );
+      ( "ipv6",
+        [
+          test_case "host keeps brackets" `Quick test_host_bracketed_ipv6;
+          test_case "port extracted" `Quick test_port_bracketed_ipv6;
+          test_case "bare host rejected" `Quick test_host_bare_ipv6_rejected;
+          test_case "bare port rejected" `Quick test_port_bare_ipv6_rejected;
+          test_case
+            "round-trip preserves brackets"
+            `Quick
+            test_round_trip_preserves_bracketed_ipv6;
         ] );
     ]

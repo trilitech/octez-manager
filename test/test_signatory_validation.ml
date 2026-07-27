@@ -89,6 +89,8 @@ let test_valid_http_addresses () =
       ("0.0.0.0:8080", "Any address");
       ("192.168.1.100:9000", "Private network");
       ("signatory.example.com:6732", "Domain name");
+      ("[::1]:6732", "Bracketed IPv6 loopback");
+      ("[fe80::1%eth0]:6732", "Bracketed IPv6 with zone id");
     ]
   in
   List.iter
@@ -114,6 +116,7 @@ let test_invalid_http_addresses () =
       ("127.0.0.1:65536", "Port too high");
       ("127.0.0.1:abc", "Invalid port");
       ("127.0.0.1:6732:extra", "Too many colons");
+      ("fe80::1:9732", "Bare IPv6 with port (ambiguous, must be bracketed)");
     ]
   in
   List.iter
@@ -124,6 +127,28 @@ let test_invalid_http_addresses () =
       | Ok () -> Alcotest.failf "%s: Expected %s to be invalid" description addr
       | Error (`Msg _) -> ())
     addresses
+
+let test_bare_ipv6_error_message_is_actionable () =
+  match
+    Signatory_validation.validate_http_address
+      ~addr:"fe80::1:9732"
+      ~name:"address"
+  with
+  | Ok () -> Alcotest.fail "Expected bare IPv6 address to be rejected"
+  | Error (`Msg msg) ->
+      let contains_substring ~needle haystack =
+        let hlen = String.length haystack and nlen = String.length needle in
+        let rec loop i =
+          if i + nlen > hlen then false
+          else if String.equal (String.sub haystack i nlen) needle then true
+          else loop (i + 1)
+        in
+        loop 0
+      in
+      Alcotest.(check bool)
+        "error message mentions bracketing"
+        true
+        (contains_substring ~needle:"bracketed" msg)
 
 let test_valid_backends () =
   let backends =
@@ -303,6 +328,10 @@ let () =
         [
           test_case "valid HTTP addresses" `Quick test_valid_http_addresses;
           test_case "invalid HTTP addresses" `Quick test_invalid_http_addresses;
+          test_case
+            "bare IPv6 error message is actionable"
+            `Quick
+            test_bare_ipv6_error_message_is_actionable;
         ] );
       ( "Backends",
         [

@@ -44,8 +44,22 @@ let test_parse_host_port_wildcard () =
 
 let test_parse_host_port_ipv6 () =
   let result = Port_validation.parse_host_port "[::1]:8732" in
-  (* IPv6 addresses with brackets not supported - contains multiple colons *)
-  check_some_pair "IPv6 not supported" None result
+  (* Bracketed IPv6 literals are accepted; the host keeps its brackets so
+     it round-trips into a valid octez CLI argument (see #1006). *)
+  check_some_pair "bracketed IPv6 accepted" (Some ("[::1]", 8732)) result
+
+let test_parse_host_port_ipv6_zone_id () =
+  let result = Port_validation.parse_host_port "[fe80::1%eth0]:9732" in
+  (* Zone ids are part of the bracketed literal and accepted verbatim. *)
+  check_some_pair
+    "bracketed IPv6 with zone id accepted"
+    (Some ("[fe80::1%eth0]", 9732))
+    result
+
+let test_parse_host_port_bare_ipv6_rejected () =
+  let result = Port_validation.parse_host_port "fe80::1:9732" in
+  (* Bare (unbracketed) IPv6 combined with a port is ambiguous — rejected. *)
+  check_some_pair "bare IPv6 rejected" None result
 
 let test_parse_host_port_no_port () =
   let result = Port_validation.parse_host_port "127.0.0.1" in
@@ -330,6 +344,47 @@ let test_validate_addr_wildcard () =
       check bool "port in use is valid" true true
   | Error _ -> fail "unexpected error for wildcard"
 
+let test_validate_addr_bracketed_ipv6 () =
+  let result =
+    Port_validation.validate_addr
+      ~addr:"[::1]:54325"
+      ~example:"127.0.0.1:54325"
+      ()
+  in
+  match result with
+  | Ok () -> check bool "bracketed IPv6 accepted" true true
+  | Error (Port_validation.Port_in_use _) ->
+      check bool "port in use is valid" true true
+  | Error _ -> fail "unexpected error for bracketed IPv6"
+
+(* Naive substring search, to avoid pulling in a regex library just for
+   an assertion. *)
+let contains_substring ~needle haystack =
+  let hlen = String.length haystack and nlen = String.length needle in
+  let rec loop i =
+    if i + nlen > hlen then false
+    else if String.equal (String.sub haystack i nlen) needle then true
+    else loop (i + 1)
+  in
+  loop 0
+
+let test_validate_addr_bare_ipv6_rejected () =
+  let result =
+    Port_validation.validate_addr
+      ~addr:"fe80::1:9732"
+      ~example:"127.0.0.1:8732"
+      ()
+  in
+  match result with
+  | Error Port_validation.Bare_ipv6 ->
+      let msg = Port_validation.pp_error Port_validation.Bare_ipv6 in
+      check
+        bool
+        "actionable bracket message"
+        true
+        (contains_substring ~needle:"bracketed" msg)
+  | _ -> fail "bare IPv6 with port should be rejected as Bare_ipv6"
+
 (* ============================================================ *)
 (* Test Suite *)
 (* ============================================================ *)
@@ -340,6 +395,10 @@ let parse_host_port_tests =
     ("parse hostname:port", `Quick, test_parse_host_port_hostname);
     ("parse wildcard:port", `Quick, test_parse_host_port_wildcard);
     ("parse IPv6:port", `Quick, test_parse_host_port_ipv6);
+    ("parse IPv6:port with zone id", `Quick, test_parse_host_port_ipv6_zone_id);
+    ( "parse bare IPv6:port rejected",
+      `Quick,
+      test_parse_host_port_bare_ipv6_rejected );
     ("parse no port", `Quick, test_parse_host_port_no_port);
     ("parse invalid format", `Quick, test_parse_host_port_invalid);
     ("parse empty string", `Quick, test_parse_host_port_empty);
@@ -367,6 +426,10 @@ let validate_addr_tests =
     ("validate port too high", `Quick, test_validate_addr_port_too_high);
     ("validate boundary 1024", `Quick, test_validate_addr_boundary_1024);
     ("validate boundary 65535", `Quick, test_validate_addr_boundary_65535);
+    ("validate bracketed IPv6", `Quick, test_validate_addr_bracketed_ipv6);
+    ( "validate bare IPv6 rejected",
+      `Quick,
+      test_validate_addr_bare_ipv6_rejected );
   ]
 
 let validate_specific_tests =
