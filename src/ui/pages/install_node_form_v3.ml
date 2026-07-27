@@ -401,7 +401,8 @@ let make_initial_model () =
             service_user = svc.Service.service_user;
             app_bin_dir = svc.Service.app_bin_dir;
             bin_source = svc.Service.bin_source;
-            enable_on_boot = true;
+            enable_on_boot =
+              Option.value ~default:true svc.Service.enabled_on_boot;
             start_now = false;
             (* Don't auto-start after edit *)
             extra_args = String.concat " " svc.Service.extra_args;

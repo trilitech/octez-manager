@@ -296,6 +296,7 @@ let to_service (info : node_info) : Service.t =
     signer_mode = None;
     signer_uri = None;
     group = None;
+    enabled_on_boot = None;
   }
 
 (** Get all public nodes as Service.t list *)

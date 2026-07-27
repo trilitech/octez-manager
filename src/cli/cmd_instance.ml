@@ -532,7 +532,8 @@ let instance_term =
                             bin_source = svc.bin_source;
                             extra_args = new_extra_args;
                             extra_env = [];
-                            auto_enable = true;
+                            auto_enable =
+                              Option.value ~default:true svc.enabled_on_boot;
                             logging_mode = svc.logging_mode;
                             bootstrap = Installer_types.Genesis;
                             preserve_data = true;
@@ -707,7 +708,8 @@ let instance_term =
                             bin_source = svc.bin_source;
                             logging_mode = svc.logging_mode;
                             extra_args = new_extra_args;
-                            auto_enable = true;
+                            auto_enable =
+                              Option.value ~default:true svc.enabled_on_boot;
                             preserve_data = true;
                             extra_nodes = [];
                           }
@@ -735,7 +737,8 @@ let instance_term =
                             bin_source = svc.bin_source;
                             logging_mode = svc.logging_mode;
                             extra_args = new_extra_args;
-                            auto_enable = true;
+                            auto_enable =
+                              Option.value ~default:true svc.enabled_on_boot;
                             preserve_data = true;
                           }
                         in
@@ -821,7 +824,8 @@ let instance_term =
                                 ("OCTEZ_DAL_NET_ADDR", new_net);
                               ];
                             extra_paths = [dal_data_dir];
-                            auto_enable = true;
+                            auto_enable =
+                              Option.value ~default:true svc.enabled_on_boot;
                             depends_on = new_depends_on;
                             preserve_data = true;
                           }

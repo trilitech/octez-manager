@@ -29,6 +29,10 @@ type t = {
       (** Remote signer configuration for bakers (None = Local_keys for backward compat) *)
   signer_uri : string option;  (** Resolved URI for display/metrics *)
   group : string option;  (** Group this service belongs to, if any *)
+  enabled_on_boot : bool option;
+      (** Last enable-on-boot state octez-manager applied to the systemd unit.
+          [None] means unknown (legacy service.json predating this field);
+          callers should treat [None] as [true] to preserve prior behavior. *)
 }
 
 let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
@@ -36,7 +40,8 @@ let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     ?(snapshot_auto = false) ?(snapshot_uri = None)
     ?(snapshot_network_slug = None) ?(snapshot_no_check = false)
     ?(extra_args = []) ?(depends_on = None) ?(dependents = [])
-    ?(signer_mode = None) ?(signer_uri = None) ?(group = None) () =
+    ?(signer_mode = None) ?(signer_uri = None) ?(group = None)
+    ?(enabled_on_boot = None) () =
   {
     instance;
     role;
@@ -60,6 +65,7 @@ let make ~instance ~role ~network ~history_mode ~data_dir ~rpc_addr ~net_addr
     signer_mode;
     signer_uri;
     group;
+    enabled_on_boot;
   }
 
 let get_bin_source t =
@@ -154,6 +160,8 @@ let to_yojson t =
       ( "signer_uri",
         match t.signer_uri with Some s -> `String s | None -> `Null );
       ("group", match t.group with Some s -> `String s | None -> `Null);
+      ( "enabled_on_boot",
+        match t.enabled_on_boot with Some b -> `Bool b | None -> `Null );
     ]
   in
   (* Add bin_source if present *)
@@ -243,6 +251,11 @@ let of_yojson json =
       | `String s when s <> "" -> Some s
       | _ -> None
     in
+    let enabled_on_boot =
+      match json |> member "enabled_on_boot" with
+      | `Bool b -> Some b
+      | _ -> None
+    in
     match history_mode with
     | Error _ as err -> err
     | Ok history_mode -> (
@@ -272,6 +285,7 @@ let of_yojson json =
                 signer_mode;
                 signer_uri;
                 group;
+                enabled_on_boot;
               }
         | Error _ as err -> err)
   with Yojson.Json_error msg -> Error (`Msg msg)

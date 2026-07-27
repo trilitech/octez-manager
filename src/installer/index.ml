@@ -99,6 +99,7 @@ let install ?(quiet = false) (request : index_request) =
       ~extra_args:all_service_args
       ~depends_on:request.depends_on
       ~dependents:existing_dependents
+      ~enabled_on_boot:(Some request.auto_enable)
       ()
   in
   let* () = Service_registry.write service in

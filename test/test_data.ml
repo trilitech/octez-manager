@@ -37,6 +37,7 @@ let make_service ?(instance = "my-node") ?(role = "node") ?(network = "mainnet")
     signer_mode = None;
     signer_uri = None;
     group = None;
+    enabled_on_boot = None;
   }
 
 let make_state ?(instance = "my-node") ?(role = "node") ?(enabled = Some true)

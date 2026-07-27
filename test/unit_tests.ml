@@ -161,6 +161,7 @@ let sample_service ?(logging_mode = Logging_mode.Journald) () : Service.t =
     signer_mode = None;
     signer_uri = None;
     group = None;
+    enabled_on_boot = None;
   }
 
 let sort_services =
@@ -3249,6 +3250,43 @@ let install_accuser_form_v3_edit_prefill_preserves_global_args () =
           "--media-type json --extra x"
           model.core.extra_args)
 
+(* Regression test for #1001: every install wizard's EDIT-mode prefill
+   hardcoded [enable_on_boot = true], so editing an intentionally disabled
+   service silently re-enabled it at boot on submit. Without the fix,
+   [model.core.enable_on_boot] below would be [true] even though the
+   persisted service has [enabled_on_boot = Some false]. *)
+let install_baker_form_v3_edit_prefill_preserves_disabled_boot_state () =
+  if is_ci () then Alcotest.skip ()
+  else
+    with_fake_xdg (fun _env ->
+        let inst = "baker-issue-1001" in
+        let service =
+          {
+            (Service.make
+               ~instance:inst
+               ~role:"baker"
+               ~network:"mainnet"
+               ~history_mode:History_mode.Rolling
+               ~data_dir:"/tmp/octez/baker-issue-1001"
+               ~rpc_addr:(Rpc_addr.of_string "127.0.0.1:8732")
+               ~net_addr:""
+               ~service_user:"octez"
+               ~app_bin_dir:"/usr/bin"
+               ~logging_mode:Logging_mode.Journald
+               ())
+            with
+            Service.enabled_on_boot = Some false;
+          }
+        in
+        Octez_manager_ui.Context.set_pending_edit_service
+          ~service
+          ~stopped_dependents:[] ;
+        let model = Install_baker_form_v3.For_tests.initial_model () in
+        Alcotest.(check bool)
+          "enable_on_boot prefilled from persisted disabled state"
+          false
+          model.core.enable_on_boot)
+
 let system_user_validate_missing () =
   match
     System_user.validate_user_for_service ~user:"__missing_octez_user__"
@@ -3836,6 +3874,62 @@ let service_dependents_default_empty () =
     "depends_on default none"
     None
     service.Service.depends_on
+
+(* ============================================================================
+   Service enabled_on_boot field tests (#1001)
+   ============================================================================ *)
+
+let service_roundtrip_enabled_on_boot_false () =
+  let service =
+    {(sample_service ()) with Service.enabled_on_boot = Some false}
+  in
+  match Service.to_yojson service |> Service.of_yojson with
+  | Ok decoded ->
+      Alcotest.(check (option bool))
+        "enabled_on_boot false preserved"
+        (Some false)
+        decoded.Service.enabled_on_boot
+  | Error (`Msg msg) -> Alcotest.failf "roundtrip failed: %s" msg
+
+let service_roundtrip_enabled_on_boot_true () =
+  let service =
+    {(sample_service ()) with Service.enabled_on_boot = Some true}
+  in
+  match Service.to_yojson service |> Service.of_yojson with
+  | Ok decoded ->
+      Alcotest.(check (option bool))
+        "enabled_on_boot true preserved"
+        (Some true)
+        decoded.Service.enabled_on_boot
+  | Error (`Msg msg) -> Alcotest.failf "roundtrip failed: %s" msg
+
+let service_enabled_on_boot_legacy_json_is_none () =
+  (* A service.json written before this field existed must deserialize with
+     enabled_on_boot = None (unknown), not crash and not default to a
+     specific boolean. *)
+  let legacy_json =
+    `Assoc
+      [
+        ("instance", `String "alpha");
+        ("role", `String "node");
+        ("network", `String "https://example/net.json");
+        ("history_mode", `String "full");
+        ("data_dir", `String "/tmp/octez/alpha");
+        ("rpc_addr", `String "127.0.0.1:8732");
+        ("net_addr", `String "0.0.0.0:9732");
+        ("service_user", `String "octez");
+        ("app_bin_dir", `String "/opt/octez");
+        ("created_at", `String "2024-01-01 00:00:00");
+        ("logging_mode", `Assoc [("type", `String "journald")]);
+      ]
+  in
+  match Service.of_yojson legacy_json with
+  | Ok decoded ->
+      Alcotest.(check (option bool))
+        "legacy service.json has no enabled_on_boot"
+        None
+        decoded.Service.enabled_on_boot
+  | Error (`Msg msg) -> Alcotest.failf "legacy roundtrip failed: %s" msg
 
 (* ============================================================================
    Instance name validation tests (edit mode)
@@ -6526,6 +6620,13 @@ let () =
             `Quick
             install_accuser_form_v3_edit_prefill_preserves_global_args;
         ] );
+      ( "installer.enable_on_boot",
+        [
+          Alcotest.test_case
+            "baker edit form preserves disabled boot state (#1001)"
+            `Quick
+            install_baker_form_v3_edit_prefill_preserves_disabled_boot_state;
+        ] );
       ( "snapshots.basic",
         [
           Alcotest.test_case "slug_of_network" `Quick snapshots_slug_of_network;
@@ -6918,6 +7019,21 @@ let () =
             "defaults empty"
             `Quick
             service_dependents_default_empty;
+        ] );
+      ( "service.enabled_on_boot",
+        [
+          Alcotest.test_case
+            "roundtrip false"
+            `Quick
+            service_roundtrip_enabled_on_boot_false;
+          Alcotest.test_case
+            "roundtrip true"
+            `Quick
+            service_roundtrip_enabled_on_boot_true;
+          Alcotest.test_case
+            "legacy json has no field -> None"
+            `Quick
+            service_enabled_on_boot_legacy_json_is_none;
         ] );
       ( "instance_name",
         [
