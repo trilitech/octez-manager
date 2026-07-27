@@ -60,8 +60,17 @@ let validate_authorized_keys keys =
     @param name Field name for error messages
     @return Ok () if valid, Error with message otherwise *)
 let validate_http_address ~addr ~name =
-  match String.split_on_char ':' addr with
-  | [host; port_str] -> (
+  match Host_port.split addr with
+  | Error Host_port.Bare_ipv6 ->
+      Error (`Msg (Printf.sprintf "%s: %s" name Host_port.bare_ipv6_message))
+  | Error Host_port.Invalid_format ->
+      Error
+        (`Msg
+           (Printf.sprintf
+              "%s: must be in format 'host:port', got '%s'"
+              name
+              addr))
+  | Ok (host, port_str) -> (
       if host = "" then
         Error (`Msg (Printf.sprintf "%s: host cannot be empty" name))
       else
@@ -75,13 +84,6 @@ let validate_http_address ~addr ~name =
           Error
             (`Msg (Printf.sprintf "%s: invalid port number '%s'" name port_str))
       )
-  | _ ->
-      Error
-        (`Msg
-           (Printf.sprintf
-              "%s: must be in format 'host:port', got '%s'"
-              name
-              addr))
 
 (** Validate Signatory backend configuration.
     

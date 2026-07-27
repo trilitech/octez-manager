@@ -39,6 +39,9 @@ val clear_port_in_use_override : unit -> unit
 (** Validation error types. *)
 type validation_error =
   | Invalid_format of string  (** Invalid host:port format *)
+  | Bare_ipv6
+      (** Multiple colons outside of brackets — an unbracketed IPv6
+          address combined with a port is ambiguous. *)
   | Port_out_of_range  (** Port not in 1024-65535 range *)
   | Used_by_other_instance of int * string  (** Port and instance name *)
   | Port_in_use of int * string option  (** Port and optional process name *)

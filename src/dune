@@ -57,6 +57,7 @@
   signer_validation
   manager_interfaces
   capabilities
+  host_port
   rpc_addr
   port_validation
   external_service

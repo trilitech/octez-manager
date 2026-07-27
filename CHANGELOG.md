@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Host:port fields (RPC address, P2P address, Signatory address) no longer reject bracketed IPv6 literals such as `[::1]:8732`, which previously failed validation with "Must be host:port" even though octez accepts them. A bare (unbracketed) IPv6 address combined with a port, e.g. `fe80::1:9732`, is inherently ambiguous and is now rejected with an actionable message asking to bracket the address instead of a generic format error (fixes #1006)
+
 - Editing a node, baker, accuser, DAL node, indexer, or signatory instance that was intentionally disabled from starting at boot no longer silently re-enables it on save. Previously, the edit form's "Enable on boot" toggle always started at "enabled" regardless of the instance's actual state, because that state was never persisted; it is now recorded and restored on edit (fixes #1001)
 
 - The node install wizard no longer submits a snapshot import for archive nodes. Previously, manually selecting a snapshot and then switching History Mode to "archive" kept the hidden selection in the form state, producing an install that tried to bootstrap an archive node from a snapshot (fixes #1000)

@@ -8,20 +8,20 @@
 (** Port validation utilities shared between CLI and UI. *)
 
 let parse_host_port (s : string) : (string * int) option =
-  match String.split_on_char ':' s with
-  | [host; port] -> (
+  match Host_port.split s with
+  | Error _ -> None
+  | Ok (host, port) -> (
       try
         let p = int_of_string (String.trim port) in
         let h = String.trim host in
         if p > 0 && p < 65536 && h <> "" then Some (h, p) else None
       with _ -> None)
-  | _ -> None
 
 let parse_port addr =
-  match String.split_on_char ':' addr with
-  | [_; port_str] -> (
+  match Host_port.split addr with
+  | Error _ -> None
+  | Ok (_, port_str) -> (
       try Some (int_of_string (String.trim port_str)) with _ -> None)
-  | _ -> None
 
 (** Cache for service ports to avoid repeated I/O during form validation.
     Short TTL since services can be added/removed. *)
@@ -185,6 +185,7 @@ let next_free_port ~start ~avoid =
 
 type validation_error =
   | Invalid_format of string
+  | Bare_ipv6
   | Port_out_of_range
   | Used_by_other_instance of int * string
   | Port_in_use of int * string option
@@ -192,6 +193,7 @@ type validation_error =
 let pp_error = function
   | Invalid_format example ->
       Printf.sprintf "Must be host:port (e.g., %s)" example
+  | Bare_ipv6 -> Host_port.bare_ipv6_message
   | Port_out_of_range -> "Port must be between 1024 and 65535"
   | Used_by_other_instance (port, instance) ->
       Printf.sprintf "Port %d is used by instance '%s'" port instance
@@ -205,37 +207,44 @@ let pp_error = function
     @param example Example format to show in error messages
     @return Ok () if valid, Error with reason if not *)
 let validate_addr ~addr ?exclude_instance ~example () =
-  match parse_host_port addr with
-  | None -> Error (Invalid_format example)
-  | Some (_host, port) -> (
-      if port < 1024 || port > 65535 then Error Port_out_of_range
-      else
-        let rpc_ports, p2p_ports = ports_from_services ?exclude_instance () in
-        let all_ports = rpc_ports @ p2p_ports in
-        let find_instance p =
-          List.find_opt (fun (pt, _) -> pt = p) all_ports |> Option.map snd
-        in
-        match find_instance port with
-        | Some instance -> Error (Used_by_other_instance (port, instance))
-        | None ->
-            let owned_by_self =
-              match exclude_instance with
-              | Some inst -> port_owned_by_instance ~instance:inst port
-              | None -> false
+  match Host_port.split addr with
+  | Error Host_port.Bare_ipv6 -> Error Bare_ipv6
+  | Error Host_port.Invalid_format -> Error (Invalid_format example)
+  | Ok _ -> (
+      match parse_host_port addr with
+      | None -> Error (Invalid_format example)
+      | Some (_host, port) -> (
+          if port < 1024 || port > 65535 then Error Port_out_of_range
+          else
+            let rpc_ports, p2p_ports =
+              ports_from_services ?exclude_instance ()
             in
-            if owned_by_self then Ok ()
-            else if is_port_in_use port then
-              (* Use get_port_process for the error detail when no override *)
-              let proc_opt =
-                match !port_in_use_override with
-                | Some _ -> None
-                | None -> (
-                    match get_port_process port with
-                    | Some p -> p
-                    | None -> None)
-              in
-              Error (Port_in_use (port, proc_opt))
-            else Ok ())
+            let all_ports = rpc_ports @ p2p_ports in
+            let find_instance p =
+              List.find_opt (fun (pt, _) -> pt = p) all_ports |> Option.map snd
+            in
+            match find_instance port with
+            | Some instance -> Error (Used_by_other_instance (port, instance))
+            | None ->
+                let owned_by_self =
+                  match exclude_instance with
+                  | Some inst -> port_owned_by_instance ~instance:inst port
+                  | None -> false
+                in
+                if owned_by_self then Ok ()
+                else if is_port_in_use port then
+                  (* Use get_port_process for the error detail when no
+                     override *)
+                  let proc_opt =
+                    match !port_in_use_override with
+                    | Some _ -> None
+                    | None -> (
+                        match get_port_process port with
+                        | Some p -> p
+                        | None -> None)
+                  in
+                  Error (Port_in_use (port, proc_opt))
+                else Ok ()))
 
 (** Validate an RPC address. *)
 let validate_rpc_addr ?exclude_instance addr =
