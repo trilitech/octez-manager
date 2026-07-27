@@ -2,8 +2,8 @@
   "metadata": {
     "generated_at": "2026-04-09T00:00:00.000000",
     "generated_by": "Rebase: merge main (101 tests) + install-index test",
-    "total_tests": 106,
-    "total_duration": 829.05,
+    "total_tests": 107,
+    "total_duration": 844.05,
     "shard_count": 5,
     "mean_shard_duration": 163.81,
     "max_shard_duration": 190.61,
@@ -85,10 +85,11 @@
       "import/53-import-cascade-accuser.sh",
       "import/61-import-cascade-all-configs-preserved.sh",
       "index/01-install.sh",
-      "cli/02-instance-no-args.sh"
+      "cli/02-instance-no-args.sh",
+      "node/28-enable-on-boot-persistence.sh"
     ],
-    "test_count": 19,
-    "total_duration": 151.0
+    "test_count": 20,
+    "total_duration": 166.0
   },
   "shard-4": {
     "tests": [
