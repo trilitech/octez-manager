@@ -255,24 +255,37 @@ let parse_endpoint url =
     | _ -> None
   with _ -> None
 
+(** Strip the surrounding square brackets from a bracketed IPv6 literal
+    (turning [\[::1\]] into [::1]), so it can be compared against a host
+    parsed from a URI (which never carries brackets). Non-bracketed
+    hosts are returned unchanged. *)
+let strip_brackets h =
+  let len = String.length h in
+  if len >= 2 && h.[0] = '[' && h.[len - 1] = ']' then String.sub h 1 (len - 2)
+  else h
+
 (** Check if an endpoint matches a service's RPC address. *)
 let endpoint_matches_rpc ~endpoint ~rpc_addr =
-  match (parse_endpoint endpoint, rpc_addr) with
-  | Some (ep_host, ep_port), addr -> (
-      match String.split_on_char ':' addr with
-      | [host; port] | [""; host; port] -> (
+  match parse_endpoint endpoint with
+  | None -> false
+  | Some (ep_host, ep_port) -> (
+      match Host_port.split rpc_addr with
+      | Error _ -> false
+      | Ok (host, port) -> (
           try
             let rpc_port = int_of_string port in
-            let rpc_host = if host = "" then "0.0.0.0" else host in
+            let host = strip_brackets host in
+            let rpc_host = if String.equal host "" then "0.0.0.0" else host in
             let normalize h =
-              if h = "localhost" || h = "127.0.0.1" || h = "0.0.0.0" then
-                "localhost"
+              if
+                String.equal h "localhost" || String.equal h "127.0.0.1"
+                || String.equal h "0.0.0.0"
+              then "localhost"
               else h
             in
-            ep_port = rpc_port && normalize ep_host = normalize rpc_host
-          with _ -> false)
-      | _ -> false)
-  | _ -> false
+            Int.equal ep_port rpc_port
+            && String.equal (normalize ep_host) (normalize rpc_host)
+          with _ -> false))
 
 (** Get services this one depends on via endpoint matching. *)
 let get_dependencies external_svc all_services =

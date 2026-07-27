@@ -522,13 +522,13 @@ let create_dal_from_external ~instance ~external_svc ~network ~data_dir
       let increment_port addr =
         if addr = "" then ""
         else
-          match String.split_on_char ':' addr with
-          | [host; port] -> (
+          match Host_port.split addr with
+          | Ok (host, port) -> (
               try
                 let port_num = int_of_string port in
                 Printf.sprintf "%s:%d" host (port_num + 1)
               with _ -> addr)
-          | _ -> addr
+          | Error _ -> addr
       in
       (increment_port effective_rpc_addr, increment_port effective_net_addr)
     else (effective_rpc_addr, effective_net_addr)

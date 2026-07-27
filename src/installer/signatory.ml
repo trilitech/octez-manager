@@ -17,15 +17,17 @@ let validate_address address =
   let trimmed = String.trim address in
   if trimmed = "" then R.error_msg "Address cannot be empty"
   else
-    match String.split_on_char ':' trimmed with
-    | [_host; port_str] -> (
+    match Host_port.split trimmed with
+    | Ok (_host, port_str) -> (
         match int_of_string_opt port_str with
         | Some port when port > 0 && port <= 65535 -> Ok trimmed
         | _ ->
             R.error_msgf
               "Invalid port in address '%s'. Port must be 1-65535."
               trimmed)
-    | _ ->
+    | Error Host_port.Bare_ipv6 ->
+        R.error_msgf "%s Got '%s'." Host_port.bare_ipv6_message trimmed
+    | Error Host_port.Invalid_format ->
         R.error_msgf
           "Invalid address format '%s'. Expected 'host:port' (e.g., \
            '127.0.0.1:6732')."
