@@ -689,6 +689,9 @@ let set_node_with_autoname node m =
         ~network:node.network
         ~history_mode:node.history_mode
     in
+    let new_is_archive =
+      String.(lowercase_ascii (trim node.history_mode)) = "archive"
+    in
     (* Only auto-update if instance name matches the old generated name *)
     if String.equal m.core.instance_name old_name then
       let new_data_dir = Paths.default_role_dir "node" new_name in
@@ -696,17 +699,19 @@ let set_node_with_autoname node m =
       let should_update_data_dir =
         String.equal (String.trim m.node.data_dir) old_default_dir
       in
-      (* Auto-update snapshot if:
+      (* Archive nodes never bootstrap from a snapshot, so switching to
+         archive must clear ANY selection, manual ones included — the
+         snapshot field is hidden in archive mode, so a surviving value
+         would bypass its validation entirely (issue #1000).
+         Otherwise, auto-update the snapshot if:
          1. Current snapshot is an auto snapshot and network or history_mode changed, OR
          2. Current snapshot is None and we're moving FROM archive mode to non-archive mode *)
       let old_is_archive =
         String.(lowercase_ascii (trim m.node.history_mode)) = "archive"
       in
-      let new_is_archive =
-        String.(lowercase_ascii (trim node.history_mode)) = "archive"
-      in
       let new_snapshot =
-        if
+        if new_is_archive then `None
+        else if
           (is_auto_snapshot m.snapshot
           || (m.snapshot = `None && old_is_archive && not new_is_archive))
           && ((not (String.equal m.node.network node.network))
@@ -728,6 +733,7 @@ let set_node_with_autoname node m =
         core = {m.core with instance_name = new_name};
         snapshot = new_snapshot;
       }
+    else if new_is_archive then {m with node; snapshot = `None}
     else {m with node}
 
 let spec =
@@ -1169,6 +1175,9 @@ module For_tests = struct
   let fresh_model = base_initial_model
 
   let with_snapshot snapshot m = {m with snapshot}
+
+  let with_instance_name instance_name m =
+    {m with core = {m.core with instance_name}}
 
   let node_of m = m.node
 

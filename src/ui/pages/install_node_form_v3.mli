@@ -72,6 +72,10 @@ module For_tests : sig
       bypassing any field on-change logic. *)
   val with_snapshot : snapshot_selection -> model -> model
 
+  (** Test-only setter overriding the instance name, to simulate a user
+      who renamed the instance away from the auto-generated name. *)
+  val with_instance_name : string -> model -> model
+
   (** Read back the model's node configuration. *)
   val node_of : model -> Form_builder_common.node_config
 
