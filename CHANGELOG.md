@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.0-rc4] - 2026-07-31
+
 ### Fixed
 
 - Host:port fields (RPC address, P2P address, Signatory address) no longer reject bracketed IPv6 literals such as `[::1]:8732`, which previously failed validation with "Must be host:port" even though octez accepts them. A bare (unbracketed) IPv6 address combined with a port, e.g. `fe80::1:9732`, is inherently ambiguous and is now rejected with an actionable message asking to bracket the address instead of a generic format error (fixes #1006)
