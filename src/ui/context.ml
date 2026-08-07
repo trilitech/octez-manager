@@ -365,6 +365,8 @@ type multi_progress_state = {
   binaries : binary_progress list;
   finished_at : float option;
   checksum_message : string option;
+  started_at : float;
+  last_progress_update : float;
 }
 
 let multi_progress : multi_progress_state option ref = ref None
@@ -415,6 +417,7 @@ let format_status_icon status =
 
 (* Start multi-progress *)
 let multi_progress_start ~version ~binaries =
+  let now = Unix.gettimeofday () in
   let widgets =
     List.map
       (fun name ->
@@ -430,11 +433,19 @@ let multi_progress_start ~version ~binaries =
   in
   multi_progress :=
     Some
-      {version; binaries = widgets; finished_at = None; checksum_message = None} ;
+      {
+        version;
+        binaries = widgets;
+        finished_at = None;
+        checksum_message = None;
+        started_at = now;
+        last_progress_update = now;
+      } ;
   mark_download_dirty ()
 
 (* Update progress for a specific binary *)
 let multi_progress_update ~binary ~downloaded ~total =
+  let now = Unix.gettimeofday () in
   multi_progress :=
     Option.map
       (fun mp ->
@@ -462,7 +473,7 @@ let multi_progress_update ~binary ~downloaded ~total =
               else bp)
             mp.binaries
         in
-        {mp with binaries})
+        {mp with binaries; last_progress_update = now})
       !multi_progress ;
   mark_download_dirty ()
 
@@ -502,6 +513,25 @@ let multi_progress_finish () =
       (fun mp -> {mp with finished_at = Some (Unix.gettimeofday ())})
       !multi_progress ;
   mark_download_dirty ()
+
+(* Check if download appears stalled (no progress for 45 seconds) *)
+let multi_progress_is_stalled () =
+  match !multi_progress with
+  | None -> false
+  | Some mp ->
+      let now = Unix.gettimeofday () in
+      (* If finished, not stalled *)
+      if Option.is_some mp.finished_at then false
+      else
+        (* Check if any binary has made progress *)
+        let has_progress =
+          List.exists
+            (fun bp -> bp.status = `InProgress || bp.status = `Complete)
+            mp.binaries
+        in
+        (* Stalled if: started >45s ago AND (no progress updates OR still pending) *)
+        now -. mp.started_at > 45.0
+        && ((not has_progress) || now -. mp.last_progress_update > 45.0)
 
 (* Render multi-progress display *)
 let render_multi_progress ~cols:_ =

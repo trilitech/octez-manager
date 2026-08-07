@@ -1312,6 +1312,12 @@ let open_download_progress_modal ~version ~on_complete =
         Context.render_multi_progress ~cols:(size.LTerm_geom.cols - 4)
       in
       if String.trim multi_progress_lines <> "" then add multi_progress_lines
+      else if Context.multi_progress_is_stalled () then (
+        add
+          "\xe2\x9a\xa0 Download appears stalled (no progress for 45+ seconds)" ;
+        add "" ;
+        add "Check /tmp/octez_manager_cmds.log for curl output details." ;
+        add "You may need to cancel (Esc) and retry the download.")
       else add "Initializing download..." ;
 
       add "" ;

@@ -203,6 +203,10 @@ val multi_progress_checksum : string -> unit
 (** Finish multi-progress (will linger for a few seconds before clearing) *)
 val multi_progress_finish : unit -> unit
 
+(** Check if download appears stalled (no progress for 45 seconds).
+    Returns [true] if download has been running for >45s with no progress updates. *)
+val multi_progress_is_stalled : unit -> bool
+
 (** Render multi-progress display (returns multi-line string) *)
 val render_multi_progress : cols:int -> string
 
