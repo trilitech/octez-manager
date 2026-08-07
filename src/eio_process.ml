@@ -15,6 +15,46 @@ let process_mgr_ref : any_proc_mgr option Atomic.t = Atomic.make None
 
 let get_process_mgr () = Atomic.get process_mgr_ref
 
+(* Eio's built-in PATH resolver only checks [Sys.file_exists], which matches
+   directories and non-executable files. When the user's PATH includes a
+   project directory containing a [test] subdir, [Eio.Process.spawn ["test";
+   ...]] would execve the directory and fail with "execve: Permission denied".
+   We resolve the program here, requiring a regular file with X_OK access,
+   and pass it to spawn as [~executable]. *)
+let resolve_executable argv =
+  match argv with
+  | [] -> Error (`Msg "Cannot run empty command")
+  | name :: _ when not (Filename.is_implicit name) -> Ok name
+  | name :: _ ->
+      let is_executable_file p =
+        try
+          let st = Unix.stat p in
+          st.Unix.st_kind = Unix.S_REG
+          &&
+          try
+            Unix.access p [Unix.X_OK] ;
+            true
+          with Unix.Unix_error _ -> false
+        with Unix.Unix_error _ -> false
+      in
+      let dirs =
+        Sys.getenv_opt "PATH"
+        |> Option.value ~default:"/bin:/usr/bin"
+        |> String.split_on_char ':'
+      in
+      let resolved =
+        List.find_map
+          (fun dir ->
+            let p = Filename.concat dir name in
+            if is_executable_file p then Some p else None)
+          dirs
+      in
+      match resolved with
+      | Some p -> Ok p
+      | None ->
+          Error
+            (`Msg (Printf.sprintf "Executable %S not found in PATH" name))
+
 (** Read lines from an Eio flow, calling [on_line] for each line read. *)
 let read_lines_eio flow ~on_line =
   let reader = Eio.Buf_read.of_flow ~max_size:(10 * 1024 * 1024) flow in
@@ -32,10 +72,21 @@ let read_lines_eio flow ~on_line =
     In TUI mode stdout/stderr are always captured via pipes -- there is no
     terminal to inherit -- so the [quiet] flag has no effect on the Eio path. *)
 let run_eio (Mgr mgr) ~quiet:_ ?on_log argv =
+  match resolve_executable argv with
+  | Error _ as e -> e
+  | Ok executable ->
   Eio.Switch.run @@ fun sw ->
   let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
   let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
-  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w ~stderr:stderr_w argv in
+  let proc =
+    Eio.Process.spawn
+      ~sw
+      mgr
+      ~executable
+      ~stdout:stdout_w
+      ~stderr:stderr_w
+      argv
+  in
   Eio.Flow.close stdout_w ;
   Eio.Flow.close stderr_w ;
   let log_lines = ref [] in
@@ -65,10 +116,21 @@ let run_eio (Mgr mgr) ~quiet:_ ?on_log argv =
     Drains stderr in parallel with stdout to prevent the process from blocking
     if the stderr pipe buffer fills up. *)
 let run_out_eio (Mgr mgr) argv =
+  match resolve_executable argv with
+  | Error _ as e -> e
+  | Ok executable ->
   Eio.Switch.run @@ fun sw ->
   let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
   let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
-  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w ~stderr:stderr_w argv in
+  let proc =
+    Eio.Process.spawn
+      ~sw
+      mgr
+      ~executable
+      ~stdout:stdout_w
+      ~stderr:stderr_w
+      argv
+  in
   Eio.Flow.close stdout_w ;
   Eio.Flow.close stderr_w ;
   let stdout_out = ref "" in
@@ -99,10 +161,21 @@ let run_out_eio (Mgr mgr) argv =
     after [timeout] seconds if it hasn't exited.  A watchdog OS thread
     sends SIGTERM to unblock the Eio fiber reading from the pipes. *)
 let run_out_with_timeout_eio (Mgr mgr) ~timeout argv =
+  match resolve_executable argv with
+  | Error _ as e -> e
+  | Ok executable ->
   Eio.Switch.run @@ fun sw ->
   let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
   let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
-  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w ~stderr:stderr_w argv in
+  let proc =
+    Eio.Process.spawn
+      ~sw
+      mgr
+      ~executable
+      ~stdout:stdout_w
+      ~stderr:stderr_w
+      argv
+  in
   Eio.Flow.close stdout_w ;
   Eio.Flow.close stderr_w ;
   (* State: 0 = running, 1 = completed, 2 = timed out.
@@ -160,10 +233,21 @@ let run_out_with_timeout_eio (Mgr mgr) ~timeout argv =
     may print to either stream (e.g., operation hashes from the batch
     transfer command). *)
 let run_out_with_timeout_combined_eio (Mgr mgr) ~timeout argv =
+  match resolve_executable argv with
+  | Error _ as e -> e
+  | Ok executable ->
   Eio.Switch.run @@ fun sw ->
   let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
   let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
-  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w ~stderr:stderr_w argv in
+  let proc =
+    Eio.Process.spawn
+      ~sw
+      mgr
+      ~executable
+      ~stdout:stdout_w
+      ~stderr:stderr_w
+      argv
+  in
   Eio.Flow.close stdout_w ;
   Eio.Flow.close stderr_w ;
   let state = Atomic.make 0 in
@@ -216,10 +300,21 @@ let run_out_with_timeout_combined_eio (Mgr mgr) ~timeout argv =
 
 (** Run a command via Eio and return stdout, including stderr in error messages. *)
 let run_out_silent_eio (Mgr mgr) argv =
+  match resolve_executable argv with
+  | Error _ as e -> e
+  | Ok executable ->
   Eio.Switch.run @@ fun sw ->
   let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
   let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
-  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w ~stderr:stderr_w argv in
+  let proc =
+    Eio.Process.spawn
+      ~sw
+      mgr
+      ~executable
+      ~stdout:stdout_w
+      ~stderr:stderr_w
+      argv
+  in
   Eio.Flow.close stdout_w ;
   Eio.Flow.close stderr_w ;
   let stdout_out = ref "" in
@@ -249,10 +344,21 @@ let run_out_silent_eio (Mgr mgr) argv =
 (** Run a command via Eio with streaming output, handling [\\r] and [\\n] as
     line delimiters for progress-style output. *)
 let run_streaming_eio (Mgr mgr) ~on_log argv =
+  match resolve_executable argv with
+  | Error _ as e -> e
+  | Ok executable ->
   Eio.Switch.run @@ fun sw ->
   let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
   let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
-  let proc = Eio.Process.spawn ~sw mgr ~stdout:stdout_w ~stderr:stderr_w argv in
+  let proc =
+    Eio.Process.spawn
+      ~sw
+      mgr
+      ~executable
+      ~stdout:stdout_w
+      ~stderr:stderr_w
+      argv
+  in
   Eio.Flow.close stdout_w ;
   Eio.Flow.close stderr_w ;
   let log_lines = ref [] in
@@ -333,9 +439,12 @@ let download_file_with_progress_eio (Mgr mgr) ~url ~dest_path ~on_progress =
         | None -> None
     with _ -> None
   in
+  match resolve_executable cmd with
+  | Error _ as e -> e
+  | Ok executable ->
   Eio.Switch.run @@ fun sw ->
   let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
-  let proc = Eio.Process.spawn ~sw mgr ~stderr:stderr_w cmd in
+  let proc = Eio.Process.spawn ~sw mgr ~executable ~stderr:stderr_w cmd in
   Eio.Flow.close stderr_w ;
   let buffer = Buffer.create 128 in
   let reader = Eio.Buf_read.of_flow ~max_size:(10 * 1024 * 1024) stderr_r in
