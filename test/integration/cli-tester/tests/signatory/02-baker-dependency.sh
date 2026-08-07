@@ -33,7 +33,7 @@ om install-signatory \
 	--no-enable 2>&1
 
 echo "==> Step 2: Verify signatory appears in om list"
-if ! om list 2>&1 | grep -q "$SIGNATORY_INSTANCE"; then
+if ! om list 2>&1 | grep "$SIGNATORY_INSTANCE" >/dev/null; then
 	echo "ERROR: Signatory instance '$SIGNATORY_INSTANCE' not found in om list"
 	echo "Full om list output:"
 	om list 2>&1
@@ -121,7 +121,7 @@ systemctl daemon-reload
 echo "==> Step 10: Verify systemd can resolve the dependency chain"
 # This command would have failed with "Unit octez-signatory@X.service not found"
 # before the fix in src/systemd_dropin.ml:53
-if ! systemctl list-dependencies "$BAKER_UNIT" 2>&1 | grep -q "signatory@${SIGNATORY_INSTANCE}.service"; then
+if ! systemctl list-dependencies "$BAKER_UNIT" 2>&1 | grep "signatory@${SIGNATORY_INSTANCE}.service" >/dev/null; then
 	echo "ERROR: systemd cannot resolve signatory dependency"
 	systemctl list-dependencies "$BAKER_UNIT" || true
 	exit 1
@@ -129,7 +129,7 @@ fi
 
 echo "==> Step 11: Verify no dependency resolution errors"
 # Try to start the baker (should fail gracefully since node isn't running, but dependency should resolve)
-if systemctl start "$BAKER_UNIT" 2>&1 | grep -q "not found"; then
+if systemctl start "$BAKER_UNIT" 2>&1 | grep "not found" >/dev/null; then
 	echo "ERROR: systemd reports 'not found' when starting baker"
 	systemctl status "$BAKER_UNIT" || true
 	exit 1

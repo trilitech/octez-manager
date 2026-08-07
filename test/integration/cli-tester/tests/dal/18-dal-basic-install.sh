@@ -85,7 +85,7 @@ fi
 echo "Systemd service exists"
 
 # Verify service shows in list (using --internal for robustness)
-if ! om list --internal 2>&1 | grep -q "$DAL_INSTANCE"; then
+if ! om list --internal 2>&1 | grep "$DAL_INSTANCE" >/dev/null; then
 	echo "ERROR: DAL instance not in list output"
 	om list --internal
 	exit 1

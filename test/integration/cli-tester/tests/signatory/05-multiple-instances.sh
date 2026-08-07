@@ -81,7 +81,7 @@ for instance in "$SIGNATORY1_INSTANCE" "$SIGNATORY2_INSTANCE" "$SIGNATORY3_INSTA
 		exit 1
 	fi
 	# Verify it's listed as signatory role
-	if ! om list 2>&1 | grep "$instance" | grep -q "signatory"; then
+	if ! om list 2>&1 | grep "$instance" | grep "signatory" >/dev/null; then
 		echo "ERROR: Instance $instance not listed as signatory role"
 		om list 2>&1 | grep "$instance"
 		exit 1
@@ -160,27 +160,27 @@ BAKER1_UNIT="octez-baker@${BAKER1_INSTANCE}.service"
 BAKER2_UNIT="octez-baker@${BAKER2_INSTANCE}.service"
 
 # Baker 1 -> Signatory 1
-if ! systemctl list-dependencies "$BAKER1_UNIT" | grep -q "signatory@${SIGNATORY1_INSTANCE}.service"; then
+if ! systemctl list-dependencies "$BAKER1_UNIT" | grep "signatory@${SIGNATORY1_INSTANCE}.service" >/dev/null; then
 	echo "ERROR: Baker1 not dependent on signatory1"
 	systemctl list-dependencies "$BAKER1_UNIT"
 	exit 1
 fi
 
 # Baker 2 -> Signatory 2
-if ! systemctl list-dependencies "$BAKER2_UNIT" | grep -q "signatory@${SIGNATORY2_INSTANCE}.service"; then
+if ! systemctl list-dependencies "$BAKER2_UNIT" | grep "signatory@${SIGNATORY2_INSTANCE}.service" >/dev/null; then
 	echo "ERROR: Baker2 not dependent on signatory2"
 	systemctl list-dependencies "$BAKER2_UNIT"
 	exit 1
 fi
 
 echo "==> Step 8: Verify cross-contamination - baker1 should NOT depend on signatory2 or signatory3"
-if systemctl list-dependencies "$BAKER1_UNIT" | grep -q "signatory@${SIGNATORY2_INSTANCE}.service"; then
+if systemctl list-dependencies "$BAKER1_UNIT" | grep "signatory@${SIGNATORY2_INSTANCE}.service" >/dev/null; then
 	echo "ERROR: Baker1 incorrectly depends on signatory2"
 	systemctl list-dependencies "$BAKER1_UNIT"
 	exit 1
 fi
 
-if systemctl list-dependencies "$BAKER1_UNIT" | grep -q "signatory@${SIGNATORY3_INSTANCE}.service"; then
+if systemctl list-dependencies "$BAKER1_UNIT" | grep "signatory@${SIGNATORY3_INSTANCE}.service" >/dev/null; then
 	echo "ERROR: Baker1 incorrectly depends on signatory3"
 	systemctl list-dependencies "$BAKER1_UNIT"
 	exit 1
