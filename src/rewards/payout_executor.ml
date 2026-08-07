@@ -525,4 +525,6 @@ module Internal_for_tests = struct
   let collect_payouts = collect_payouts
 
   let execute_batch = execute_batch
+
+  let build_batch_cmd = build_batch_cmd
 end

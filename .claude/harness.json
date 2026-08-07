@@ -1,0 +1,174 @@
+{
+  "version": "1.0.0",
+  "profile": "developer",
+  "source_of_truth": ".harness",
+  "runtimes": [
+    {
+      "name": "claude-code",
+      "enabled": true,
+      "entrypoint": ".claude/"
+    },
+    {
+      "name": "codex",
+      "enabled": true,
+      "entrypoint": ".agents/skills/"
+    },
+    {
+      "name": "codex-global",
+      "enabled": false,
+      "entrypoint": "~/.codex/skills/"
+    },
+    {
+      "name": "opencode",
+      "enabled": false,
+      "entrypoint": ".opencode"
+    },
+    {
+      "name": "pi",
+      "enabled": false,
+      "entrypoint": ".pi/skills"
+    },
+    {
+      "name": "copilot",
+      "enabled": false,
+      "entrypoint": ".github"
+    }
+  ],
+  "project": {
+    "name": ".",
+    "languages": [
+      "javascript",
+      "typescript"
+    ],
+    "frameworks": [],
+    "ci": null,
+    "issue_tracker": "github"
+  },
+  "layers": {
+    "agents": [
+      {
+        "name": "architect",
+        "source": "roster",
+        "version": "1.5.0",
+        "role": "Code quality and architecture guardian focused on structural regressions, duplication, and maintainability risks.",
+        "tunables": {}
+      },
+      {
+        "name": "implementer",
+        "source": "roster",
+        "version": "1.3.0",
+        "role": "Executes scoped feature/fix tasks in isolated worktrees with deterministic verification before handoff.",
+        "tunables": {}
+      },
+      {
+        "name": "kb-agent",
+        "source": "roster",
+        "version": "2.4.0",
+        "role": "Bootstraps and maintains project knowledge bases as source-of-truth artifacts for specs, properties, and architecture.",
+        "tunables": {}
+      },
+      {
+        "name": "planner",
+        "source": "roster",
+        "version": "1.2.0",
+        "role": "Takes a validated research brief and decomposes it into compressed, verified sub-briefs for each execution agent. Runs with a fresh context \u2014 no research history.",
+        "tunables": {}
+      },
+      {
+        "name": "qa",
+        "source": "roster",
+        "version": "1.3.0",
+        "role": "Verifies implemented behavior through deterministic test execution and focused scenario checks.",
+        "tunables": {}
+      },
+      {
+        "name": "recruiter",
+        "source": "roster",
+        "version": "2.5.2",
+        "role": "Meta-agent that analyzes a project, searches agent sources (personal roster + public registries), and assembles or updates an optimal agent team across shared harness files and runtime-specific entrypoints.",
+        "tunables": {}
+      },
+      {
+        "name": "reviewer",
+        "source": "roster",
+        "version": "1.4.0",
+        "role": "Performs structured code review focused on correctness, security, and regression risk.",
+        "tunables": {}
+      },
+      {
+        "name": "tech-lead",
+        "source": "roster",
+        "version": "1.9.0",
+        "role": "Orchestrates agent teams, gates tool and skill requests, and owns merge/governance quality bars.",
+        "tunables": {}
+      }
+    ],
+    "rules": [
+      {
+        "name": "code-quality",
+        "source": "roster",
+        "scope": "global",
+        "category": "style"
+      },
+      {
+        "name": "escalation",
+        "source": "roster",
+        "scope": "global",
+        "category": "safety"
+      },
+      {
+        "name": "human-validation",
+        "source": "roster",
+        "scope": "global",
+        "category": "governance"
+      },
+      {
+        "name": "sycophancy",
+        "source": "roster",
+        "scope": "global",
+        "category": "safety"
+      }
+    ],
+    "hooks": [
+      {
+        "name": "block-dangerous-commands",
+        "event": "PreToolUse",
+        "matcher": "Bash",
+        "source": "roster"
+      },
+      {
+        "name": "post-edit-lint",
+        "event": "PostToolUse",
+        "matcher": "Edit|Write",
+        "source": "roster"
+      }
+    ],
+    "skills": [
+      {
+        "name": "git-conventions",
+        "source": "roster",
+        "version": "1.0.0"
+      },
+      {
+        "name": "kb-update",
+        "source": "roster",
+        "version": "1.1.0"
+      },
+      {
+        "name": "tdd-workflow",
+        "source": "roster",
+        "version": "1.0.0"
+      }
+    ],
+    "mcp": [],
+    "kb": {
+      "structure": "minimal",
+      "bootstrapped": false,
+      "last_audit": null,
+      "auditors": []
+    },
+    "metabolism": {
+      "completed_tasks": 0
+    }
+  }
+}
