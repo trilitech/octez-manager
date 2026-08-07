@@ -1,0 +1,249 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2025-2026 Nomadic Labs <contact@nomadic-labs.com>            *)
+(*                                                                            *)
+(******************************************************************************)
+
+(** System metrics collection for service instances.
+
+    Collects CPU, memory, disk usage, and version information for
+    services managed by systemd. Designed to be reusable across
+    different service types (node, baker, accuser, dal, signer). *)
+
+(** Per-process resource statistics *)
+type process_stats = {
+  pid : int;
+  cpu_percent : float;  (** 0-100 per core *)
+  memory_rss : int64;  (** bytes *)
+  memory_percent : float;  (** 0-100 *)
+}
+
+(** Previous CPU sample for delta calculation *)
+type cpu_sample = {
+  utime : int64;  (** user time in clock ticks *)
+  stime : int64;  (** system time in clock ticks *)
+  timestamp : float;  (** Unix timestamp *)
+}
+
+(** Aggregate metrics for a service instance *)
+type t = {
+  version : string option;  (** e.g. "21.0" *)
+  cpu_percent : float;  (** sum across all processes *)
+  memory_rss : int64;  (** total RSS bytes *)
+  memory_percent : float;  (** sum across all processes *)
+  data_dir_size : int64 option;  (** bytes *)
+  pids : int list;  (** tracked PIDs *)
+}
+
+let empty =
+  {
+    version = None;
+    cpu_percent = 0.0;
+    memory_rss = 0L;
+    memory_percent = 0.0;
+    data_dir_size = None;
+    pids = [];
+  }
+
+(** Page size in bytes (standard on Linux) *)
+let page_size = 4096
+
+(** Clock ticks per second (standard on Linux) *)
+let clock_ticks_per_sec = 100
+
+(** Get the main PID for a systemd service or standalone process *)
+let get_main_pid_by_unit ~unit_name =
+  (* Check if this is a standalone process (format: process-PID) *)
+  if String.starts_with ~prefix:"process-" unit_name then
+    let pid_str = String.sub unit_name 8 (String.length unit_name - 8) in
+    int_of_string_opt pid_str
+  else
+    (* Regular systemd unit - query MainPID *)
+    let cmd =
+      if Paths.is_root () then
+        ["systemctl"; "show"; "--property=MainPID"; unit_name]
+      else ["systemctl"; "--user"; "show"; "--property=MainPID"; unit_name]
+    in
+    match Cmd_runner.run_out cmd with
+    | Ok output -> (
+        (* Output is "MainPID=12345" *)
+        match String.split_on_char '=' output with
+        | [_; pid_str] -> (
+            let pid_str = String.trim pid_str in
+            match int_of_string_opt pid_str with
+            | Some pid when pid > 0 -> Some pid
+            | _ -> None)
+        | _ -> None)
+    | Error _ -> None
+
+let get_service_main_pid ~role ~instance =
+  let unit_name = Printf.sprintf "octez-%s@%s" role instance in
+  get_main_pid_by_unit ~unit_name
+
+(** Get child PIDs of a process *)
+let get_child_pids ~parent_pid =
+  let path = Printf.sprintf "/proc/%d/task/%d/children" parent_pid parent_pid in
+  try
+    let ic = open_in path in
+    let line = try input_line ic with End_of_file -> "" in
+    close_in ic ;
+    String.split_on_char ' ' line
+    |> List.filter_map (fun s ->
+        let s = String.trim s in
+        if s = "" then None else int_of_string_opt s)
+  with _ -> []
+
+(** Get all PIDs for a service by unit name (main + children, recursively) *)
+let get_pids_by_unit ~unit_name =
+  match get_main_pid_by_unit ~unit_name with
+  | None -> []
+  | Some main_pid ->
+      let rec collect_all pid =
+        let children = get_child_pids ~parent_pid:pid in
+        pid :: List.concat_map collect_all children
+      in
+      collect_all main_pid
+
+(** Get all PIDs for a service (main + children, recursively) *)
+let get_service_pids ~role ~instance =
+  match get_service_main_pid ~role ~instance with
+  | None -> []
+  | Some main_pid ->
+      let rec collect_all pid =
+        let children = get_child_pids ~parent_pid:pid in
+        pid :: List.concat_map collect_all children
+      in
+      collect_all main_pid
+
+(** Read /proc/<pid>/stat and parse CPU times *)
+let read_proc_stat ~pid =
+  let path = Printf.sprintf "/proc/%d/stat" pid in
+  try
+    let ic = open_in path in
+    let line = input_line ic in
+    close_in ic ;
+    (* Format: pid (comm) state ppid pgrp session tty_nr tpgid flags minflt
+       cminflt majflt cmajflt utime stime cutime cstime ...
+       Fields are space-separated, but comm can contain spaces and is in parens *)
+    let close_paren = String.rindex line ')' in
+    let rest =
+      String.sub line (close_paren + 2) (String.length line - close_paren - 2)
+    in
+    let fields = String.split_on_char ' ' rest in
+    (* After (comm), fields are: state(0) ppid(1) ... utime(11) stime(12) ... rss(21) *)
+    let utime = List.nth_opt fields 11 |> Option.map Int64.of_string in
+    let stime = List.nth_opt fields 12 |> Option.map Int64.of_string in
+    let rss_pages = List.nth_opt fields 21 |> Option.map Int64.of_string in
+    match (utime, stime, rss_pages) with
+    | Some u, Some s, Some rss ->
+        Some (u, s, Int64.mul rss (Int64.of_int page_size))
+    | _ -> None
+  with _ -> None
+
+(** Read total system memory from /proc/meminfo *)
+let total_memory =
+  lazy
+    (try
+       let ic = open_in "/proc/meminfo" in
+       let rec find_memtotal () =
+         match input_line ic with
+         | exception End_of_file -> 0L
+         | line ->
+             if String.length line > 9 && String.sub line 0 9 = "MemTotal:" then
+               let parts =
+                 String.split_on_char ' ' line |> List.filter (fun s -> s <> "")
+               in
+               match parts with
+               | _ :: kb_str :: _ -> (
+                   match Int64.of_string_opt kb_str with
+                   | Some kb -> Int64.mul kb 1024L
+                   | None -> find_memtotal ())
+               | _ -> find_memtotal ()
+             else find_memtotal ()
+       in
+       let result = find_memtotal () in
+       close_in ic ;
+       result
+     with _ -> 0L)
+
+(** Calculate CPU percentage from two samples *)
+let calc_cpu_percent ~prev ~curr =
+  let delta_time = curr.timestamp -. prev.timestamp in
+  if delta_time <= 0.0 then 0.0
+  else
+    let delta_utime = Int64.sub curr.utime prev.utime in
+    let delta_stime = Int64.sub curr.stime prev.stime in
+    let delta_ticks = Int64.add delta_utime delta_stime in
+    let ticks_per_interval = delta_time *. Float.of_int clock_ticks_per_sec in
+    if ticks_per_interval <= 0.0 then 0.0
+    else
+      (* CPU percentage (can exceed 100% on multi-core systems) *)
+      Int64.to_float delta_ticks /. ticks_per_interval *. 100.0
+
+(** Get process stats with CPU calculated from previous sample *)
+let get_process_stats ~pid ~prev_sample =
+  match read_proc_stat ~pid with
+  | None -> None
+  | Some (utime, stime, rss) ->
+      let now = Unix.gettimeofday () in
+      let curr_sample = {utime; stime; timestamp = now} in
+      let cpu_percent =
+        match prev_sample with
+        | None -> 0.0
+        | Some prev -> calc_cpu_percent ~prev ~curr:curr_sample
+      in
+      let mem_total = Lazy.force total_memory in
+      let memory_percent =
+        if mem_total > 0L then
+          Int64.to_float rss /. Int64.to_float mem_total *. 100.0
+        else 0.0
+      in
+      Some ({pid; cpu_percent; memory_rss = rss; memory_percent}, curr_sample)
+
+(** Extract version string from binary --version output.
+    Tries two patterns:
+    1. "Octez X.Y" — standard octez binaries (octez-node, octez-baker, …)
+    2. "version v?X.Y" — octez-index and other tools with semver output *)
+let parse_version_output output =
+  let lines = String.split_on_char '\n' output in
+  let search_line re line =
+    match Str.search_forward (Str.regexp re) line 0 with
+    | _ -> Some (Str.matched_group 1 line)
+    | exception Not_found -> None
+  in
+  let rec find_with re = function
+    | [] -> None
+    | line :: rest -> (
+        match search_line re line with
+        | Some v -> Some v
+        | None -> find_with re rest)
+  in
+  (* Standard octez binaries: "Octez 21.0" *)
+  match find_with "Octez \\([0-9]+\\.[0-9]+\\)" lines with
+  | Some _ as v -> v
+  | None ->
+      (* Fallback for octez-index and similar: "version v0.1.0" *)
+      find_with "version v?\\([0-9]+\\.[0-9]+\\)" lines
+
+(** Get version string from a binary *)
+let get_version ~binary =
+  let full_path =
+    if Filename.is_relative binary then
+      match Paths.which binary with Some p -> p | None -> binary
+    else binary
+  in
+  if not (Sys.file_exists full_path) then None
+  else
+    (* Use shell to redirect stderr and timeout to avoid broken pipe noise *)
+    let cmd =
+      Printf.sprintf
+        "timeout 2s %s --version 2>/dev/null"
+        (Cmd_runner.sh_quote full_path)
+    in
+    match Cmd_runner.run_out ["sh"; "-c"; cmd] with
+    | Ok output -> parse_version_output output
+    | Error _ -> None
+
+(** Format bytes as human-readable string *)
+let format_bytes = String_utils.format_bytes

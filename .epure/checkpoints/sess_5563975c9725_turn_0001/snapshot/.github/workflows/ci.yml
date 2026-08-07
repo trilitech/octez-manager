@@ -1,0 +1,573 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      needs-integration: ${{ steps.filter.outputs.needs-integration }}
+      has-source: ${{ steps.filter.outputs.has-source }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            needs-integration:
+              - 'src/**'
+              - '!src/ui/**'
+              - 'test/integration/**'
+              - '.github/workflows/ci.yml'
+              - 'Makefile'
+            has-source:
+              - 'src/**'
+              - 'test/**'
+              - 'dune-project'
+              - '*.opam'
+              - '.ocamlformat'
+              - 'Makefile'
+              - 'scripts/**'
+              - '.github/workflows/**'
+
+  docs-check:
+    name: Build and Test
+    needs: changes
+    if: needs.changes.outputs.has-source == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Documentation-only change
+        run: |
+          echo "This change does not modify source code."
+          echo "Skipping full build and test pipeline."
+          echo "✓ Documentation check passed"
+
+  build-and-test:
+    name: Build and Test
+    needs: changes
+    if: needs.changes.outputs.has-source == 'true' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}-ci-debian:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      OPAMYES: "true"
+      OPAMROOT: /root/.opam
+      MIAOU_GIT_URL: "https://github.com/trilitech/miaou.git"
+      PPX_FORBID_GIT_URL: "https://github.com/atacama-dev/ppx_forbid.git"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for copyright check script to see git history
+
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Cache opam packages
+        id: cache-opam
+        uses: actions/cache@v4
+        with:
+          path: /root/.opam
+          key: opam-debian-miaou-${{ hashFiles('.github/miaou-version', 'octez-manager.opam') }}
+
+      - name: Ensure opam is initialized
+        id: opam-init
+        run: |
+          if opam switch list 2>&1 | grep -q "5.3.0"; then
+            echo "Opam switch 5.3.0 exists, using it..."
+            eval $(opam env)
+          else
+            echo "Initializing opam and creating switch 5.3.0..."
+            opam init --disable-sandboxing --bare -y || true
+            opam switch create 5.3.0 ocaml.5.3.0 -y
+            eval $(opam env)
+          fi
+          # Verify the switch is functional — a cache hit can restore /root/.opam
+          # but the switch may be invalid, causing opam to recreate a bare switch
+          # without dune or project dependencies.
+          eval $(opam env)
+          if command -v dune > /dev/null 2>&1; then
+            echo "switch-valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "WARNING: opam switch exists but dune is not installed."
+            echo "Will reinstall dependencies."
+            echo "switch-valid=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pin miaou and ppx_forbid packages
+        if: steps.cache-opam.outputs.cache-hit != 'true' || steps.opam-init.outputs.switch-valid != 'true'
+        run: |
+          eval $(opam env)
+          echo "Pinning ppx_forbid and ppx_enforce..."
+          opam pin add ppx_forbid "$PPX_FORBID_GIT_URL" --no-action
+          opam pin add ppx_enforce "$PPX_FORBID_GIT_URL" --no-action
+          echo "Pinning miaou packages..."
+          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-registry "$MIAOU_GIT_URL" --no-action
+          opam install ppx_forbid ppx_enforce miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner miaou-registry eio_posix --jobs=4
+
+      - name: Install project dependencies
+        if: steps.cache-opam.outputs.cache-hit != 'true' || steps.opam-init.outputs.switch-valid != 'true'
+        run: |
+          eval $(opam env)
+          opam install . --deps-only --with-test --jobs=4
+          opam install ocamlformat
+
+      - name: Cache dune build
+        uses: actions/cache@v4
+        with:
+          path: _build
+          key: dune-${{ runner.os }}-${{ hashFiles('**/*.ml', '**/*.mli', 'dune-project', '**/dune') }}
+          restore-keys: |
+            dune-${{ runner.os }}-${{ github.base_ref }}-
+            dune-${{ runner.os }}-
+
+      - name: Check copyright headers
+        run: |
+          echo "Checking copyright headers..."
+          ./scripts/check-copyright.sh
+
+      - name: Check no direct TzKT URL literals
+        run: |
+          echo "Checking for direct TzKT URL literals outside indexer module..."
+          ./scripts/check-direct-tzkt.sh
+
+      - name: Build
+        run: |
+          eval $(opam env)
+          echo '(-ccopt "-static -no-pie")' > static_flags.sexp
+          dune build --release
+
+      - name: Test
+        run: |
+          eval $(opam env)
+          git checkout -- static_flags.sexp
+          make test
+
+      - name: Build golden path test binary
+        run: |
+          eval $(opam env)
+          dune build test/test_golden_path_tui_v2.exe
+
+      - name: Check completions are up to date
+        run: |
+          eval $(opam env)
+          mkdir -p /tmp/completions-check
+          dune exec -- octez-manager-gen-completion --out-dir /tmp/completions-check
+          if ! diff -q completions/octez-manager.bash /tmp/completions-check/octez-manager.bash >/dev/null 2>&1 || \
+             ! diff -q completions/octez-manager.zsh /tmp/completions-check/octez-manager.zsh >/dev/null 2>&1; then
+            echo "ERROR: Shell completion files are out of date."
+            echo "Run: dune exec -- octez-manager-gen-completion --out-dir completions"
+            echo ""
+            echo "=== Bash diff ==="
+            diff completions/octez-manager.bash /tmp/completions-check/octez-manager.bash || true
+            echo ""
+            echo "=== Zsh diff ==="
+            diff completions/octez-manager.zsh /tmp/completions-check/octez-manager.zsh || true
+            exit 1
+          fi
+          echo "Completion files are up to date."
+
+      - name: Architecture metrics
+        run: |
+          eval $(opam env)
+          # Install sqlite3 system library if not present (opam cache may have
+          # the OCaml package but container may lack the system .so file)
+          if ! ldconfig -p | grep -q libsqlite3; then
+            apt-get update -qq && apt-get install -y -qq libsqlite3-dev > /dev/null
+          fi
+          # Install OCaml sqlite3 bindings if not in opam cache
+          if ! ocamlfind query sqlite3 > /dev/null 2>&1; then
+            opam install sqlite3 -y
+          fi
+          # Ensure all .cmt/.cmti files exist (the cached _build may be stale)
+          dune build @check
+          dune exec -- tools/arch_index.exe
+          dune exec tools/arch_query.exe -- metrics -o architecture-metrics.json
+          dune exec tools/arch_query.exe -- stats
+          echo ""
+          echo "=== Metrics ==="
+          cat architecture-metrics.json
+
+      - name: Upload architecture metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-metrics
+          path: architecture-metrics.json
+          retention-days: 90
+
+      - name: Download baseline metrics (PRs only)
+        if: github.event_name == 'pull_request'
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: ci.yml
+          branch: main
+          name: architecture-metrics
+          path: baseline-metrics
+          check_artifacts: true
+          if_no_artifact_found: ignore
+        continue-on-error: true
+
+      - name: Compare architecture metrics (PRs only)
+        if: github.event_name == 'pull_request'
+        run: |
+          eval $(opam env)
+          if [ -f baseline-metrics/architecture-metrics.json ]; then
+            echo "Comparing against main branch baseline..."
+            dune exec tools/arch_query.exe -- compare baseline-metrics/architecture-metrics.json architecture-metrics.json
+          else
+            echo "No baseline found on main branch, skipping comparison."
+            echo "Metrics will be saved as baseline when this branch merges to main."
+          fi
+
+      - name: Prepare binary artifacts
+        run: |
+          mkdir -p artifacts
+          cp _build/default/src/main.exe artifacts/octez-manager
+          cp _build/default/test/test_golden_path_tui_v2.exe artifacts/test_golden_path_tui_v2
+          chmod +x artifacts/octez-manager artifacts/test_golden_path_tui_v2
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: octez-manager-static
+          path: artifacts/
+          retention-days: 1
+
+  check-shard-registration:
+    name: Check Shard Registration
+    runs-on: ubuntu-latest
+    needs: [changes]
+    # Run this check whenever integration tests would run
+    if: |
+      (needs.changes.outputs.needs-integration == 'true' && github.event_name == 'pull_request') ||
+      startsWith(github.ref, 'refs/tags/') ||
+      github.event_name == 'push'
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run shard registration selftest
+        run: |
+          cd test/integration/cli-tester
+          ./selftest-shard-registration.sh
+
+  integration-tests:
+    name: Integration Tests (shard ${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    needs: [changes, build-and-test, check-shard-registration]
+    # Run fast (non-instrumented) integration tests on:
+    # 1. Pull requests (fast iteration - coverage runs only on main branch)
+    # 2. Release tags (fast validation before release)
+    if: |
+      (needs.changes.outputs.needs-integration == 'true' && github.event_name == 'pull_request') ||
+      startsWith(github.ref, 'refs/tags/')
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download static binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: octez-manager-static
+          path: test/integration/cli-tester/
+
+      - name: Prepare test binaries
+        run: |
+          chmod +x test/integration/cli-tester/octez-manager test/integration/cli-tester/test_golden_path_tui_v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: docker-${{ runner.os }}-${{ hashFiles('test/integration/**/Dockerfile*') }}
+          restore-keys: |
+            docker-${{ runner.os }}-
+
+      - name: Build containers with cache
+        working-directory: test/integration
+        env:
+          DOCKER_BUILDKIT: 1
+        run: |
+          # Build sandbox with cache
+          docker buildx build \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
+            --load \
+            -t test-integration-sandbox:latest \
+            -f sandbox/Dockerfile \
+            .
+
+          # Build cli-tester with cache
+          docker buildx build \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
+            --load \
+            -t test-integration-cli-tester:latest \
+            -f cli-tester/Dockerfile \
+            .
+
+      - name: Start containers
+        working-directory: test/integration
+        run: |
+          # docker-compose will use the pre-built cached images
+          docker compose up -d
+
+          # Wait for sandbox to be healthy
+          echo "Waiting for sandbox..."
+          timeout 300 bash -c 'until docker compose exec -T sandbox curl -sf http://localhost:8080/health 2>/dev/null; do sleep 5; done'
+          echo "Sandbox is ready"
+
+          # Wait for systemd to be ready
+          echo "Waiting for systemd..."
+          for i in {1..30}; do
+            if docker compose exec -T cli-tester systemctl is-system-running 2>/dev/null; then
+              echo "Systemd is ready"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run integration tests (shard ${{ matrix.shard }})
+        working-directory: test/integration
+        env:
+          PARALLEL_JOBS: 3
+        run: |
+          docker compose exec -T -e PARALLEL_JOBS cli-tester /run-tests.sh --shard ${{ matrix.shard }}
+
+      - name: Output timing data
+        if: always()
+        working-directory: test/integration
+        run: |
+          echo "=== Test Timing Data (shard ${{ matrix.shard }}) ==="
+          docker compose exec -T cli-tester cat /tmp/test-timings.log 2>/dev/null || echo "No timing data available"
+
+      - name: Collect logs on failure
+        if: failure()
+        working-directory: test/integration
+        run: |
+          echo "=== Sandbox logs ==="
+          docker compose logs sandbox || true
+          echo "=== CLI-tester logs ==="
+          docker compose logs cli-tester || true
+
+      - name: Cleanup
+        if: always()
+        working-directory: test/integration
+        run: |
+          docker compose down -v || true
+
+      - name: Move Docker cache
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache 2>/dev/null || true
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-and-test
+    permissions:
+      contents: write
+    container:
+      image: ghcr.io/${{ github.repository }}-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      OPAMYES: "true"
+      OPAMROOT: /home/opam/.opam
+      MIAOU_GIT_URL: "https://github.com/trilitech/miaou.git"
+      PPX_FORBID_GIT_URL: "https://github.com/atacama-dev/ppx_forbid.git"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache opam packages
+        id: cache-opam
+        uses: actions/cache@v4
+        with:
+          path: /home/opam/.opam
+          key: opam-miaou-${{ hashFiles('.github/miaou-version', 'octez-manager.opam') }}
+
+      - name: Install dependencies
+        if: steps.cache-opam.outputs.cache-hit != 'true'
+        run: |
+          eval $(opam env)
+          opam pin add ppx_forbid "$PPX_FORBID_GIT_URL" --no-action
+          opam pin add ppx_enforce "$PPX_FORBID_GIT_URL" --no-action
+          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-registry "$MIAOU_GIT_URL" --no-action
+          opam install ppx_forbid ppx_enforce miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner miaou-registry eio_posix --jobs=4
+          opam install . --deps-only --jobs=4
+
+      - name: Build static binary
+        run: |
+          eval $(opam env)
+          echo '(-ccopt "-static -no-pie")' > static_flags.sexp
+          dune build --release
+
+      - name: Prepare release artifact
+        run: |
+          mkdir -p release
+          cp _build/default/src/main.exe release/octez-manager-${{ github.ref_name }}-linux-x86_64
+          chmod +x release/octez-manager-${{ github.ref_name }}-linux-x86_64
+
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum octez-manager-${{ github.ref_name }}-linux-x86_64 > sha256sums.txt
+
+      - name: Upload binary for packaging jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-binary
+          path: release/octez-manager-${{ github.ref_name }}-linux-x86_64
+          retention-days: 1
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/octez-manager-${{ github.ref_name }}-linux-x86_64
+            release/sha256sums.txt
+          generate_release_notes: true
+
+  package-ubuntu:
+    name: Package (.deb Ubuntu)
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: release-binary
+          path: bin
+
+      - name: Install fpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev rubygems build-essential
+          sudo gem install fpm
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build Ubuntu .deb package
+        run: |
+          chmod +x bin/octez-manager-*
+          fpm -s dir -t deb \
+            -n octez-manager \
+            -v ${{ steps.version.outputs.version }} \
+            --architecture amd64 \
+            --description "CLI and TUI for managing Tezos infrastructure" \
+            --url "https://github.com/trilitech/octez-manager" \
+            --license "MIT" \
+            --maintainer "Nomadic Labs <contact@nomadic-labs.com>" \
+            --vendor "Nomadic Labs" \
+            --category "utils" \
+            --deb-priority optional \
+            --deb-dist stable \
+            bin/octez-manager-${{ github.ref_name }}-linux-x86_64=/usr/local/bin/octez-manager
+          mv *.deb octez-manager_${{ steps.version.outputs.version }}_ubuntu_amd64.deb
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: octez-manager_${{ steps.version.outputs.version }}_ubuntu_amd64.deb
+
+  package-debian:
+    name: Package (.deb Debian)
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    permissions:
+      contents: write
+    container:
+      image: debian:bookworm
+
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y ruby ruby-dev rubygems build-essential curl
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: release-binary
+          path: bin
+
+      - name: Install fpm
+        run: gem install fpm
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build Debian .deb package
+        run: |
+          chmod +x bin/octez-manager-*
+          fpm -s dir -t deb \
+            -n octez-manager \
+            -v ${{ steps.version.outputs.version }} \
+            --architecture amd64 \
+            --description "CLI and TUI for managing Tezos infrastructure" \
+            --url "https://github.com/trilitech/octez-manager" \
+            --license "MIT" \
+            --maintainer "Nomadic Labs <contact@nomadic-labs.com>" \
+            --vendor "Nomadic Labs" \
+            --category "utils" \
+            --deb-priority optional \
+            --deb-dist bookworm \
+            bin/octez-manager-${{ github.ref_name }}-linux-x86_64=/usr/local/bin/octez-manager
+          mv *.deb octez-manager_${{ steps.version.outputs.version }}_debian_amd64.deb
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: octez-manager_${{ steps.version.outputs.version }}_debian_amd64.deb

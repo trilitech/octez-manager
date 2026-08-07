@@ -1,0 +1,332 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
+(** {1 Role Detection} *)
+
+type role =
+  | Node
+  | Baker
+  | Accuser
+  | Dal_node
+  | Index
+  | Signatory
+  | Unknown of string
+
+let role_to_string = function
+  | Node -> "node"
+  | Baker -> "baker"
+  | Accuser -> "accuser"
+  | Dal_node -> "dal-node"
+  | Index -> "index"
+  | Signatory -> "signatory"
+  | Unknown s -> s
+
+let role_of_string = function
+  | "node" -> Node
+  | "baker" -> Baker
+  | "accuser" -> Accuser
+  | "dal-node" | "dal" -> Dal_node
+  | "index" -> Index
+  | "signatory" -> Signatory
+  | s -> Unknown s
+
+let role_of_binary_name ?subcommand binary_name =
+  let name = Filename.basename binary_name |> String.lowercase_ascii in
+  (* Check for subcommands first - octez-baker can run DAL node or accuser *)
+  match subcommand with
+  | Some "dal" -> Dal_node
+  | Some "accuser" -> Accuser
+  | _ ->
+      if String.starts_with ~prefix:"octez-node" name then Node
+      else if
+        String.starts_with ~prefix:"octez-baker" name
+        || String.starts_with ~prefix:"tezos-baker" name
+      then Baker
+      else if
+        String.starts_with ~prefix:"octez-accuser" name
+        || String.starts_with ~prefix:"tezos-accuser" name
+      then Accuser
+      else if String.starts_with ~prefix:"octez-dal-node" name then Dal_node
+      else if String.starts_with ~prefix:"octez-index" name then Index
+      else if String.starts_with ~prefix:"signatory" name then Signatory
+      else Unknown name
+
+(** {1 Confidence Tracking} *)
+
+type confidence = Detected | Inferred | Permission_denied | Unknown
+
+let confidence_to_string = function
+  | Detected -> "detected"
+  | Inferred -> "inferred"
+  | Permission_denied -> "permission-denied"
+  | Unknown -> "unknown"
+
+type 'a field = {value : 'a option; confidence : confidence; source : string}
+
+let unknown () = {value = None; confidence = Unknown; source = "unknown"}
+
+let detected ~source value = {value = Some value; confidence = Detected; source}
+
+let inferred ~source value = {value = Some value; confidence = Inferred; source}
+
+let permission_denied ~source =
+  {value = None; confidence = Permission_denied; source}
+
+let is_known field =
+  match field.confidence with Detected | Inferred -> true | _ -> false
+
+let value_or ~default field =
+  match field.value with Some v -> v | None -> default
+
+(** {1 Systemd Unit State} *)
+
+type unit_state = {
+  active_state : string;
+  sub_state : string;
+  enabled : bool option;
+}
+
+(** {1 Detected Configuration} *)
+
+type detected_config = {
+  (* Always available from systemd *)
+  unit_name : string;
+  unit_file_path : string option;
+  exec_start : string;
+  unit_state : unit_state;
+  (* From systemd show properties *)
+  user : string option;
+  group : string option;
+  working_dir : string option;
+  environment_files : string list;
+  (* Inferred from binary/args/env/config *)
+  role : role field;
+  binary_path : string field;
+  binary_version : string field;
+  data_dir : string field;
+  rpc_addr : string field;
+  net_addr : string field;
+  network : string field;
+  history_mode : string field;
+  (* Baker/Accuser specific *)
+  node_endpoint : string field;
+  base_dir : string field;
+  delegates : string list field;
+  (* DAL specific *)
+  dal_endpoint : string field;
+  (* Logging *)
+  daily_logs_dir : string option;
+      (** Path to daily_logs directory if it exists *)
+  (* Unparsed *)
+  extra_args : string list;
+  parse_warnings : string list;
+}
+
+(** {1 External Service} *)
+
+type t = {config : detected_config; suggested_instance_name : string}
+
+(** {1 Status} *)
+
+type status =
+  | Running
+  | Stopped
+  | Disabled
+  | Failed of string
+  | Unknown of string
+
+let status_of_unit_state state =
+  match (state.active_state, state.sub_state, state.enabled) with
+  | "active", "running", _ -> Running
+  | "inactive", "dead", Some false -> Disabled
+  | "inactive", _, _ -> Stopped
+  | "failed", sub, _ -> Failed sub
+  | active, sub, _ -> Unknown (active ^ "/" ^ sub)
+
+let status_label = function
+  | Running -> "running"
+  | Stopped -> "stopped"
+  | Disabled -> "disabled"
+  | Failed msg -> "failed (" ^ msg ^ ")"
+  | Unknown msg -> "unknown (" ^ msg ^ ")"
+
+(** {1 Constructors} *)
+
+let empty_config ~unit_name ~exec_start ~unit_state =
+  {
+    unit_name;
+    unit_file_path = None;
+    exec_start;
+    unit_state;
+    user = None;
+    group = None;
+    working_dir = None;
+    environment_files = [];
+    role = unknown ();
+    binary_path = unknown ();
+    binary_version = unknown ();
+    data_dir = unknown ();
+    rpc_addr = unknown ();
+    net_addr = unknown ();
+    network = unknown ();
+    history_mode = unknown ();
+    node_endpoint = unknown ();
+    base_dir = unknown ();
+    delegates = unknown ();
+    dal_endpoint = unknown ();
+    daily_logs_dir = None;
+    extra_args = [];
+    parse_warnings = [];
+  }
+
+let suggest_instance_name ~unit_name =
+  let name =
+    if String.ends_with ~suffix:".service" unit_name then
+      String.sub unit_name 0 (String.length unit_name - 8)
+    else unit_name
+  in
+  (* Remove common prefixes to keep names short *)
+  let without_prefix =
+    if String.starts_with ~prefix:"octez-" name then
+      String.sub name 6 (String.length name - 6)
+    else if String.starts_with ~prefix:"tezos-" name then
+      String.sub name 6 (String.length name - 6)
+    else name
+  in
+  (* Extract instance name from systemd template format (role@instance) *)
+  match String.index_opt without_prefix '@' with
+  | Some at_pos ->
+      String.sub
+        without_prefix
+        (at_pos + 1)
+        (String.length without_prefix - at_pos - 1)
+  | None -> without_prefix
+
+(** {1 Inspection} *)
+
+let unknown_field_count config =
+  let count_unknown f = if f.confidence = Unknown then 1 else 0 in
+  count_unknown config.role
+  + count_unknown config.binary_path
+  + count_unknown config.data_dir
+  + count_unknown config.rpc_addr
+  + count_unknown config.network
+
+let unknown_field_names config =
+  let check name field acc =
+    if field.confidence = Unknown then name :: acc else acc
+  in
+  [] |> check "role" config.role
+  |> check "binary_path" config.binary_path
+  |> check "data_dir" config.data_dir
+  |> check "rpc_addr" config.rpc_addr
+  |> check "network" config.network
+  |> List.rev
+
+let permission_denied_fields config =
+  let check name field acc =
+    if field.confidence = Permission_denied then name :: acc else acc
+  in
+  [] |> check "role" config.role
+  |> check "binary_path" config.binary_path
+  |> check "data_dir" config.data_dir
+  |> check "rpc_addr" config.rpc_addr
+  |> check "network" config.network
+  |> List.rev
+
+(** {1 Dependency Resolution} *)
+
+(** Extract host:port from an endpoint URL.
+    Examples:
+    - "http://localhost:8736" -> Some ("localhost", 8736)
+    - "http://127.0.0.1:10736" -> Some ("127.0.0.1", 10736) *)
+let parse_endpoint url =
+  try
+    let uri = Uri.of_string url in
+    match (Uri.host uri, Uri.port uri) with
+    | Some host, Some port -> Some (host, port)
+    | Some host, None ->
+        let port = if Uri.scheme uri = Some "https" then 443 else 80 in
+        Some (host, port)
+    | _ -> None
+  with _ -> None
+
+(** Check if an endpoint matches a service's RPC address. *)
+let endpoint_matches_rpc ~endpoint ~rpc_addr =
+  match (parse_endpoint endpoint, rpc_addr) with
+  | Some (ep_host, ep_port), addr -> (
+      match String.split_on_char ':' addr with
+      | [host; port] | [""; host; port] -> (
+          try
+            let rpc_port = int_of_string port in
+            let rpc_host = if host = "" then "0.0.0.0" else host in
+            let normalize h =
+              if h = "localhost" || h = "127.0.0.1" || h = "0.0.0.0" then
+                "localhost"
+              else h
+            in
+            ep_port = rpc_port && normalize ep_host = normalize rpc_host
+          with _ -> false)
+      | _ -> false)
+  | _ -> false
+
+(** Get services this one depends on via endpoint matching. *)
+let get_dependencies external_svc all_services =
+  let config = external_svc.config in
+  (* Helper to find matching services for an endpoint *)
+  let find_matches endpoint existing_deps =
+    List.fold_left
+      (fun acc (other : t) ->
+        if other.config.unit_name <> config.unit_name then
+          match other.config.rpc_addr.value with
+          | Some rpc when endpoint_matches_rpc ~endpoint ~rpc_addr:rpc ->
+              let role_str =
+                match other.config.role.value with
+                | Some r -> role_to_string r
+                | None -> "unknown"
+              in
+              let dep = (other.config.unit_name, role_str) in
+              if List.mem dep acc then acc else dep :: acc
+          | _ -> acc
+        else acc)
+      existing_deps
+      all_services
+  in
+  (* Check node_endpoint *)
+  let deps =
+    match config.node_endpoint.value with
+    | Some endpoint -> find_matches endpoint []
+    | None -> []
+  in
+  (* Check dal_endpoint *)
+  let deps =
+    match config.dal_endpoint.value with
+    | Some endpoint -> find_matches endpoint deps
+    | None -> deps
+  in
+  List.rev deps
+
+(** Get services that depend on this one (reverse lookup). *)
+let get_dependents external_svc all_services =
+  List.filter_map
+    (fun (other : t) ->
+      if other.config.unit_name <> external_svc.config.unit_name then
+        let other_deps = get_dependencies other all_services in
+        if
+          List.exists
+            (fun (name, _) -> name = external_svc.config.unit_name)
+            other_deps
+        then
+          let role_str =
+            match other.config.role.value with
+            | Some r -> role_to_string r
+            | None -> "unknown"
+          in
+          Some (other.config.unit_name, role_str)
+        else None
+      else None)
+    all_services

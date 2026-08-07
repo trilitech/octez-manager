@@ -1,0 +1,161 @@
+---
+title: Octez Manager
+description: CLI and TUI for managing Tezos infrastructure
+template: splash
+hero:
+  tagline: Deploy and manage Tezos nodes, bakers, and DAL infrastructure from your terminal.
+  image:
+    file: ../../assets/logo.png
+  actions:
+    - text: Get Started
+      link: /getting-started/introduction/
+      icon: right-arrow
+    - text: GitHub
+      link: https://github.com/trilitech/octez-manager
+      icon: github
+      variant: minimal
+---
+
+import { Card, CardGrid, Code, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Experimental Software">
+Octez Manager is in early development. Recommended for **testnet use only** (Shadownet, Weeklynet). We do not guarantee backward compatibility with future versions.
+</Aside>
+
+## Install in seconds
+
+<Tabs>
+  <TabItem label="Script">
+```bash
+curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh
+```
+  </TabItem>
+</Tabs>
+
+## See it in action
+
+![Octez Manager TUI](/gifs/octez-manager.gif)
+
+## Deploy a node in one command
+
+```bash
+octez-manager install-node \
+  --instance shadownet \
+  --network shadownet \
+  --history-mode rolling \
+  --snapshot
+```
+
+Or launch the interactive TUI:
+
+```bash
+octez-manager
+```
+
+---
+
+## Why Octez Manager?
+
+<CardGrid>
+	<Card title="One tool, full stack" icon="rocket">
+		Node, baker, accuser, DAL node, Signatory, octez-index — all managed from a single interface.
+	</Card>
+	<Card title="Production ready" icon="setting">
+		Systemd integration, proper user isolation, automatic snapshots.
+	</Card>
+	<Card title="Interactive & scriptable" icon="laptop">
+		Beautiful TUI for operations, full CLI for automation.
+	</Card>
+	<Card title="Real-time monitoring" icon="document">
+		Live logs, service status, sync progress — all in your terminal.
+	</Card>
+	<Card title="Binary management" icon="seti:config">
+		Download, store, and switch between Octez versions. Upgrade services with cascade updates and automatic rollback.
+	</Card>
+	<Card title="Self-updating" icon="up-caret">
+		Get notified of new releases and update octez-manager directly from the TUI or CLI.
+	</Card>
+</CardGrid>
+
+---
+
+## Supported services
+
+| Service | Command | Description |
+|---------|---------|-------------|
+| **Node** | `install-node` | Tezos L1 node with snapshot bootstrap |
+| **DAL Node** | `install-dal-node` | Data Availability Layer |
+| **Baker** | `install-baker` | Block production and attestations |
+| **Accuser** | `install-accuser` | Double-baking detection |
+| **Signatory** | `install-signatory` | Remote signer (HSM/cloud KMS) |
+| **octez-index** | `install-index` | TzKT-compatible indexer |
+
+---
+
+## Manage instances
+
+```bash
+# List all instances
+octez-manager list
+
+# Control services
+octez-manager instance shadownet start
+octez-manager instance shadownet stop
+octez-manager instance shadownet restart
+
+# View logs
+octez-manager instance shadownet logs
+
+# Show details
+octez-manager instance shadownet show
+```
+
+---
+
+## Manage Octez binaries
+
+```bash
+# List available versions
+octez-manager binaries list-remote
+
+# Download a specific version
+octez-manager binaries download 24.1
+
+# See what's installed locally
+octez-manager binaries list
+
+# Clean up old versions
+octez-manager binaries prune
+```
+
+---
+
+## Import existing services
+
+Already running Octez services? Import them into octez-manager:
+
+```bash
+# Discover unmanaged octez services
+octez-manager list --external
+
+# Import an existing service
+octez-manager import octez-node-mainnet --strategy takeover
+```
+
+---
+
+<style>
+{`
+  .logo-light { display: inline; }
+  .logo-dark { display: none; }
+  :root[data-theme='dark'] .logo-light { display: none; }
+  :root[data-theme='dark'] .logo-dark { display: inline; }
+`}
+</style>
+
+<div style="display: flex; align-items: center; justify-content: center; margin-top: 2rem; opacity: 0.8;">
+  <a href="https://www.nomadic-labs.com/" target="_blank" rel="noopener">
+    <img src="/nomadic-labs-logo.png" alt="Nomadic Labs" class="logo-light" style="height: 28px;" />
+    <img src="/nomadic-labs-logo-white.png" alt="Nomadic Labs" class="logo-dark" style="height: 28px;" />
+  </a>
+</div>

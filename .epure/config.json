@@ -1,0 +1,10 @@
+{
+  "project_name": "octez-manager",
+  "agent_temperatures": {
+    "analyst": 0.7,
+    "architect": 0.4,
+    "critic": 0.3,
+    "builder": 0.2,
+    "reviewer": 0.1
+  }
+}

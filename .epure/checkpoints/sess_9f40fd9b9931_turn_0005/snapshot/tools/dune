@@ -1,0 +1,19 @@
+(library
+ (name ocaml_lint_hook)
+ (modules ocaml_lint_hook))
+
+(executable
+ (name gen_completion)
+ (public_name octez-manager-gen-completion)
+ (modules gen_completion)
+ (libraries octez_manager_lib rresult))
+
+(executable
+ (name arch_index)
+ (modules arch_index)
+ (libraries compiler-libs.common sqlite3 unix))
+
+(executable
+ (name arch_query)
+ (modules arch_query)
+ (libraries sqlite3 cmdliner str))

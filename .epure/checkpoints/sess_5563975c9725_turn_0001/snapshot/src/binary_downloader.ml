@@ -1,0 +1,629 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
+open Rresult
+
+let ( let* ) = Result.bind
+
+(** Parallel submit function. Defaults to Domain.spawn (fire-and-forget).
+    Set to Domain_pool.submit at TUI startup for pooled execution.
+    Uses Atomic.t for safe cross-domain reads. *)
+let parallel_submit_ref : ((unit -> unit) -> unit) Atomic.t =
+  Atomic.make (fun fn ->
+      ignore (Domain.spawn (fun () -> try fn () with _ -> ())))
+
+let set_parallel_submit f = Atomic.set parallel_submit_ref f
+
+(** Yield hook for cooperative scheduling.
+    In CLI mode (Domain.spawn), Thread.yield is sufficient.
+    In TUI mode (Eio domain pool), this must be set to Eio_unix.sleep
+    so that the Eio event loop can run other fibers while we poll. *)
+let yield_hook : (unit -> unit) Atomic.t =
+  Atomic.make (fun () -> Thread.yield ())
+
+let set_yield_hook f = Atomic.set yield_hook f
+
+(** Utilities *)
+
+let iso8601_now () =
+  let open Unix in
+  let tm = gmtime (time ()) in
+  Printf.sprintf
+    "%04d-%02d-%02dT%02d:%02d:%02dZ"
+    (tm.tm_year + 1900)
+    (tm.tm_mon + 1)
+    tm.tm_mday
+    tm.tm_hour
+    tm.tm_min
+    tm.tm_sec
+
+(** Constants *)
+let base_url = "https://octez.tezos.com/releases"
+
+let versions_url = base_url ^ "/versions.json"
+
+(** Types *)
+
+type arch = X86_64 | Arm64
+
+type version_info = {
+  version : string;
+  release_date : string option;
+  is_rc : bool;
+}
+
+type progress_callback = downloaded:int64 -> total:int64 option -> unit
+
+(** Multi-file progress tracking for downloads *)
+type multi_progress_state = {
+  current_file : string;
+  file_index : int;
+  total_files : int;
+  downloaded : int64;
+  total : int64 option;
+}
+
+type multi_progress_callback = multi_progress_state -> unit
+
+type checksum_status = Verified | Skipped | Failed of string
+
+type download_result = {
+  version : string;
+  installed_path : string;
+  binaries : string list;
+  checksum_status : checksum_status;
+}
+
+(** Architecture detection *)
+
+let detect_arch () =
+  match Cmd_runner.run_out ["uname"; "-m"] with
+  | Ok output -> (
+      let machine = String.trim output in
+      match machine with
+      | "x86_64" | "amd64" -> Ok X86_64
+      | "aarch64" | "arm64" -> Ok Arm64
+      | _ ->
+          R.error_msgf
+            "Unsupported architecture: %s (expected x86_64 or arm64)"
+            machine)
+  | Error _ as e -> e
+
+let arch_to_string = function X86_64 -> "x86_64" | Arm64 -> "arm64"
+
+(** URL construction *)
+
+let binary_url ~version ~arch ~binary =
+  Printf.sprintf
+    "%s/octez-v%s/binaries/%s/%s"
+    base_url
+    version
+    (arch_to_string arch)
+    binary
+
+let checksums_url ~version ~arch =
+  Printf.sprintf
+    "%s/octez-v%s/binaries/%s/sha256sums.txt"
+    base_url
+    version
+    (arch_to_string arch)
+
+(** Version fetching *)
+
+let parse_version_json json =
+  try
+    let open Yojson.Safe.Util in
+    let versions_array =
+      match json with
+      | `List lst -> lst
+      | `Assoc _ ->
+          (* Try to find a versions array inside *)
+          member "versions" json |> to_list
+      | _ -> failwith "Expected JSON array or object"
+    in
+    let parse_version v =
+      (* Parse major.minor format with optional rc *)
+      let major = member "major" v |> to_int in
+      let minor = member "minor" v |> to_int in
+      let rc = member "rc" v |> to_int_option in
+      let version =
+        match rc with
+        | Some rc_num -> Printf.sprintf "%d.%d-rc%d" major minor rc_num
+        | None -> Printf.sprintf "%d.%d" major minor
+      in
+      let release_date =
+        member "pubDate" v |> to_int_option
+        |> Option.map (fun ts ->
+            if ts > 0 then
+              (* Convert Unix timestamp to ISO date *)
+              let open Unix in
+              let tm = gmtime (float_of_int ts) in
+              Printf.sprintf
+                "%04d-%02d-%02d"
+                (tm.tm_year + 1900)
+                (tm.tm_mon + 1)
+                tm.tm_mday
+            else "")
+        |> fun opt -> match opt with Some s when s <> "" -> Some s | _ -> None
+      in
+      let is_rc = rc <> None in
+      {version; release_date; is_rc}
+    in
+    Ok (List.map parse_version versions_array)
+  with exn ->
+    R.error_msgf "Failed to parse versions.json: %s" (Printexc.to_string exn)
+
+let fetch_versions_json () =
+  match
+    Cmd_runner.run_out_silent
+      [
+        "curl";
+        "-fsL";
+        "--max-time";
+        "10";
+        "--connect-timeout";
+        "5";
+        versions_url;
+      ]
+  with
+  | Ok body when String.trim body <> "" -> Ok body
+  | Ok _ -> R.error_msg "Empty versions.json response"
+  | Error _ as e -> e
+
+let fetch_versions ?(include_rc = false) () =
+  let* json_str = fetch_versions_json () in
+  let json = Yojson.Safe.from_string json_str in
+  let* versions = parse_version_json json in
+  let filtered =
+    if include_rc then versions else List.filter (fun v -> not v.is_rc) versions
+  in
+  Ok filtered
+
+(** Binary names *)
+
+let binaries_for_version _version =
+  (* For now, return the list of binaries we always download.
+     In the future, we could fetch protocol-specific baker/accuser variants
+     from the release metadata. *)
+  Ok
+    [
+      "octez-node";
+      "octez-client";
+      "octez-baker";
+      "octez-dal-node";
+      (* Accuser is not included as it runs via octez-baker *)
+    ]
+
+(** Disk space utilities *)
+
+let check_disk_space () =
+  let dir = Binary_registry.binaries_dir () in
+  (* Ensure directory exists before running df *)
+  let owner, group = Paths.current_user_group_names () in
+  let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dir in
+  match Cmd_runner.run_out ["df"; "-B1"; dir] with
+  | Ok output -> (
+      (* Parse df output: lines like:
+         Filesystem           1B-blocks        Used   Available Use% Mounted on
+         /dev/sda1         1000000000000 50000000000 95000000000  35% / *)
+      let lines = String.split_on_char '\n' output in
+      match lines with
+      | _ :: data_line :: _ -> (
+          let parts =
+            String.split_on_char ' ' data_line
+            |> List.filter (fun s -> String.trim s <> "")
+          in
+          match parts with
+          | _ :: _ :: _ :: available :: _ -> (
+              try Ok (Int64.of_string available)
+              with _ -> R.error_msg "Failed to parse df output")
+          | _ -> R.error_msg "Unexpected df output format")
+      | _ -> R.error_msg "No df output")
+  | Error _ as e -> e
+
+let estimate_download_size _version =
+  (* Rough estimate: node ~100MB, client ~50MB, dal-node ~50MB = ~200MB
+     In the future, we could get this from release metadata *)
+  Ok 200_000_000L
+
+(** Checksum verification *)
+
+let fetch_checksums ~version ~arch =
+  let url = checksums_url ~version ~arch in
+  match
+    Cmd_runner.run_out_silent
+      ["curl"; "-fsL"; "--max-time"; "10"; "--connect-timeout"; "5"; url]
+  with
+  | Ok body when String.trim body <> "" ->
+      (* Parse sha256sums.txt format: "hash  filename" *)
+      let lines = String.split_on_char '\n' body in
+      let parse_line line =
+        match String.split_on_char ' ' line |> List.filter (( <> ) "") with
+        | hash :: filename :: _ -> Some (filename, hash)
+        | _ -> None
+      in
+      Ok (List.filter_map parse_line lines)
+  | Ok _ -> R.error_msg "Empty checksums file"
+  | Error _ as e -> e
+
+let verify_checksum ~filepath ~expected_hash =
+  let* actual_hash = Download.compute_sha256 filepath in
+  if String.equal actual_hash expected_hash then Ok ()
+  else
+    R.error_msgf
+      "Checksum mismatch for %s: expected %s, got %s"
+      filepath
+      expected_hash
+      actual_hash
+
+(** Download utilities *)
+
+(** Get file size via HEAD request
+    
+    Returns the Content-Length if available, None otherwise.
+    Failures are logged but not treated as errors - download will proceed without size info. *)
+let get_file_size ~url =
+  match
+    Cmd_runner.run_out_silent
+      ["curl"; "-sI"; "--max-time"; "5"; "--connect-timeout"; "3"; url]
+  with
+  | Ok headers ->
+      (* Parse Content-Length: header *)
+      let lines = String.split_on_char '\n' headers in
+      let rec find_content_length = function
+        | [] -> None
+        | line :: rest ->
+            let trimmed = String.trim line in
+            if
+              String.length trimmed > 15
+              && String.lowercase_ascii (String.sub trimmed 0 15)
+                 = "content-length:"
+            then
+              let size_str =
+                String.trim (String.sub trimmed 15 (String.length trimmed - 15))
+              in
+              try Some (Int64.of_string size_str) with _ -> None
+            else find_content_length rest
+      in
+      find_content_length lines
+  | Error _ -> None
+
+let download_file_curl ~url ~dest ?progress () =
+  match progress with
+  | Some callback ->
+      (* Use progress-aware download *)
+      let on_progress current total =
+        let downloaded = Int64.of_int current in
+        let total_opt = Option.map Int64.of_int total in
+        callback ~downloaded ~total:total_opt
+      in
+      Download.download_file_with_progress ~url ~dest_path:dest ~on_progress
+  | None ->
+      (* Fallback to simple curl without progress *)
+      let cmd =
+        [
+          "curl";
+          "-fsSL";
+          "--max-time";
+          "300";
+          "--connect-timeout";
+          "10";
+          "-o";
+          dest;
+          url;
+        ]
+      in
+      Cmd_runner.run cmd
+
+let download_binary ~version ~arch ~binary ~dest_dir ?progress () =
+  let url = binary_url ~version ~arch ~binary in
+  let dest = Filename.concat dest_dir binary in
+  let* () = download_file_curl ~url ~dest ?progress () in
+  (* Make executable *)
+  let* () = Cmd_runner.run ["chmod"; "+x"; dest] in
+  Ok dest
+
+(** Atomic installation helpers *)
+
+let temp_version_dir version =
+  let pid = Unix.getpid () in
+  Filename.concat
+    (Binary_registry.binaries_dir ())
+    (Printf.sprintf ".tmp.v%s.%d" version pid)
+
+let cleanup_stale_temp_dirs ?(max_age_seconds = 3600) () =
+  let dir = Binary_registry.binaries_dir () in
+  if Sys.file_exists dir && Sys.is_directory dir then
+    try
+      let now = Unix.time () in
+      let entries = Sys.readdir dir |> Array.to_list in
+      let temp_dirs =
+        entries
+        |> List.filter (fun e ->
+            String.length e > 5
+            && String.sub e 0 5 = ".tmp."
+            && Sys.is_directory (Filename.concat dir e))
+      in
+      List.iter
+        (fun temp_dir ->
+          let full_path = Filename.concat dir temp_dir in
+          try
+            let stat = Unix.stat full_path in
+            let age = now -. stat.Unix.st_mtime in
+            if age > float_of_int max_age_seconds then
+              (* Stale temp directory, remove it *)
+              ignore (Cmd_runner.run_out ["rm"; "-rf"; full_path])
+          with _ -> ())
+        temp_dirs
+    with _ -> ()
+
+(** Main download function *)
+
+let download_version ~version ?(verify_checksums = true) ?progress
+    ?multi_progress () =
+  let* arch = detect_arch () in
+  let final_dir = Binary_registry.managed_version_path version in
+  let temp_dir = temp_version_dir version in
+
+  (* Ensure parent binaries directory exists *)
+  let binaries_dir = Binary_registry.binaries_dir () in
+  let owner, group = Paths.current_user_group_names () in
+  let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o755 binaries_dir in
+
+  (* Check if already exists and is complete *)
+  let* () =
+    if Sys.file_exists final_dir then
+      if Binary_registry.is_complete_installation version then
+        R.error_msgf "Version v%s is already installed" version
+      else (
+        (* Incomplete installation - remove it *)
+        (try ignore (Cmd_runner.run_out ["rm"; "-rf"; final_dir]) with _ -> ()) ;
+        Ok ())
+    else Ok ()
+  in
+
+  (* Clean up any stale temp directories *)
+  cleanup_stale_temp_dirs () ;
+
+  (* Remove temp directory if it exists from a previous failed attempt *)
+  (try
+     if Sys.file_exists temp_dir then
+       ignore (Cmd_runner.run_out ["rm"; "-rf"; temp_dir])
+   with _ -> ()) ;
+
+  (* Use temp_dir for download, rename to final_dir on success *)
+  let dest_dir = temp_dir in
+  (* Check disk space *)
+  let* available = check_disk_space () in
+  let* required = estimate_download_size version in
+  if available < required then
+    R.error_msgf
+      "Insufficient disk space: need %Ld bytes, have %Ld bytes"
+      required
+      available
+  else
+    (* Create version directory *)
+    let owner, group = Paths.current_user_group_names () in
+    let* () = File_ops.ensure_dir_path ~owner ~group ~mode:0o755 dest_dir in
+
+    (* Get list of binaries to download *)
+    let* binary_list = binaries_for_version version in
+    let total_files = List.length binary_list in
+
+    (* Pre-fetch file sizes if using multi-progress *)
+    let file_sizes =
+      match multi_progress with
+      | Some _ ->
+          List.map
+            (fun binary ->
+              let url = binary_url ~version ~arch ~binary in
+              (binary, get_file_size ~url))
+            binary_list
+      | None -> []
+    in
+
+    (* Download all binaries in parallel *)
+    let download_all_parallel () =
+      (* Create a download task for each binary *)
+      let download_tasks =
+        List.mapi
+          (fun index binary ->
+            let progress_for_file =
+              match multi_progress with
+              | Some mp_callback ->
+                  let file_size =
+                    List.assoc_opt binary file_sizes
+                    |> Option.value ~default:None
+                  in
+                  Some
+                    (fun ~downloaded ~total ->
+                      let total' =
+                        match total with Some t -> Some t | None -> file_size
+                      in
+                      mp_callback
+                        {
+                          current_file = binary;
+                          file_index = index;
+                          total_files;
+                          downloaded;
+                          total = total';
+                        })
+              | None -> progress
+            in
+            (binary, index, progress_for_file))
+          binary_list
+      in
+
+      (* Download binaries concurrently using parallel_submit *)
+      let n = List.length download_tasks in
+      let results = Array.make n (Error (`Msg "not started")) in
+      let remaining = Atomic.make n in
+      let submit_fn = Atomic.get parallel_submit_ref in
+      let yield_fn = Atomic.get yield_hook in
+      List.iteri
+        (fun i (binary, _index, progress_for_file) ->
+          submit_fn (fun () ->
+              Fun.protect
+                ~finally:(fun () ->
+                  ignore (Atomic.fetch_and_add remaining (-1)))
+                (fun () ->
+                  let r =
+                    download_binary
+                      ~version
+                      ~arch
+                      ~binary
+                      ~dest_dir
+                      ?progress:progress_for_file
+                      ()
+                  in
+                  results.(i) <- Result.map (fun _ -> binary) r)))
+        download_tasks ;
+      (* Wait for all downloads to complete.
+         We use a cooperative polling loop instead of Mutex/Condition
+         because the latter blocks the OS thread, which would freeze
+         the Eio event loop on the current domain and deadlock any
+         download task that was scheduled on the same domain. *)
+      while Atomic.get remaining > 0 do
+        yield_fn ()
+      done ;
+      (* Collect: first error wins, or all binaries *)
+      let rec collect acc i =
+        if i >= n then Ok (List.rev acc)
+        else
+          match results.(i) with
+          | Ok binary -> collect (binary :: acc) (i + 1)
+          | Error _ as e ->
+              (try Cmd_runner.run_out ["rm"; "-rf"; dest_dir] |> ignore
+               with _ -> ()) ;
+              e
+      in
+      collect [] 0
+    in
+
+    let* downloaded_binaries = download_all_parallel () in
+
+    (* Verify checksums if requested *)
+    let checksum_status =
+      if verify_checksums then
+        match fetch_checksums ~version ~arch with
+        | Ok checksums -> (
+            let verify_all () =
+              let rec check = function
+                | [] -> Ok ()
+                | binary :: rest -> (
+                    let filepath = Filename.concat dest_dir binary in
+                    match List.assoc_opt binary checksums with
+                    | Some expected_hash -> (
+                        match verify_checksum ~filepath ~expected_hash with
+                        | Ok () -> check rest
+                        | Error _ as e -> e)
+                    | None ->
+                        (* Binary not in checksums file - skip *)
+                        check rest)
+              in
+              check downloaded_binaries
+            in
+            match verify_all () with
+            | Ok () -> Verified
+            | Error (`Msg reason) -> Failed reason)
+        | Error (`Msg reason) -> Failed reason
+      else Skipped
+    in
+
+    (* Save metadata *)
+    let metadata =
+      `Assoc
+        [
+          ("version", `String version);
+          ("architecture", `String (arch_to_string arch));
+          ("download_date", `String (iso8601_now ()));
+          ( "checksum_status",
+            `String
+              (match checksum_status with
+              | Verified -> "verified"
+              | Skipped -> "skipped"
+              | Failed _ -> "failed") );
+        ]
+    in
+    let metadata_file = Filename.concat dest_dir ".metadata.json" in
+    (try Yojson.Safe.to_file metadata_file metadata with _ -> ()) ;
+
+    (* Atomic rename: move from temp to final location *)
+    let* () =
+      match Cmd_runner.run ["mv"; temp_dir; final_dir] with
+      | Ok () -> Ok ()
+      | Error _ as e ->
+          (* Cleanup temp on rename failure *)
+          (try ignore (Cmd_runner.run_out ["rm"; "-rf"; temp_dir])
+           with _ -> ()) ;
+          e
+    in
+
+    Ok
+      {
+        version;
+        installed_path = final_dir;
+        binaries = downloaded_binaries;
+        checksum_status;
+      }
+
+(** Calculate directory size in bytes *)
+
+let calculate_directory_size path =
+  if not (Sys.file_exists path) then Ok 0L
+  else
+    try
+      (* Use du command to calculate directory size *)
+      let output = Cmd_runner.run_out ["du"; "-sb"; path] in
+      match output with
+      | Ok out -> (
+          (* du -sb outputs: "SIZE\tPATH" *)
+          try
+            let size_str = List.hd (String.split_on_char '\t' out) in
+            Ok (Int64.of_string (String.trim size_str))
+          with _ -> R.error_msgf "Failed to parse du output: %s" out)
+      | Error _ as e -> e
+    with e ->
+      R.error_msgf
+        "Failed to calculate directory size: %s"
+        (Printexc.to_string e)
+
+(** Format bytes into human-readable string *)
+
+let format_size_bytes bytes =
+  let open Int64 in
+  if bytes < 1024L then Printf.sprintf "%Ld B" bytes
+  else if bytes < mul 1024L 1024L then
+    Printf.sprintf "%.1f KB" (to_float bytes /. 1024.0)
+  else if bytes < mul (mul 1024L 1024L) 1024L then
+    Printf.sprintf "%.1f MB" (to_float bytes /. 1024.0 /. 1024.0)
+  else Printf.sprintf "%.1f GB" (to_float bytes /. 1024.0 /. 1024.0 /. 1024.0)
+
+(** Get version size with formatted string *)
+
+let get_version_size version =
+  let path = Binary_registry.managed_version_path version in
+  match calculate_directory_size path with
+  | Ok bytes -> Ok (bytes, format_size_bytes bytes)
+  | Error _ as e -> e
+
+(** Remove version *)
+
+let remove_version version =
+  let dest_dir = Binary_registry.managed_version_path version in
+  if not (Sys.file_exists dest_dir) then
+    R.error_msgf "Version v%s is not installed" version
+  else
+    match Cmd_runner.run ["rm"; "-rf"; dest_dir] with
+    | Ok () -> Ok ()
+    | Error _ as e -> e
+
+(** For tests *)
+
+module For_tests = struct
+  let parse_version_json = parse_version_json
+end

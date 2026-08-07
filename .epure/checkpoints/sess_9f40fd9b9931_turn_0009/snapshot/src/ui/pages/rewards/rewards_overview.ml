@@ -1,0 +1,544 @@
+(******************************************************************************)
+(*                                                                            *)
+(* SPDX-License-Identifier: MIT                                               *)
+(* Copyright (c) 2026 Nomadic Labs <contact@nomadic-labs.com>                 *)
+(*                                                                            *)
+(******************************************************************************)
+
+(** Overview tab for the Rewards page. *)
+
+open Octez_manager_rewards
+module Widgets = Miaou_widgets_display.Widgets
+module Box = Miaou_widgets_layout.Box_widget
+module Desc_list = Miaou_widgets_display.Description_list
+module Grid = Miaou_widgets_layout.Grid_layout
+module Display = Rewards_display_utils
+
+let format_tez_short mutez =
+  let tez = Int64.to_float mutez /. 1_000_000.0 in
+  let s = Printf.sprintf "%.2f" tez in
+  (* Add thousands separators *)
+  let parts = String.split_on_char '.' s in
+  match parts with
+  | [int_part; dec_part] ->
+      let negative = String.length int_part > 0 && int_part.[0] = '-' in
+      let digits =
+        if negative then String.sub int_part 1 (String.length int_part - 1)
+        else int_part
+      in
+      let len = String.length digits in
+      let buf = Buffer.create (len + (len / 3) + 4) in
+      if negative then Buffer.add_char buf '-' ;
+      for i = 0 to len - 1 do
+        if i > 0 && (len - i) mod 3 = 0 then Buffer.add_char buf ',' ;
+        Buffer.add_char buf digits.[i]
+      done ;
+      Buffer.add_char buf '.' ;
+      Buffer.add_string buf dec_part ;
+      Buffer.contents buf
+  | _ -> s
+
+let render_network_badge network =
+  let lower = String.lowercase_ascii network in
+  if String.equal lower "mainnet" then
+    Widgets.themed_warning
+      (Printf.sprintf " %s " (String.uppercase_ascii network))
+  else Widgets.themed_accent (Printf.sprintf " %s " network)
+
+let render_current_cycle_box ~box_width ~instance current_cycle =
+  let cycle_line =
+    match current_cycle with
+    | Some _cycle -> Widgets.themed_text "Status: In progress"
+    | None -> Widgets.themed_muted "Loading cycle data..."
+  in
+  let continual_active = Rewards_scheduler.get_payout_timer_active ~instance in
+  let continual_line =
+    if continual_active then
+      let interval_str =
+        match Rewards_scheduler.get_continual_interval ~instance with
+        | Some interval when interval > 1 ->
+            Printf.sprintf " (every %d cycles)" interval
+        | _ -> ""
+      in
+      Widgets.themed_success (Printf.sprintf "Continual: Active%s" interval_str)
+    else "Continual: " ^ Widgets.themed_error "Inactive"
+  in
+  let content = String.concat "\n" [cycle_line; continual_line] in
+  let title =
+    match current_cycle with
+    | Some c -> Printf.sprintf "Current Cycle: %d" c
+    | None -> "Current Cycle"
+  in
+  Box.render ~title ~style:Rounded ~width:box_width content
+
+let render_last_completed_box ~box_width ~instance
+    (cr : Rewards.cycle_rewards option) =
+  match cr with
+  | None ->
+      Box.render
+        ~title:"Last Completed"
+        ~style:Rounded
+        ~width:box_width
+        (Widgets.themed_muted "No completed cycle data")
+  | Some cr ->
+      let total_rewards = Rewards.total_earned cr in
+      let delegator_count = cr.num_delegators in
+      let status =
+        Rewards_scheduler.get_payout_status ~instance ~cycle:cr.cycle
+      in
+      let status_label =
+        if delegator_count = 0 then Widgets.themed_muted "N/A (no delegators)"
+        else
+          match status with
+          | Rewards.Paid -> Widgets.themed_success "Paid"
+          | Rewards.Unpaid -> Widgets.themed_warning "Unpaid"
+          | Rewards.Partial -> Widgets.themed_warning "Partial"
+          | Rewards.Failed -> Widgets.themed_error "Failed"
+          | Rewards.In_progress -> Widgets.themed_accent "In progress"
+      in
+      let reward_rows label (s : Rewards.reward_split) =
+        [
+          ( label,
+            Rewards.format_tez (Rewards.total_of_split s) ^ " \xEA\x9C\xA9" );
+          ( "  Delegation",
+            "  " ^ Rewards.format_tez s.delegated ^ " \xEA\x9C\xA9" );
+        ]
+      in
+      let items =
+        [("Earned Rewards", Rewards.format_tez total_rewards ^ " \xEA\x9C\xA9")]
+        @ reward_rows "Block Rewards" cr.block_rewards
+        @ reward_rows "Attestation" cr.attestation_rewards
+        @ reward_rows "DAL Rewards" cr.dal_rewards
+        @ [
+            ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
+            ("Delegators", string_of_int delegator_count);
+            ("Payout Status", status_label);
+          ]
+      in
+      let desc =
+        Desc_list.create ~key_width:16 ~items ()
+        |> Desc_list.render ~cols:(box_width - 4) ~wrap:true ~focus:false
+      in
+      Box.render
+        ~title:(Printf.sprintf "Last Completed: Cycle %d" cr.cycle)
+        ~style:Rounded
+        ~width:box_width
+        desc
+
+let render_recent_cycles_box ~box_width ~instance ~current_cycle ~cursor
+    (cycles : Rewards.cycle_rewards list) =
+  match cycles with
+  | [] ->
+      Box.render
+        ~title:"Recent Cycles"
+        ~style:Rounded
+        ~width:box_width
+        (Widgets.themed_muted "No cycle data available")
+  | _ ->
+      let header =
+        "  "
+        ^ Display.pad_right 7 "CYCLE"
+        ^ " "
+        ^ Display.pad_right 16 "EARNED"
+        ^ " "
+        ^ Display.pad_right 14 "DISTRIBUTED"
+        ^ " STATUS"
+      in
+      let rows =
+        List.mapi
+          (fun i (cr : Rewards.cycle_rewards) ->
+            let is_current =
+              match current_cycle with
+              | Some cc -> Int.equal cr.cycle cc
+              | None -> false
+            in
+            let cycle_label =
+              if is_current then string_of_int cr.cycle ^ " \xe2\x97\x80"
+              else string_of_int cr.cycle
+            in
+            let earned =
+              format_tez_short (Rewards.total_earned cr) ^ " \xEA\x9C\xA9"
+            in
+            let status =
+              Rewards_scheduler.get_payout_status ~instance ~cycle:cr.cycle
+            in
+            let distributed =
+              match
+                Rewards_scheduler.get_payout_summary ~instance ~cycle:cr.cycle
+              with
+              | Some s ->
+                  format_tez_short s.distributed_rewards ^ " \xEA\x9C\xA9"
+              | None -> "\xE2\x80\x94"
+            in
+            let status_str =
+              match status with
+              | Rewards.Paid -> Widgets.themed_success "paid"
+              | Rewards.Unpaid -> Widgets.themed_muted "unpaid"
+              | Rewards.Partial -> Widgets.themed_warning "partial"
+              | Rewards.Failed -> Widgets.themed_error "failed"
+              | Rewards.In_progress -> Widgets.themed_accent "in progress"
+            in
+            let indicator = if i = cursor then "\xe2\x96\xb8 " else "  " in
+            let line =
+              indicator
+              ^ Display.pad_right 7 cycle_label
+              ^ " "
+              ^ Display.pad_right 16 earned
+              ^ " "
+              ^ Display.pad_right 14 distributed
+              ^ " " ^ status_str
+            in
+            if i = cursor then Widgets.themed_emphasis line
+            else if is_current then Widgets.themed_accent line
+            else Widgets.themed_text line)
+          cycles
+      in
+      let content = String.concat "\n" (Widgets.themed_muted header :: rows) in
+      Box.render ~title:"Recent Cycles" ~style:Rounded ~width:box_width content
+
+let render_blueprint_box ~box_width (bp : Rewards.payout_blueprint) =
+  let total_distributable =
+    List.fold_left
+      (fun acc (r : Rewards.delegator_reward) ->
+        match r.status with
+        | Rewards.Eligible -> Int64.add acc r.net_reward
+        | _ -> acc)
+      0L
+      bp.delegator_rewards
+  in
+  let items =
+    [
+      ("Cycle", string_of_int bp.cycle);
+      ("Total Delegators", string_of_int bp.total_delegators);
+      ("Eligible Delegators", string_of_int bp.eligible_delegators);
+      ( "Total Distributable",
+        format_tez_short total_distributable ^ " \xEA\x9C\xA9" );
+      ( "Baker Bond Income",
+        format_tez_short bp.baker_bond_income ^ " \xEA\x9C\xA9" );
+      ( "Baker Fee Income",
+        format_tez_short bp.baker_fee_income ^ " \xEA\x9C\xA9" );
+      ("Est. TX Fees", format_tez_short bp.estimated_tx_fees ^ " \xEA\x9C\xA9");
+    ]
+  in
+  let desc =
+    Desc_list.create ~key_width:20 ~items ()
+    |> Desc_list.render ~cols:(box_width - 4) ~wrap:true ~focus:false
+  in
+  Box.render ~title:"Payout Preview" ~style:Rounded ~width:box_width desc
+
+let short_address addr =
+  let len = String.length addr in
+  if len <= 14 then addr
+  else String.sub addr 0 8 ^ ".." ^ String.sub addr (len - 4) 4
+
+(* Reports written by older builds may contain multi-line notes (e.g. the full
+   octez-client "Command failed: …\nOutput:\n…" trace). The most useful line
+   in that trace is rarely the last one ("multiple transfers simulation
+   failed" / "Fatal error:") — it's the protocol-layer diagnostic just above
+   it ("Underflowing subtraction of … tez and … tez", "Balance of contract …
+   too low (…)"). Heuristic: scan the last few non-empty lines and prefer one
+   that mentions a specific cause; fall back to the last line. *)
+let one_line_note ~max_width s =
+  let candidate =
+    if String.contains s '\n' then
+      let lines =
+        String.split_on_char '\n' s
+        |> List.map String.trim
+        |> List.filter (fun l -> String.length l > 0)
+      in
+      let contains_substring haystack needle =
+        let lh = String.length haystack and ln = String.length needle in
+        let rec check i =
+          if i + ln > lh then false
+          else if String.equal (String.sub haystack i ln) needle then true
+          else check (i + 1)
+        in
+        ln > 0 && check 0
+      in
+      let mentions_specific_cause line =
+        let l = String.lowercase_ascii line in
+        contains_substring l "underflowing"
+        || contains_substring l "balance "
+        || contains_substring l "too low"
+        || contains_substring l "insufficient"
+        || contains_substring l "rejected"
+        || contains_substring l "counter"
+      in
+      let tail = List.rev lines |> List.filteri (fun i _ -> i < 6) in
+      match List.find_opt mentions_specific_cause tail with
+      | Some line -> line
+      | None -> ( match tail with last :: _ -> last | [] -> s)
+    else s
+  in
+  let buf = Buffer.create (String.length candidate) in
+  let prev_space = ref false in
+  String.iter
+    (fun c ->
+      let c = match c with '\n' | '\r' | '\t' -> ' ' | _ -> c in
+      if c = ' ' then
+        if !prev_space then ()
+        else (
+          Buffer.add_char buf c ;
+          prev_space := true)
+      else (
+        Buffer.add_char buf c ;
+        prev_space := false))
+    (String.trim candidate) ;
+  let flat = Buffer.contents buf in
+  if String.length flat <= max_width then flat
+  else if max_width <= 1 then String.sub flat 0 max_width
+  else String.sub flat 0 (max_width - 1) ^ "\xE2\x80\xA6"
+
+let render_payouts_box ~box_width ~instance ~cycle =
+  let results = Rewards_scheduler.get_payout_results ~instance ~cycle in
+  match results with
+  | [] -> ""
+  | _ ->
+      let paid_count =
+        List.fold_left
+          (fun acc (r : Rewards.payout_result) ->
+            if r.success then acc + 1 else acc)
+          0
+          results
+      in
+      let total = List.length results in
+      let prefix_width = 2 + 3 + 1 + 16 + 1 + 16 + 1 in
+      let note_width = max 10 (box_width - 4 - prefix_width) in
+      let header =
+        "  " ^ Display.pad_right 3 "" ^ " "
+        ^ Display.pad_right 16 "DELEGATOR"
+        ^ " "
+        ^ Display.pad_right 16 "AMOUNT"
+        ^ " NOTE"
+      in
+      let rows =
+        List.map
+          (fun (r : Rewards.payout_result) ->
+            let icon, _style =
+              if r.success then ("\xe2\x9c\x93", Widgets.themed_success)
+              else ("\xe2\x9c\x97", Widgets.themed_error)
+            in
+            let amount_str =
+              if r.success then format_tez_short r.amount ^ " \xEA\x9C\xA9"
+              else "\xE2\x80\x94"
+            in
+            let raw_note =
+              if r.success then ""
+              else if String.length r.note > 0 then r.note
+              else "failed"
+            in
+            let note = one_line_note ~max_width:note_width raw_note in
+            let line =
+              "  " ^ Display.pad_right 3 icon ^ " "
+              ^ Display.pad_right 16 (short_address r.delegator)
+              ^ " "
+              ^ Display.pad_right 16 amount_str
+              ^ " " ^ note
+            in
+            if r.success then Widgets.themed_text line
+            else Widgets.themed_error line)
+          results
+      in
+      let title = Printf.sprintf "Payouts (%d/%d paid)" paid_count total in
+      let content = String.concat "\n" (Widgets.themed_muted header :: rows) in
+      Box.render ~title ~style:Rounded ~width:box_width content
+
+let render_excluded_box ~box_width ~instance ~cycle =
+  let excluded = Rewards_scheduler.get_excluded_delegators ~instance ~cycle in
+  match excluded with
+  | [] -> ""
+  | _ ->
+      let header =
+        "  "
+        ^ Display.pad_right 16 "DELEGATOR"
+        ^ " "
+        ^ Display.pad_right 16 "WOULD-BE"
+        ^ " REASON"
+      in
+      let rows =
+        List.map
+          (fun (r : Rewards.delegator_reward) ->
+            let amount_str = format_tez_short r.net_reward ^ " \xEA\x9C\xA9" in
+            let line =
+              "  "
+              ^ Display.pad_right 16 (short_address r.delegator)
+              ^ " "
+              ^ Display.pad_right 16 amount_str
+              ^ " "
+              ^ Rewards.string_of_delegator_status r.status
+            in
+            Widgets.themed_muted line)
+          excluded
+      in
+      let title = Printf.sprintf "Excluded (%d)" (List.length excluded) in
+      let content = String.concat "\n" (Widgets.themed_muted header :: rows) in
+      Box.render ~title ~style:Rounded ~width:box_width content
+
+let render_cycle_detail ~box_width ~instance ~baker:_
+    (state : Rewards_state.state) cycle =
+  let cr = Rewards_scheduler.get_cycle_data ~instance ~cycle in
+  let header =
+    Widgets.themed_primary (Printf.sprintf " Cycle %d Detail " cycle)
+  in
+  let back_hint = Widgets.themed_muted "  Press Esc to return to dashboard" in
+  let detail_box =
+    match cr with
+    | None ->
+        Box.render
+          ~title:(Printf.sprintf "Cycle %d" cycle)
+          ~style:Rounded
+          ~width:box_width
+          (Widgets.themed_muted "No data available for this cycle")
+    | Some cr ->
+        let total_rewards = Rewards.total_earned cr in
+        let delegator_count = cr.num_delegators in
+        let status =
+          Rewards_scheduler.get_payout_status ~instance ~cycle:cr.cycle
+        in
+        let status_label =
+          if delegator_count = 0 then Widgets.themed_muted "N/A (no delegators)"
+          else
+            match status with
+            | Rewards.Paid -> Widgets.themed_success "Paid"
+            | Rewards.Unpaid -> Widgets.themed_warning "Unpaid"
+            | Rewards.Partial -> Widgets.themed_warning "Partial"
+            | Rewards.Failed -> Widgets.themed_error "Failed"
+            | Rewards.In_progress -> Widgets.themed_accent "In progress"
+        in
+        let reward_rows label (s : Rewards.reward_split) =
+          [
+            ( label,
+              Rewards.format_tez (Rewards.total_of_split s) ^ " \xEA\x9C\xA9" );
+            ( "  Delegation",
+              "  " ^ Rewards.format_tez s.delegated ^ " \xEA\x9C\xA9" );
+          ]
+        in
+        let items =
+          [
+            ( "Earned Rewards",
+              Rewards.format_tez total_rewards ^ " \xEA\x9C\xA9" );
+          ]
+          @ reward_rows "Block Rewards" cr.block_rewards
+          @ reward_rows "Attestation" cr.attestation_rewards
+          @ reward_rows "DAL Rewards" cr.dal_rewards
+          @ [
+              ("Block Fees", Rewards.format_tez cr.block_fees ^ " \xEA\x9C\xA9");
+              ("Delegators", string_of_int delegator_count);
+              ("Payout Status", status_label);
+            ]
+        in
+        let desc =
+          Desc_list.create ~key_width:16 ~items ()
+          |> Desc_list.render ~cols:(box_width - 4) ~wrap:true ~focus:false
+        in
+        Box.render
+          ~title:(Printf.sprintf "Cycle %d" cycle)
+          ~style:Rounded
+          ~width:box_width
+          desc
+  in
+  let payouts_box = render_payouts_box ~box_width ~instance ~cycle in
+  let excluded_box = render_excluded_box ~box_width ~instance ~cycle in
+  let preview_box =
+    match state.blueprint with
+    | Some bp when bp.Rewards.cycle = cycle ->
+        render_blueprint_box ~box_width bp
+    | _ -> Widgets.themed_muted "  Press g to generate payout preview"
+  in
+  let parts = [header; back_hint; ""; detail_box] in
+  let parts =
+    if String.length payouts_box > 0 then parts @ [""; payouts_box] else parts
+  in
+  let parts =
+    if String.length excluded_box > 0 then parts @ [""; excluded_box] else parts
+  in
+  let parts = parts @ [""; preview_box] in
+  String.concat "\n" parts
+
+let render_setup_cta_box ~box_width =
+  let lines =
+    [
+      Widgets.themed_text "No payout configuration yet for this baker.";
+      "";
+      Widgets.themed_text "Press Tab to open the Configuration tab and set:";
+      Widgets.themed_muted
+        "  - payout key alias       (which key signs payouts)";
+      Widgets.themed_muted "  - baker fee              (% kept by the baker)";
+      Widgets.themed_muted "  - min payout / balance   (skip dust)";
+      "";
+      Widgets.themed_muted
+        "Once saved, Generate / Pay / Dry-run become available here.";
+    ]
+  in
+  Box.render
+    ~title:"Set up rewards"
+    ~style:Rounded
+    ~width:box_width
+    (String.concat "\n" lines)
+
+let resolve_network ~instance =
+  match Octez_manager_lib.Service_registry.find ~instance with
+  | Ok (Some svc) -> svc.Octez_manager_lib.Service.network
+  | _ -> (
+      match Rewards_scheduler.get_network_for_instance ~instance with
+      | Some n -> n
+      | None -> "unknown")
+
+let render_dashboard ~box_width ~instance ~baker:_ (state : Rewards_state.state)
+    =
+  let network = resolve_network ~instance in
+  let recent = Rewards_scheduler.get_recent_cycles ~instance in
+  let current_cycle = state.current_cycle in
+  let last_completed =
+    match current_cycle with
+    | Some cc ->
+        List.find_opt (fun (cr : Rewards.cycle_rewards) -> cr.cycle < cc) recent
+    | None -> List.nth_opt recent 0
+  in
+  let network_line = render_network_badge network in
+  let current_box =
+    render_current_cycle_box ~box_width ~instance current_cycle
+  in
+  let completed_box =
+    render_last_completed_box ~box_width ~instance last_completed
+  in
+  let recent_box =
+    render_recent_cycles_box
+      ~box_width
+      ~instance
+      ~current_cycle
+      ~cursor:state.cycle_cursor
+      recent
+  in
+  let setup_cta =
+    if state.config_exists then [] else [render_setup_cta_box ~box_width; ""]
+  in
+  let parts =
+    setup_cta
+    @ [network_line; ""; current_box; ""; completed_box; ""; recent_box]
+  in
+  let parts =
+    if state.overview_preview then
+      match state.blueprint with
+      | Some bp -> parts @ [""; render_blueprint_box ~box_width bp]
+      | None -> parts @ [""; Widgets.themed_muted "  Generating preview..."]
+    else parts
+  in
+  String.concat "\n" parts
+
+let render ~(state : Rewards_state.state) ~cols =
+  let box_width = min (cols - 2) 72 in
+  match Rewards_state.selected_baker_instance state with
+  | None ->
+      String.concat
+        "\n"
+        [
+          "";
+          Widgets.themed_muted "  No baker instances configured.";
+          Widgets.themed_muted "  Install a baker to view reward data.";
+        ]
+  | Some (instance, baker) -> (
+      match state.selected_cycle with
+      | Some cycle ->
+          render_cycle_detail ~box_width ~instance ~baker state cycle
+      | None -> render_dashboard ~box_width ~instance ~baker state)

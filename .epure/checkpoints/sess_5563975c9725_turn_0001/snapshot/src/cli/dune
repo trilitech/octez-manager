@@ -1,0 +1,47 @@
+(include_subdirs no)
+
+(library
+ (name octez_manager_cli)
+ (wrapped false)
+ (modules
+  cli_output
+  cli_helpers
+  cli_progress
+  cmd_install_accuser
+  cmd_install_baker
+  cmd_install_dal
+  cmd_install_index
+  cmd_install_node
+  cmd_install_signatory
+  cmd_group
+  cmd_instance
+  cmd_import
+  cmd_binaries
+  cmd_self_update
+  cmd_utils
+  cmd_rpc
+  cmd_web
+  cmd_baker
+  cmd_rewards
+  cmd_sandbox)
+ (libraries
+  octez_manager_lib
+  octez_manager_rewards
+  octez-manager.ui
+  miaou-core.lib
+  miaou-driver-web.runner
+  miaou-driver-web.driver
+  miaou-core.helpers
+  cmdliner
+  rresult
+  yojson
+  linenoise
+  eio_posix)
+ (preprocess
+  (pps ppx_blob))
+ (preprocessor_deps
+  (file ../web/static/index.html)
+  (file ../web/static/viewer.html)
+  (file ../../favicon.png))
+ (instrumentation
+  (backend bisect_ppx)))

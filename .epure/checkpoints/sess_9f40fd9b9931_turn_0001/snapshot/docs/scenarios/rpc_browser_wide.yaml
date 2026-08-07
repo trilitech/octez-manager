@@ -1,0 +1,116 @@
+# RPC Browser Wide Screen Demo
+# 
+# Shows two pagers side-by-side with the working shortcut method
+
+name: RPC Browser Wide Demo
+description: Two pagers side-by-side
+cols: 220
+rows: 60
+title: "octez-manager — RPC Browser (Wide)"
+output: rpc_browser_wide
+init_wait: 3.0
+
+actions:
+  # Wait for main screen to fully render
+  - comment: "Wait for instances page to load"
+  - wait: 2.0
+  
+  # Open RPC browser
+  - comment: "Open RPC browser"
+  - key: r
+  - wait: 1.5
+  
+  # Navigate to a local node (15 downs)
+  - comment: "Navigate to local node"
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.2
+  
+  # Select the node
+  - comment: "Select node"
+  - key: Enter
+  - wait: 2.0
+  
+  # First query using shortcut
+  - comment: "Query /chains/main/blocks/head"
+  - key: "1"
+  - wait: 3.0
+  
+  # Create second pager
+  - comment: "Create second pager"
+  - key: S
+  - wait: 1.0
+  
+  # Go back to root
+  - key: Backspace
+  - wait: 0.2
+  - key: Backspace
+  - wait: 0.2
+  - key: Backspace
+  - wait: 0.2
+  - key: Backspace
+  - wait: 0.3
+  
+  # Navigate manually to /version (11 downs)
+  - comment: "Navigate to /version"
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.08
+  - key: Down
+  - wait: 0.15
+  - key: Enter
+  - wait: 0.8
+  
+  # Select GET
+  - key: Down
+  - wait: 0.15
+  - key: Enter
+  - wait: 2.5
+  
+  # Show both pagers
+  - comment: "Show both pagers"
+  - wait: 5.0

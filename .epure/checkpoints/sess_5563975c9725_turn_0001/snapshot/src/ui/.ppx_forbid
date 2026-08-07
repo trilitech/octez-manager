@@ -1,0 +1,38 @@
+# ppx_forbid configuration for octez-manager TUI
+# Inherits from project-wide config and adds TUI-specific theming rules
+
+include ../../.ppx_forbid
+
+# === TUI-specific: No direct stdout/stderr (corrupts terminal) ===
+function Stdlib.print_endline "Use logging or TUI display functions"
+function Stdlib.print_string "Use logging or TUI display functions"
+function Stdlib.print_newline "Use logging or TUI display functions"
+function Stdlib.print_int "Use logging or TUI display functions"
+function Stdlib.print_float "Use logging or TUI display functions"
+function Stdlib.print_char "Use logging or TUI display functions"
+function Stdlib.prerr_endline "Use logging or Toast notifications"
+function Stdlib.prerr_string "Use logging or Toast notifications"
+function Stdlib.prerr_newline "Use logging or Toast notifications"
+function Printf.printf "Use logging or TUI display functions"
+function Printf.eprintf "Use logging or Toast notifications"
+function Format.printf "Use logging or TUI display functions"
+function Format.eprintf "Use logging or Toast notifications"
+
+# === Theming: Use themed helpers instead of hardcoded colors ===
+function Miaou_widgets_display.Widgets.fg "Use themed_* helpers (themed_text, themed_error, etc.)"
+function Miaou_widgets_display.Widgets.bg "Use themed_* helpers or Style_context"
+function Widgets.fg "Use themed_* helpers (themed_text, themed_error, etc.)"
+function Widgets.bg "Use themed_* helpers or Style_context"
+function W.fg "Use themed_* helpers (themed_text, themed_error, etc.)"
+function W.bg "Use themed_* helpers or Style_context"
+
+# === Text formatting guidance ===
+# All text displayed in the UI should use Ui_fmt or Widgets.themed_* for
+# visibility in both light and dark modes. Printf.sprintf is allowed but
+# text will be auto-themed by Miaou's renderer as a fallback.
+# TODO: Migrate to Ui_fmt and then enable this rule:
+# function Printf.sprintf "Use Ui_fmt for themed text"
+
+# === Deprecated layout: Use Themed_page.render_layout instead ===
+function Miaou_widgets_layout.Vsection.render "Use Themed_page.render_layout for proper theming"
+function Vsection.render "Use Themed_page.render_layout for proper theming"

@@ -1,0 +1,1222 @@
+(test
+ (name test_indexer)
+ (libraries alcotest octez_manager_common)
+ (modules test_indexer)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name unit_tests)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  test_string_helpers_lib)
+ (modules unit_tests)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_registries)
+ (libraries alcotest octez_manager_lib)
+ (modules test_registries)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_group)
+ (libraries alcotest octez_manager_lib)
+ (modules test_group)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_yes_wallet)
+ (libraries alcotest octez_manager_lib)
+ (modules test_yes_wallet)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_cli_progress)
+ (libraries alcotest octez_manager_cli test_string_helpers_lib)
+ (modules test_cli_progress)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_system_metrics_scheduler)
+ (libraries alcotest octez-manager.ui miaou-core.widgets.display)
+ (modules test_system_metrics_scheduler)
+ (instrumentation
+  (backend bisect_ppx)))
+
+; TUI tests are skipped in CI (headless driver hangs in container)
+; Run locally with: dune exec test/tui_flow_tests.exe
+
+; Shared TUI test helpers library
+
+(library
+ (name test_string_helpers_lib)
+ (wrapped false)
+ (modules test_string_helpers))
+
+(library
+ (name tui_test_helpers_lib)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  test_string_helpers_lib)
+ (modules tui_test_helpers)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name tui_flow_tests)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules tui_flow_tests)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_install_node_form)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_install_node_form)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_install_baker_form)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_install_baker_form)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_install_accuser_form)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_install_accuser_form)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_install_dal_node_form)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_install_dal_node_form)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_modal_interactions)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_modal_interactions)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_instances_page)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_instances_page)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_golden_path_tui_v2)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  miaou-core.helpers
+  lambda-term
+  tui_test_helpers_lib
+  tui_command_runner_lib
+  ui_regression_framework_lib
+  eio_main)
+ (modules test_golden_path_tui_v2)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_instance_actions)
+ (libraries alcotest test_mocks unix)
+ (modules test_instance_actions)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_instances_actions_pure)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui
+  str)
+ (modules test_instances_actions_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_instances_navigation_pure)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  mock_service_helpers_lib)
+ (modules test_instances_navigation_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_node_env)
+ (libraries alcotest octez_manager_lib unix)
+ (modules test_node_env)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_port_validation)
+ (libraries alcotest octez_manager_lib)
+ (modules test_port_validation)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_execstart_parser)
+ (libraries alcotest octez_manager_lib)
+ (modules test_execstart_parser)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_system_user)
+ (libraries alcotest octez_manager_lib)
+ (modules test_system_user)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_snapshots)
+ (libraries alcotest octez_manager_lib)
+ (modules test_snapshots)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_version_checker)
+ (libraries alcotest octez_manager_lib)
+ (modules test_version_checker)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_common_utils)
+ (libraries alcotest octez_manager_lib)
+ (modules test_common_utils)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_teztnets)
+ (libraries alcotest octez_manager_lib)
+ (modules test_teztnets)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_common_extended)
+ (libraries alcotest octez_manager_lib unix)
+ (modules test_common_extended)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_binary_downloader_extended)
+ (libraries alcotest octez_manager_lib yojson)
+ (modules test_binary_downloader_extended)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_systemd_extended)
+ (libraries alcotest octez_manager_lib)
+ (modules test_systemd_extended)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_external_service_extended)
+ (libraries alcotest octez_manager_lib)
+ (modules test_external_service_extended)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_simple_modules)
+ (libraries alcotest octez_manager_lib yojson)
+ (modules test_simple_modules)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_keys_reader)
+ (libraries alcotest octez_manager_lib yojson)
+ (modules test_keys_reader)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_wallets_page)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_wallets_page)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_wallet_empty_delegates)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib
+  mock_service_helpers_lib)
+ (modules test_wallet_empty_delegates)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_binary_registry)
+ (libraries alcotest octez_manager_lib yojson)
+ (modules test_binary_registry)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_directory_registry)
+ (libraries alcotest octez_manager_lib yojson)
+ (modules test_directory_registry)
+ (instrumentation
+  (backend bisect_ppx)))
+
+; UI Regression Testing Framework
+
+(library
+ (name ui_regression_framework_lib)
+ (libraries
+  miaou-core.lib_miaou_internal
+  miaou-core.lib
+  octez_manager_lib
+  unix
+  str)
+ (modules ui_regression_framework deterministic_mocks))
+
+; TUI Command Runner - Declarative test framework
+
+(library
+ (name tui_command_runner_lib)
+ (libraries
+  miaou-core.lib_miaou_internal
+  miaou-core.lib
+  ui_regression_framework_lib
+  octez_manager_lib
+  str
+  unix)
+ (modules tui_command_runner))
+
+; UI Regression tests run in CI (deterministic and don't hang)
+
+(test
+ (name test_ui_regressions_minimal)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib
+  ui_regression_framework_lib)
+ (modules test_ui_regressions_minimal)
+ (instrumentation
+  (backend bisect_ppx)))
+
+; TEMPORARILY DISABLED: Flaky due to table column width differences between environments
+; Re-enable once rendering is deterministic across CI/local
+; (test
+;  (name test_ui_regressions_forms)
+;  (libraries
+;   alcotest
+;   octez_manager_lib
+;   octez-manager.ui
+;   miaou-core.lib
+;   miaou-core.lib_miaou_internal
+;   lambda-term
+;   tui_test_helpers_lib
+;   ui_regression_framework_lib)
+;  (modules test_ui_regressions_forms)
+;  (instrumentation
+;   (backend bisect_ppx)))
+
+(test
+ (name test_ui_regressions_forms_comprehensive)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib
+  ui_regression_framework_lib)
+ (modules test_ui_regressions_forms_comprehensive)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_help_parser)
+ (libraries alcotest octez_manager_lib)
+ (modules test_help_parser)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_form_builder)
+ (libraries alcotest octez-manager.ui)
+ (modules test_form_builder)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_form_builder_bundles)
+ (libraries alcotest octez-manager.ui)
+ (modules test_form_builder_bundles)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(library
+ (name mock_service_helpers_lib)
+ (libraries octez_manager_lib octez-manager.ui)
+ (modules mock_service_helpers))
+
+(test
+ (name test_instances_render)
+ (libraries alcotest octez-manager.ui mock_service_helpers_lib)
+ (modules test_instances_render)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_instances_render_pure)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  mock_service_helpers_lib
+  test_string_helpers_lib)
+ (modules test_instances_render_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_installer_snapshot)
+ (libraries alcotest octez_manager_lib)
+ (modules test_installer_snapshot)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_self_update_checker)
+ (libraries alcotest octez_manager_lib str)
+ (modules test_self_update_checker)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_global_shortcuts_pages)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_global_shortcuts_pages)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_binaries_page)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_binaries_page)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_diagnostics_page)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_diagnostics_page)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_import_cascade)
+ (libraries alcotest octez_manager_lib)
+ (modules test_import_cascade)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_process_scanner)
+ (libraries alcotest octez_manager_lib str)
+ (modules test_process_scanner)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_self_update_checker2)
+ (libraries alcotest octez_manager_lib)
+ (modules test_self_update_checker2)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_system_metrics)
+ (libraries alcotest octez-manager.ui str)
+ (modules test_system_metrics)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_display_utils)
+ (libraries alcotest octez-manager.ui)
+ (modules test_display_utils)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_import_fields)
+ (libraries alcotest octez_manager_lib)
+ (modules test_import_fields)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_systemd_templates)
+ (libraries alcotest octez_manager_lib)
+ (modules test_systemd_templates)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_settings2)
+ (libraries alcotest octez_manager_lib yojson)
+ (modules test_settings2)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_data)
+ (libraries alcotest octez_manager_lib octez-manager.ui str)
+ (modules test_data)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_external_detector2)
+ (libraries alcotest octez_manager_lib)
+ (modules test_external_detector2)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_client)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_rpc_client)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_describe)
+ (libraries alcotest octez-manager.ui yojson)
+ (modules test_rpc_describe)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_json_highlighter)
+ (libraries alcotest octez-manager.ui str)
+ (modules test_json_highlighter)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_browser_state)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  mock_service_helpers_lib)
+ (modules test_rpc_browser_state)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_browser_render_list)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  mock_service_helpers_lib)
+ (modules test_rpc_browser_render_list)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_browser_render_result)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
+ (modules test_rpc_browser_render_result)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_browser_actions)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  mock_service_helpers_lib)
+ (modules test_rpc_browser_actions)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_openapi)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_rpc_openapi)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_public_nodes_cache)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_public_nodes_cache)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_cmd_rpc)
+ (libraries alcotest octez_manager_lib octez_manager_cli)
+ (modules test_cmd_rpc)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_delegate_data)
+ (libraries alcotest octez-manager.ui yojson unix)
+ (modules test_delegate_data)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_baker_highwatermarks)
+ (libraries alcotest octez-manager.ui yojson unix str)
+ (modules test_baker_highwatermarks)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_charts)
+ (libraries alcotest octez-manager.ui str)
+ (modules test_charts)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_dal_health)
+ (libraries alcotest octez-manager.ui)
+ (modules test_dal_health)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_foldable_json)
+ (libraries alcotest octez-manager.ui yojson str)
+ (modules test_foldable_json)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_binary_help_explorer)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
+ (modules test_binary_help_explorer)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_binary_help_explorer_extended)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
+ (modules test_binary_help_explorer_extended)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_binaries_page_pure)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_binaries_page_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_modal_helpers)
+ (libraries alcotest octez-manager.ui)
+ (modules test_modal_helpers)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_scheduler)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui)
+ (modules test_rpc_scheduler)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_node_selection)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui
+  yojson)
+ (modules test_rpc_node_selection)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_instance_details)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib
+  mock_service_helpers_lib)
+ (modules test_instance_details)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_log_viewer_page)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib
+  mock_service_helpers_lib)
+ (modules test_log_viewer_page)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_import_wizard)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_import_wizard)
+ (instrumentation
+  (backend bisect_ppx)))
+
+; Property-based tests (QCheck)
+
+(test
+ (name test_execstart_parser_props)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_execstart_parser_props)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_env_file_parser_props)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_env_file_parser_props)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_version_checker_props)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_version_checker_props)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_port_validation_props)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_port_validation_props)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_help_parser_props)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_help_parser_props)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_system_metrics_props)
+ (libraries alcotest qcheck-core qcheck-alcotest octez-manager.ui)
+ (modules test_system_metrics_props)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_data_transformers_props)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui
+  yojson)
+ (modules test_data_transformers_props)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_form_builder_pure)
+ (libraries alcotest qcheck-core qcheck-alcotest octez-manager.ui)
+ (modules test_form_builder_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_browser_state_props)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui
+  mock_service_helpers_lib)
+ (modules test_rpc_browser_state_props)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_external_detector_props)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_external_detector_props)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_metrics)
+ (libraries alcotest qcheck-core qcheck-alcotest octez-manager.ui str unix)
+ (modules test_metrics)
+ (instrumentation
+  (backend bisect_ppx)))
+
+; Pure coverage tests for UI pages
+
+(test
+ (name test_flows_pure)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_lib
+  octez-manager.ui
+  test_string_helpers_lib)
+ (modules test_flows_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_snapshots_pure)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  test_string_helpers_lib)
+ (modules test_snapshots_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_import_wizard_pure)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  test_string_helpers_lib)
+ (modules test_import_wizard_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_log_viewer_page_pure)
+ (libraries alcotest octez_manager_lib octez-manager.ui)
+ (modules test_log_viewer_page_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_log_export_pure)
+ (libraries alcotest octez_manager_lib unix test_string_helpers_lib)
+ (modules test_log_export_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+; Fuzz tests (adversarial generators, high iteration count)
+
+(test
+ (name test_fuzz)
+ (libraries alcotest qcheck-core qcheck-alcotest octez_manager_lib)
+ (modules test_fuzz)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_cli_helpers)
+ (libraries
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  octez_manager_cli
+  octez_manager_lib
+  str)
+ (modules test_cli_helpers)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_pkh_validator)
+ (libraries alcotest octez-manager.ui)
+ (modules test_pkh_validator)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_signatory_validation)
+ (libraries alcotest octez_manager_lib)
+ (modules test_signatory_validation)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_signatory_downloader)
+ (libraries alcotest octez_manager_lib yojson str)
+ (modules test_signatory_downloader)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_baker_wallet_data)
+ (libraries alcotest octez-manager.ui yojson unix)
+ (modules test_baker_wallet_data)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_baker_ops)
+ (libraries alcotest octez-manager.ui str)
+ (modules test_baker_ops)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rewards_pure)
+ (libraries alcotest octez_manager_rewards octez_manager_ui)
+ (modules test_rewards_pure)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_payout_continual)
+ (libraries alcotest octez_manager_rewards unix)
+ (modules test_payout_continual)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_custom_baker_registry)
+ (libraries alcotest octez_manager_rewards unix)
+ (modules test_custom_baker_registry)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_payout_config)
+ (libraries alcotest octez_manager_rewards)
+ (modules test_payout_config)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_reward_calculator)
+ (libraries alcotest octez_manager_rewards)
+ (modules test_reward_calculator)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_hjson_parser)
+ (libraries alcotest octez_manager_rewards)
+ (modules test_hjson_parser)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_payout_report)
+ (libraries alcotest octez_manager_rewards unix)
+ (modules test_payout_report)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rpc_addr)
+ (libraries alcotest octez_manager_lib)
+ (modules test_rpc_addr)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_payout_executor)
+ (libraries alcotest octez_manager_rewards)
+ (modules test_payout_executor)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_rewards_page_custom_baker)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  octez_manager_rewards
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_rewards_page_custom_baker)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
+ (name test_main_shell_back)
+ (libraries alcotest octez_manager_lib octez-manager.ui miaou-core.lib)
+ (modules test_main_shell_back)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_help_modal_baseline)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_help_modal_baseline)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_help_modal_improvements)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_help_modal_improvements)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_help_modal_all_pages)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_help_modal_all_pages)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_help_modal_regression)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_help_modal_regression)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_help_modal_no_duplicates)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_help_modal_no_duplicates)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_help_modal_navigation)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_help_modal_navigation)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name test_help_modal_debug)
+ (libraries
+  alcotest
+  octez_manager_lib
+  octez-manager.ui
+  miaou-core.lib
+  miaou-core.lib_miaou_internal
+  lambda-term
+  tui_test_helpers_lib)
+ (modules test_help_modal_debug)
+ (instrumentation
+  (backend bisect_ppx)))

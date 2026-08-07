@@ -1,0 +1,94 @@
+# CLI tester container for integration testing
+# Uses real systemd as PID 1 for testing actual service management
+FROM debian:bookworm-slim
+
+# Install systemd and dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    systemd \
+    systemd-sysv \
+    dbus \
+    curl \
+    jq \
+    ca-certificates \
+    gnupg \
+    netbase \
+    procps \
+    bc \
+    parallel \
+    && rm -rf /var/lib/apt/lists/*
+
+# Remove unnecessary systemd units that cause issues in containers
+RUN rm -rf /lib/systemd/system/multi-user.target.wants/* \
+    /etc/systemd/system/*.wants/* \
+    /lib/systemd/system/local-fs.target.wants/* \
+    /lib/systemd/system/sockets.target.wants/*udev* \
+    /lib/systemd/system/sockets.target.wants/*initctl* \
+    /lib/systemd/system/sysinit.target.wants/systemd-tmpfiles-setup* \
+    /lib/systemd/system/systemd-update-utmp* \
+    /lib/systemd/system/getty* \
+    2>/dev/null || true
+
+# Download Octez binaries directly (more reliable than packages)
+ARG OCTEZ_VERSION=v24.0
+ARG OCTEZ_BASE_URL=https://octez.tezos.com/releases/octez-v24.0/binaries/x86_64
+RUN for binary in octez-node octez-client octez-baker octez-accuser octez-dal-node; do \
+        echo "Downloading $binary..." && \
+        curl -sfL "${OCTEZ_BASE_URL}/${binary}" -o /usr/local/bin/${binary} && \
+        chmod +x /usr/local/bin/${binary}; \
+    done
+
+# Download Signatory binary for signatory integration tests
+ARG SIGNATORY_VERSION=1.3.1
+ARG SIGNATORY_URL=https://github.com/ecadlabs/signatory/releases/download/v${SIGNATORY_VERSION}/signatory_${SIGNATORY_VERSION}_linux_amd64.tar.gz
+RUN echo "Downloading signatory ${SIGNATORY_VERSION}..." && \
+    curl -sfL "${SIGNATORY_URL}" -o /tmp/signatory.tar.gz && \
+    tar -xzf /tmp/signatory.tar.gz -C /tmp && \
+    mv /tmp/signatory /usr/local/bin/signatory && \
+    chmod +x /usr/local/bin/signatory && \
+    rm -f /tmp/signatory.tar.gz
+
+# Create stub octez-index binary (no public releases yet)
+RUN printf '#!/bin/sh\necho "octez-index stub"\n' > /usr/local/bin/octez-index && \
+    chmod +x /usr/local/bin/octez-index
+
+# Download Zcash/Sapling parameters required for node operation
+ARG ZCASH_PARAMS_URL=https://download.z.cash/downloads
+RUN mkdir -p /usr/local/share/zcash-params && \
+    echo "Downloading sapling-output.params..." && \
+    curl -sfL "${ZCASH_PARAMS_URL}/sapling-output.params" -o /usr/local/share/zcash-params/sapling-output.params && \
+    echo "Downloading sapling-spend.params..." && \
+    curl -sfL "${ZCASH_PARAMS_URL}/sapling-spend.params" -o /usr/local/share/zcash-params/sapling-spend.params
+
+# Install octez-manager and test binary from build context
+COPY cli-tester/octez-manager /usr/local/bin/octez-manager
+COPY cli-tester/test_golden_path_tui_v2 /usr/local/bin/test_golden_path_tui_v2
+RUN chmod +x /usr/local/bin/octez-manager /usr/local/bin/test_golden_path_tui_v2
+
+# Copy test scripts
+COPY cli-tester/tests/ /tests/
+COPY cli-tester/run-tests.sh /run-tests.sh
+RUN chmod +x /run-tests.sh /tests/*.sh /tests/**/*.sh 2>/dev/null || true
+
+# Ensure test users exist (both tezos and octez for compatibility)
+# octez user is needed because the TUI form defaults to octez as service user
+RUN id tezos >/dev/null 2>&1 || useradd -m -s /bin/bash tezos
+RUN id octez >/dev/null 2>&1 || useradd -m -s /bin/bash octez
+
+# Create required directories
+RUN mkdir -p /var/lib/octez /etc/octez /var/log/octez \
+    && chown -R tezos:tezos /var/lib/octez /etc/octez /var/log/octez
+
+# Pre-generate identity file to avoid PoW during tests (saves ~2-3 min per node start)
+# Generate with minimum difficulty for speed
+RUN mkdir -p /etc/octez/pregenerated && \
+    octez-node identity generate 0 --data-dir /tmp/identity-gen && \
+    cp /tmp/identity-gen/identity.json /etc/octez/pregenerated/identity.json && \
+    rm -rf /tmp/identity-gen && \
+    chmod 644 /etc/octez/pregenerated/identity.json
+
+# Systemd needs these
+VOLUME ["/sys/fs/cgroup", "/run", "/run/lock"]
+STOPSIGNAL SIGRTMIN+3
+
+# Run systemd as PID 1
+CMD ["/lib/systemd/systemd"]

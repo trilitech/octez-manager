@@ -1,0 +1,142 @@
+name: Integration Tests (Scheduled)
+
+# This workflow runs integration tests on a schedule and manual trigger.
+# For PR/push integration tests, see ci.yml which runs them as a dependent job.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run weekly to catch octez version incompatibilities
+    - cron: '0 6 * * 0'
+
+concurrency:
+  group: integration-scheduled-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-binary:
+    name: Build Static Binary
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      OPAMYES: "true"
+      OPAMROOT: /home/opam/.opam
+      MIAOU_GIT_URL: "https://github.com/trilitech/miaou.git"
+      PPX_FORBID_GIT_URL: "https://github.com/atacama-dev/ppx_forbid.git"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache opam packages
+        id: cache-opam
+        uses: actions/cache@v4
+        with:
+          path: /home/opam/.opam
+          key: opam-miaou-${{ hashFiles('.github/miaou-version') }}
+          restore-keys: |
+            opam-miaou-
+
+      - name: Pin miaou and ppx_forbid packages
+        if: steps.cache-opam.outputs.cache-hit != 'true'
+        run: |
+          opam pin add ppx_forbid "$PPX_FORBID_GIT_URL" --no-action
+          opam pin add miaou-core "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-term "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-matrix "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-driver-web "$MIAOU_GIT_URL" --no-action
+          opam pin add miaou-runner "$MIAOU_GIT_URL" --no-action
+          opam install ppx_forbid miaou-core miaou-driver-term miaou-driver-matrix miaou-driver-web miaou-runner eio_posix
+
+      - name: Build static binary
+        run: |
+          echo '(-ccopt -static)' > static_flags.sexp
+          dune build --release
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: octez-manager-static
+          path: _build/default/src/main.exe
+          retention-days: 1
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build-binary
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download static binary
+        uses: actions/download-artifact@v4
+        with:
+          name: octez-manager-static
+          path: test/integration/cli-tester/
+
+      - name: Prepare test binary
+        run: |
+          mv test/integration/cli-tester/main.exe test/integration/cli-tester/octez-manager
+          chmod +x test/integration/cli-tester/octez-manager
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test containers
+        working-directory: test/integration
+        run: |
+          docker compose build
+
+      - name: Start sandbox
+        working-directory: test/integration
+        run: |
+          docker compose up -d sandbox
+          # Wait for sandbox to be healthy
+          timeout 300 bash -c 'until docker compose exec -T sandbox curl -sf http://localhost:8080/health 2>/dev/null; do echo "Waiting for sandbox..."; sleep 10; done'
+
+      - name: Start cli-tester
+        working-directory: test/integration
+        run: |
+          docker compose up -d cli-tester
+          # Wait for systemd to be ready and debug if failing
+          echo "Waiting for systemd..."
+          for i in {1..30}; do
+            if docker compose exec -T cli-tester systemctl is-system-running 2>/dev/null; then
+              echo "Systemd is ready"
+              break
+            fi
+            echo "Attempt $i: systemd not ready yet..."
+            docker compose ps || true
+            sleep 2
+          done
+          # Show status regardless
+          docker compose ps
+          docker compose logs cli-tester || true
+
+      - name: Run integration tests
+        working-directory: test/integration
+        run: |
+          docker compose exec -T cli-tester /run-tests.sh
+
+      - name: Collect logs on failure
+        if: failure()
+        working-directory: test/integration
+        run: |
+          echo "=== Sandbox logs ==="
+          docker compose logs sandbox || true
+          echo "=== CLI-tester logs ==="
+          docker compose logs cli-tester || true
+          echo "=== systemctl status ==="
+          docker compose exec -T cli-tester systemctl status || true
+
+      - name: Cleanup
+        if: always()
+        working-directory: test/integration
+        run: |
+          docker compose down -v || true

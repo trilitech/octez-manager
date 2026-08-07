@@ -1,4 +1,11 @@
 (test
+ (name test_ocaml_lint_hook)
+ (libraries alcotest ocaml_lint_hook)
+ (modules test_ocaml_lint_hook)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(test
  (name test_indexer)
  (libraries alcotest octez_manager_common)
  (modules test_indexer)
@@ -1252,3 +1259,8 @@
  (modules test_help_modal_debug)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_demo_13)
+ (libraries alcotest ocaml_lint_hook)
+ (modules Test_demo_13))

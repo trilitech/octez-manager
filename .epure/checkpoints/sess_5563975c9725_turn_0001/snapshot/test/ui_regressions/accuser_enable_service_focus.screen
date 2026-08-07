@@ -1,0 +1,25 @@
+SIZE:240x24
+ Install Accuser 
+ ⚠ Form incomplete 
+--------------------------------------------------------------------------------
+┌───────────────────────┬──────────────────────────────────────────────┬───────┐
+│ Parameter             │ Value                                        │ S     │
+├───────────────────────┼──────────────────────────────────────────────┼───────┤
+│ Node                  │ None ⚠ Node selection is required            │ ✗     │
+│ App Bin Dir           │ /usr/bin ⚠ Binary 'octez-baker' not …        │ ✗     │
+│ Base Dir              │ …sion/.local/share/octez/accuser-accuser     │ ✓     │
+│ Extra Args            │ (none)                                       │ ✓     │
+│ Service User          │ mathias                                      │ ✓     │
+│ Enable on Boot        │ true                                         │ ✓     │
+│ Start Now             │ true                                         │ ✓     │
+│ Instance Name         │ accuser                                      │ ✓     │
+│ Confirm & Install     │ Incomplete                                   │ ✗     │
+└───────────────────────┴──────────────────────────────────────────────┴───────┘
+
+
+
+
+
+
+
+--------------------------------------------------------------------------------

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Octez Manager (Viewer)</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #1e1e1e; overflow: hidden;
+      display: flex; flex-direction: column; }
+    #header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 12px; background: #252525; border-bottom: 1px solid #333;
+      font-family: monospace; color: #d4d4d4; flex-shrink: 0;
+    }
+    #header img { height: 24px; }
+    #header .title { font-size: 15px; font-weight: bold; color: #eee; }
+    #header .badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 3px;
+      background: #a86; color: #fff; margin-left: auto;
+    }
+    #terminal { flex: 1; min-height: 0; }
+    #status {
+      background: #333; color: #aaa; padding: 2px 8px;
+      font-family: monospace; font-size: 12px; flex-shrink: 0;
+    }
+    #status.connected { color: #6a6; }
+    #status.viewer { color: #aa6; }
+    #status.disconnected { color: #a66; }
+    #password-overlay {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85); z-index: 100;
+      justify-content: center; align-items: center;
+    }
+    #password-overlay.visible { display: flex; }
+    #password-box {
+      background: #2d2d2d; border: 1px solid #555; border-radius: 6px;
+      padding: 24px; min-width: 300px; font-family: monospace; color: #d4d4d4;
+      text-align: center;
+    }
+    #password-box img { height: 48px; margin-bottom: 12px; }
+    #password-box h2 { margin: 0 0 16px; font-size: 16px; color: #eee; }
+    #password-box input[type="password"] {
+      width: 100%; padding: 8px; background: #1e1e1e; border: 1px solid #555;
+      border-radius: 3px; color: #d4d4d4; font-family: monospace; font-size: 14px;
+      outline: none;
+    }
+    #password-box input[type="password"]:focus { border-color: #888; }
+    #password-box button {
+      margin-top: 12px; width: 100%; padding: 8px; background: #444;
+      border: 1px solid #666; border-radius: 3px; color: #ddd;
+      font-family: monospace; font-size: 14px; cursor: pointer;
+    }
+    #password-box button:hover { background: #555; }
+    #password-error {
+      color: #e66; font-size: 12px; margin-top: 8px; display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <img src="/favicon.png" alt="Octez Manager">
+    <span class="title">Octez Manager</span>
+    <span class="badge">Viewer (read-only)</span>
+  </div>
+  <div id="terminal"></div>
+  <div id="status">Connecting...</div>
+  <div id="password-overlay">
+    <div id="password-box">
+      <img src="/favicon.png" alt="Octez Manager">
+      <h2>Password Required</h2>
+      <form id="pw-form">
+        <input type="password" id="pw-input" placeholder="Enter password" autocomplete="off">
+        <button type="submit">Connect</button>
+        <div id="password-error">Wrong password. Try again.</div>
+      </form>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+  <script src="/client.js"></script>
+  <script>
+    (function () {
+      var statusEl = document.getElementById('status');
+      var overlay = document.getElementById('password-overlay');
+      var pwForm = document.getElementById('pw-form');
+      var pwInput = document.getElementById('pw-input');
+      var pwError = document.getElementById('password-error');
+
+      function showPasswordForm(hadPassword, retryCb) {
+        overlay.classList.add('visible');
+        pwInput.value = '';
+        pwError.style.display = hadPassword ? 'block' : 'none';
+        pwInput.focus();
+        pwForm.onsubmit = function (ev) {
+          ev.preventDefault();
+          var pw = pwInput.value;
+          if (!pw) return;
+          pwError.style.display = 'none';
+          overlay.classList.remove('visible');
+          retryCb(pw);
+        };
+      }
+
+      MiaouTerminal(document.getElementById('terminal'), {
+        wsPath: '/ws/viewer',
+        onStatusChange: function (cls, msg) {
+          statusEl.textContent = msg;
+          statusEl.className = cls || '';
+        },
+        onAuthRequired: showPasswordForm
+      });
+    })();
+  </script>
+</body>
+</html>

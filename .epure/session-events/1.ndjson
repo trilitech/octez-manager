@@ -1,0 +1,2 @@
+{"event":"session_started","timestamp":"2026-05-04T14:23:42Z","session_id":1,"session_uuid":"sess_6a13d13a3090","phase":"converge","status":"active","started_at":"2026-05-04 14:23:42"}
+{"event":"turn_started","timestamp":"2026-05-04T14:23:42Z","session_id":1,"session_uuid":"sess_6a13d13a3090","turn_id":1,"turn_key":"1:1:builder","turn_number":1,"role":"builder","backend":"claude-code","status":"running"}

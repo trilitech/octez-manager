@@ -1,0 +1,168 @@
+name: Test Install Script
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'install.sh'
+      - '.github/workflows/test-install-script.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: test-install-script-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-install-from-url:
+    name: Test install script from GitHub
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Test on different Ubuntu versions to ensure broad compatibility
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # For PRs: Test the modified install.sh from the PR branch
+      # For pushes to main: Test the documented URL that users actually use
+      - name: Test installation (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Testing install script from PR branch"
+          sh install.sh
+          
+      - name: Test installation (main branch)
+        if: github.event_name == 'push'
+        run: |
+          echo "Testing: curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh"
+          curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh
+          
+      - name: Verify installation
+        run: |
+          # Check if binary was installed
+          if [ -f "$HOME/.local/bin/octez-manager" ]; then
+            echo "✓ Binary installed to $HOME/.local/bin/octez-manager"
+          else
+            echo "✗ Binary not found at $HOME/.local/bin/octez-manager"
+            exit 1
+          fi
+          
+          # Check if binary is executable
+          if [ -x "$HOME/.local/bin/octez-manager" ]; then
+            echo "✓ Binary is executable"
+          else
+            echo "✗ Binary is not executable"
+            exit 1
+          fi
+          
+          # Run --version to ensure it works
+          echo "Testing octez-manager --version:"
+          if "$HOME/.local/bin/octez-manager" --version; then
+            echo "✓ Binary runs successfully"
+          else
+            echo "✗ Binary failed to run"
+            exit 1
+          fi
+
+  test-install-custom-prefix:
+    name: Test install with custom prefix
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # For PRs: Test the modified install.sh from the PR branch
+      # For pushes to main: Test the documented URL that users actually use
+      - name: Test installation with custom prefix (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Testing install script from PR branch with custom prefix"
+          sh install.sh --prefix=/tmp/custom-install
+          
+      - name: Test installation with custom prefix (main branch)
+        if: github.event_name == 'push'
+        run: |
+          echo "Testing: curl -fsSL ... | sh -s -- --prefix=/tmp/custom-install"
+          curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh -s -- --prefix=/tmp/custom-install
+          
+      - name: Verify custom installation
+        run: |
+          # Check if binary was installed to custom location
+          if [ -f "/tmp/custom-install/octez-manager" ]; then
+            echo "✓ Binary installed to /tmp/custom-install/octez-manager"
+          else
+            echo "✗ Binary not found at /tmp/custom-install/octez-manager"
+            exit 1
+          fi
+          
+          # Check if binary is executable
+          if [ -x "/tmp/custom-install/octez-manager" ]; then
+            echo "✓ Binary is executable"
+          else
+            echo "✗ Binary is not executable"
+            exit 1
+          fi
+          
+          # Run --version to ensure it works
+          echo "Testing octez-manager --version:"
+          if /tmp/custom-install/octez-manager --version; then
+            echo "✓ Binary runs successfully"
+          else
+            echo "✗ Binary failed to run"
+            exit 1
+          fi
+
+  test-install-as-root:
+    name: Test install as root user
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # For PRs: Test the modified install.sh from the PR branch
+      # For pushes to main: Test the documented URL that users actually use
+      - name: Test installation as root (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Testing install script from PR branch as root (should install to /usr/local/bin)"
+          sudo sh install.sh
+          
+      - name: Test installation as root (main branch)
+        if: github.event_name == 'push'
+        run: |
+          echo "Testing installation as root (should install to /usr/local/bin)"
+          sudo sh -c 'curl -fsSL https://raw.githubusercontent.com/trilitech/octez-manager/main/install.sh | sh'
+          
+      - name: Verify root installation
+        run: |
+          # Check if binary was installed to system location
+          if [ -f "/usr/local/bin/octez-manager" ]; then
+            echo "✓ Binary installed to /usr/local/bin/octez-manager"
+          else
+            echo "✗ Binary not found at /usr/local/bin/octez-manager"
+            exit 1
+          fi
+          
+          # Check if binary is executable
+          if [ -x "/usr/local/bin/octez-manager" ]; then
+            echo "✓ Binary is executable"
+          else
+            echo "✗ Binary is not executable"
+            exit 1
+          fi
+          
+          # Run --version to ensure it works
+          echo "Testing octez-manager --version:"
+          if /usr/local/bin/octez-manager --version; then
+            echo "✓ Binary runs successfully"
+          else
+            echo "✗ Binary failed to run"
+            exit 1
+          fi
