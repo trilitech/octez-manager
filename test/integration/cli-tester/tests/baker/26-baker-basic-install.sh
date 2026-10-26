@@ -79,9 +79,8 @@ fi
 echo "Systemd service exists"
 
 # Verify service shows in list (using --internal for robustness)
-if ! om list --internal 2>&1 | grep -q "$BAKER_INSTANCE"; then
+if ! assert_command_output 0 "$BAKER_INSTANCE" "baker: expected command output" -- om list --internal; then
 	echo "ERROR: Baker instance not in list output"
-	om list --internal
 	exit 1
 fi
 echo "Baker instance in list"

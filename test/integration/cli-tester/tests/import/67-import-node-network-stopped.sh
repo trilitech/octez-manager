@@ -88,9 +88,9 @@ if ! service_is_managed "$INSTANCE"; then
 	exit 1
 fi
 
-LIST_OUTPUT=$(om list 2>&1)
+LIST_OUTPUT=$(assert_command_output 0 "" "capture list_output" -- om list)
 
-if ! echo "$LIST_OUTPUT" | grep -q "shadownet"; then
+if ! [[ "$LIST_OUTPUT" == *"shadownet"* ]]; then
 	echo "ERROR: Network not correctly detected in list output"
 	echo "List output: $LIST_OUTPUT"
 	exit 1

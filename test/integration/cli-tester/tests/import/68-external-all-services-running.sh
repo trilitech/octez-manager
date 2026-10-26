@@ -152,7 +152,7 @@ echo "Checking baker logs..."
 BAKER_LOGS=$(journalctl -u "octez-baker@${BAKER_INSTANCE}.service" --no-pager --since "1 minute ago" 2>&1 || true)
 echo "Baker logs:"
 echo "$BAKER_LOGS"
-if echo "$BAKER_LOGS" | grep -qi "error\|unknown option\|invalid\|unrecognized\|failed to parse"; then
+if grep -qi "error\|unknown option\|invalid\|unrecognized\|failed to parse" <<<"$BAKER_LOGS"; then
 	echo "ERROR: Baker service has errors in logs"
 	show_service_status "baker" "$BAKER_INSTANCE"
 	exit 1
@@ -163,7 +163,7 @@ echo "Checking accuser logs..."
 ACCUSER_LOGS=$(journalctl -u "octez-accuser@${ACCUSER_INSTANCE}.service" --no-pager --since "1 minute ago" 2>&1 || true)
 echo "Accuser logs:"
 echo "$ACCUSER_LOGS"
-if echo "$ACCUSER_LOGS" | grep -qi "error\|unknown option\|invalid\|unrecognized\|failed to parse"; then
+if grep -qi "error\|unknown option\|invalid\|unrecognized\|failed to parse" <<<"$ACCUSER_LOGS"; then
 	echo "ERROR: Accuser service has errors in logs"
 	show_service_status "accuser" "$ACCUSER_INSTANCE"
 	exit 1

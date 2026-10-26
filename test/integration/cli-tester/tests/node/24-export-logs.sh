@@ -31,7 +31,7 @@ sleep 5
 
 # Export logs
 echo "Exporting logs..."
-EXPORT_OUTPUT=$(om instance "$NODE_INSTANCE" export-logs 2>&1)
+EXPORT_OUTPUT=$(assert_command_output 0 "" "capture export_output" -- om instance "$NODE_INSTANCE" export-logs)
 echo "$EXPORT_OUTPUT"
 
 # Extract archive path from output
@@ -56,21 +56,21 @@ echo "Archive contents:"
 echo "$CONTENTS"
 
 # Check for instance-details.txt
-if ! echo "$CONTENTS" | grep -q "instance-details.txt"; then
+if ! [[ "$CONTENTS" == *"instance-details.txt"* ]]; then
 	echo "ERROR: instance-details.txt not found in archive"
 	exit 1
 fi
 echo "instance-details.txt found"
 
 # Check for service.json
-if ! echo "$CONTENTS" | grep -q "service.json"; then
+if ! [[ "$CONTENTS" == *"service.json"* ]]; then
 	echo "ERROR: service.json not found in archive"
 	exit 1
 fi
 echo "service.json found"
 
 # Check for journald.log
-if ! echo "$CONTENTS" | grep -q "journald.log"; then
+if ! [[ "$CONTENTS" == *"journald.log"* ]]; then
 	echo "ERROR: journald.log not found in archive"
 	exit 1
 fi

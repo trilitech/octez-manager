@@ -43,7 +43,7 @@ echo "Deleting group '$GROUP_A'..."
 om group delete "$GROUP_A"
 
 OUTPUT=$(om group list)
-if echo "$OUTPUT" | grep -q "$GROUP_A"; then
+if [[ "$OUTPUT" == *"$GROUP_A"* ]]; then
 	echo "ERROR: Deleted group A still in list"
 	exit 1
 fi

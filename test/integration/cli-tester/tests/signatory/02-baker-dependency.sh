@@ -33,10 +33,9 @@ om install-signatory \
 	--no-enable 2>&1
 
 echo "==> Step 2: Verify signatory appears in om list"
-if ! om list 2>&1 | grep -q "$SIGNATORY_INSTANCE"; then
+if ! assert_command_output 0 "$SIGNATORY_INSTANCE" "signatory: expected command output" -- om list; then
 	echo "ERROR: Signatory instance '$SIGNATORY_INSTANCE' not found in om list"
 	echo "Full om list output:"
-	om list 2>&1
 	exit 1
 fi
 echo "Signatory instance appears in om list"
@@ -121,21 +120,22 @@ systemctl daemon-reload
 echo "==> Step 10: Verify systemd can resolve the dependency chain"
 # This command would have failed with "Unit octez-signatory@X.service not found"
 # before the fix in src/systemd_dropin.ml:53
-if ! systemctl list-dependencies "$BAKER_UNIT" 2>&1 | grep -q "signatory@${SIGNATORY_INSTANCE}.service"; then
+if ! assert_command_output 0 "signatory@${SIGNATORY_INSTANCE}.service" "signatory: expected command output" -- systemctl list-dependencies "$BAKER_UNIT"; then
 	echo "ERROR: systemd cannot resolve signatory dependency"
-	systemctl list-dependencies "$BAKER_UNIT" || true
 	exit 1
 fi
 
 echo "==> Step 11: Verify no dependency resolution errors"
-# Try to start the baker (should fail gracefully since node isn't running, but dependency should resolve)
-if systemctl start "$BAKER_UNIT" 2>&1 | grep -q "not found"; then
+# The valid fixture accepts the request and resolves dependencies (including starting its node).
+if START_OUTPUT=$(systemctl start "$BAKER_UNIT" 2>&1); then START_STATUS=0; else START_STATUS=$?; fi
+assert_eq 0 "$START_STATUS" "baker start accepted: $START_OUTPUT" || exit 1
+if [[ "$START_OUTPUT" == *"not found"* ]]; then
 	echo "ERROR: systemd reports 'not found' when starting baker"
 	systemctl status "$BAKER_UNIT" || true
 	exit 1
 fi
 
-# Stop the baker (it's expected to fail since node isn't actually running)
+# Stop the accepted request; daemon stability/signing are outside this test.
 systemctl stop "$BAKER_UNIT" 2>/dev/null || true
 
 echo "Test passed: Baker correctly depends on signatory@${SIGNATORY_INSTANCE}.service"

@@ -21,10 +21,10 @@ om install-node \
 	--no-enable 2>&1
 
 # Get list output
-LIST_OUTPUT=$(om list 2>&1)
+LIST_OUTPUT=$(assert_command_output 0 "" "capture list_output" -- om list)
 
 # Verify instance appears
-if ! echo "$LIST_OUTPUT" | grep -q "$INSTANCE"; then
+if ! [[ "$LIST_OUTPUT" == *"$INSTANCE"* ]]; then
 	echo "ERROR: Instance not in list output"
 	echo "Output: $LIST_OUTPUT"
 	exit 1
@@ -32,7 +32,7 @@ fi
 echo "Instance appears in list"
 
 # Verify role appears
-if ! echo "$LIST_OUTPUT" | grep -q "node"; then
+if ! [[ "$LIST_OUTPUT" == *"node"* ]]; then
 	echo "ERROR: Role 'node' not in list output"
 	echo "Output: $LIST_OUTPUT"
 	exit 1
@@ -40,7 +40,7 @@ fi
 echo "Role appears in list"
 
 # Verify network appears
-if ! echo "$LIST_OUTPUT" | grep -q "shadownet"; then
+if ! [[ "$LIST_OUTPUT" == *"shadownet"* ]]; then
 	echo "ERROR: Network not in list output"
 	echo "Output: $LIST_OUTPUT"
 	exit 1
@@ -51,8 +51,8 @@ echo "Network appears in list"
 cleanup_instance "$INSTANCE"
 
 # Verify removed from list
-LIST_AFTER=$(om list 2>&1)
-if echo "$LIST_AFTER" | grep -q "$INSTANCE"; then
+LIST_AFTER=$(assert_command_output 0 "" "capture list_after" -- om list)
+if [[ "$LIST_AFTER" == *"$INSTANCE"* ]]; then
 	echo "ERROR: Instance still in list after removal"
 	exit 1
 fi

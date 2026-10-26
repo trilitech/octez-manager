@@ -61,7 +61,7 @@ NODE_UNIT="octez-node@${NODE_INSTANCE}.service"
 BAKER_UNIT="octez-baker@${BAKER_INSTANCE}.service"
 
 # Verify baker depends on signatory
-if ! systemctl list-dependencies "$BAKER_UNIT" | grep -q "$SIGNATORY_UNIT"; then
+if ! assert_command_output 0 "$SIGNATORY_UNIT" "signatory: expected command output" -- systemctl list-dependencies "$BAKER_UNIT"; then
 	echo "ERROR: Baker not dependent on signatory"
 	exit 1
 fi

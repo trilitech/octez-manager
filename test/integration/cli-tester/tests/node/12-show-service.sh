@@ -22,10 +22,10 @@ om install-node \
 
 # Get show-service output
 echo "Getting service unit..."
-OUTPUT=$(om instance "$INSTANCE" show-service 2>&1)
+OUTPUT=$(assert_command_output 0 "" "capture output" -- om instance "$INSTANCE" show-service)
 
 # Verify it contains systemd unit markers
-if ! echo "$OUTPUT" | grep -q "\[Unit\]\|\[Service\]"; then
+if ! grep -q "\[Unit\]\|\[Service\]" <<<"$OUTPUT"; then
 	echo "ERROR: show-service doesn't show systemd unit format"
 	echo "Output: $OUTPUT"
 	exit 1
@@ -33,7 +33,7 @@ fi
 echo "Shows [Unit] or [Service] section"
 
 # Verify it references the instance
-if ! echo "$OUTPUT" | grep -qi "octez\|node"; then
+if ! grep -qi "octez\|node" <<<"$OUTPUT"; then
 	echo "ERROR: show-service doesn't reference octez/node"
 	echo "Output: $OUTPUT"
 	exit 1

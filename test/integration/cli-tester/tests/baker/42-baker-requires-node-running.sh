@@ -40,15 +40,18 @@ om install-baker \
 
 # Try to start baker - should fail with clear error
 echo "Attempting to start baker (should fail)..."
-if om instance "$BAKER_INSTANCE" start 2>&1; then
+if OUTPUT=$(om instance "$BAKER_INSTANCE" start 2>&1); then
 	echo "ERROR: Baker start should have failed when node is not running"
 	exit 1
+else
+	START_STATUS=$?
 fi
-echo "Baker start correctly failed"
+# Preserve this legacy expected-failure predicate; command launch errors are not rejection evidence.
+[ "$START_STATUS" -ne 126 ] && [ "$START_STATUS" -ne 127 ] || exit 2
+echo "Baker start correctly failed (status $START_STATUS)"
 
-# Verify the error message mentions the dependency
-OUTPUT=$(om instance "$BAKER_INSTANCE" start 2>&1 || true)
-if ! echo "$OUTPUT" | grep -qi "not running\|dependency"; then
+# Verify the diagnostic from that same failed invocation mentions the dependency
+if ! grep -qi "not running\|dependency" <<<"$OUTPUT"; then
 	echo "ERROR: Error message should mention dependency not running"
 	echo "Got: $OUTPUT"
 	exit 1

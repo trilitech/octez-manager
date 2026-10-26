@@ -42,8 +42,8 @@ om group delete "$GROUP_NAME"
 echo "Group deleted"
 
 # Verify it's gone
-OUTPUT=$(om group list 2>&1)
-if echo "$OUTPUT" | grep -q "$GROUP_NAME"; then
+OUTPUT=$(assert_command_output 0 "" "capture output" -- om group list)
+if [[ "$OUTPUT" == *"$GROUP_NAME"* ]]; then
 	echo "ERROR: Group still in list after delete"
 	exit 1
 fi

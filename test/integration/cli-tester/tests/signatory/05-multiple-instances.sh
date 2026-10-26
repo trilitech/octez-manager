@@ -81,9 +81,11 @@ for instance in "$SIGNATORY1_INSTANCE" "$SIGNATORY2_INSTANCE" "$SIGNATORY3_INSTA
 		exit 1
 	fi
 	# Verify it's listed as signatory role
-	if ! om list 2>&1 | grep "$instance" | grep -q "signatory"; then
+	LIST_OUTPUT=$(assert_command_output 0 "$instance" "list signatory instance" -- om list) || exit $?
+	INSTANCE_ROW=$(grep -F "$instance" <<<"$LIST_OUTPUT") || exit 1
+	if ! [[ "$INSTANCE_ROW" == *"signatory"* ]]; then
 		echo "ERROR: Instance $instance not listed as signatory role"
-		om list 2>&1 | grep "$instance"
+		printf '%s\n' "$INSTANCE_ROW"
 		exit 1
 	fi
 done
@@ -160,29 +162,29 @@ BAKER1_UNIT="octez-baker@${BAKER1_INSTANCE}.service"
 BAKER2_UNIT="octez-baker@${BAKER2_INSTANCE}.service"
 
 # Baker 1 -> Signatory 1
-if ! systemctl list-dependencies "$BAKER1_UNIT" | grep -q "signatory@${SIGNATORY1_INSTANCE}.service"; then
+if ! assert_command_output 0 "signatory@${SIGNATORY1_INSTANCE}.service" "signatory: expected command output" -- systemctl list-dependencies "$BAKER1_UNIT"; then
 	echo "ERROR: Baker1 not dependent on signatory1"
-	systemctl list-dependencies "$BAKER1_UNIT"
 	exit 1
 fi
 
 # Baker 2 -> Signatory 2
-if ! systemctl list-dependencies "$BAKER2_UNIT" | grep -q "signatory@${SIGNATORY2_INSTANCE}.service"; then
+if ! assert_command_output 0 "signatory@${SIGNATORY2_INSTANCE}.service" "signatory: expected command output" -- systemctl list-dependencies "$BAKER2_UNIT"; then
 	echo "ERROR: Baker2 not dependent on signatory2"
-	systemctl list-dependencies "$BAKER2_UNIT"
 	exit 1
 fi
 
 echo "==> Step 8: Verify cross-contamination - baker1 should NOT depend on signatory2 or signatory3"
-if systemctl list-dependencies "$BAKER1_UNIT" | grep -q "signatory@${SIGNATORY2_INSTANCE}.service"; then
+DEPENDENCY_OUTPUT=$(assert_command_output 0 "" "read dependency chain" -- systemctl list-dependencies "$BAKER1_UNIT") || exit $?
+if [[ "$DEPENDENCY_OUTPUT" == *"signatory@${SIGNATORY2_INSTANCE}.service"* ]]; then
 	echo "ERROR: Baker1 incorrectly depends on signatory2"
-	systemctl list-dependencies "$BAKER1_UNIT"
+	printf '%s\n' "$DEPENDENCY_OUTPUT"
 	exit 1
 fi
 
-if systemctl list-dependencies "$BAKER1_UNIT" | grep -q "signatory@${SIGNATORY3_INSTANCE}.service"; then
+DEPENDENCY_OUTPUT=$(assert_command_output 0 "" "read dependency chain" -- systemctl list-dependencies "$BAKER1_UNIT") || exit $?
+if [[ "$DEPENDENCY_OUTPUT" == *"signatory@${SIGNATORY3_INSTANCE}.service"* ]]; then
 	echo "ERROR: Baker1 incorrectly depends on signatory3"
-	systemctl list-dependencies "$BAKER1_UNIT"
+	printf '%s\n' "$DEPENDENCY_OUTPUT"
 	exit 1
 fi
 

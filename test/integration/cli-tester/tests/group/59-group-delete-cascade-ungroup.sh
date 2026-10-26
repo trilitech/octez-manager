@@ -53,8 +53,8 @@ fi
 echo "Service survived --ungroup delete"
 
 # Group should be gone
-OUTPUT=$(om group list 2>&1)
-if echo "$OUTPUT" | grep -q "$GROUP_NAME"; then
+OUTPUT=$(assert_command_output 0 "" "capture output" -- om group list)
+if [[ "$OUTPUT" == *"$GROUP_NAME"* ]]; then
 	echo "ERROR: Group still exists after --ungroup delete"
 	exit 1
 fi

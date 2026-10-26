@@ -85,7 +85,7 @@ fi
 echo "✓ Metadata file present"
 
 # Verify we can list the downloaded version
-if ! om binaries list 2>&1 | grep -q "v$VERSION"; then
+if ! assert_command_output 0 "v$VERSION" "binaries: expected command output" -- om binaries list; then
 	echo "ERROR: Downloaded version not shown in binaries list"
 	exit 1
 fi
