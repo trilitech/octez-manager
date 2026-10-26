@@ -28,6 +28,43 @@ assert_contains() {
 	fi
 }
 
+# Assert status and literal stdout from one completed argv invocation.
+# Success echoes stdout for callers that also need a negative/regex assertion.
+# Usage: assert_command_output STATUS LITERAL LABEL -- COMMAND [ARG...]
+assert_command_output() {
+	if [ "$#" -lt 5 ] || [ "$4" != -- ] || [[ ! "$1" =~ ^([0-9]|[1-9][0-9]{1,2})$ ]] || [ "$1" -gt 255 ]; then
+		echo "assert_command_output: expected STATUS LITERAL LABEL -- COMMAND" >&2
+		return 2
+	fi
+	local expected_status="$1" needle="$2" label="$3"
+	shift 4
+	if ! command -v -- "$1" >/dev/null; then
+		echo "assert_command_output: command unavailable: $1" >&2
+		return 2
+	fi
+	local output status errors error_file
+	error_file=$(mktemp) || return 2
+	if output=$("$@" 2>"$error_file"); then status=0; else status=$?; fi
+	if ! errors=$(cat -- "$error_file"); then
+		rm -f -- "$error_file"
+		return 2
+	fi
+	rm -f -- "$error_file" || return 2
+	if [ "$status" -eq 126 ] || [ "$status" -eq 127 ]; then
+		printf 'Command setup failed: %s (status %s)\n%s\n%s\n' "$label" "$status" "$output" "$errors" >&2
+		return 2
+	fi
+	if ! assert_eq "$expected_status" "$status" "$label: command status" >&2; then
+		printf 'stdout:\n%s\nstderr:\n%s\n' "$output" "$errors" >&2
+		return 1
+	fi
+	if ! assert_contains "$output" "$needle" "$label" >&2; then
+		printf 'Expected/actual status: %s/%s\nstderr:\n%s\n' "$expected_status" "$status" "$errors" >&2
+		return 1
+	fi
+	printf '%s\n' "$output"
+}
+
 assert_file_exists() {
 	local path="$1"
 	local msg="${2:-file should exist: $path}"
@@ -67,7 +104,8 @@ _OM_USER_LOCK="/tmp/om-service-user.lock"
 instance_exists() {
 	local instance="$1"
 	# Primary check: ask octez-manager
-	if om list 2>&1 | grep -q "$instance"; then
+	local output
+	if output=$(om list 2>/dev/null) && [[ "$output" == *"$instance"* ]]; then
 		return 0
 	fi
 	# Fallback: check the service registry file directly.
@@ -109,7 +147,8 @@ service_exists() {
 	# fully propagated through systemd's internal state
 	while [ $retry -lt $max_retries ]; do
 		# Template units are listed as role@.service, not role@instance.service
-		if systemctl list-unit-files "octez-${role}@.service" 2>/dev/null | grep -q "octez-${role}@"; then
+		local output
+		if output=$(systemctl list-unit-files "octez-${role}@.service" 2>/dev/null) && [[ "$output" == *"octez-${role}@"* ]]; then
 			return 0
 		fi
 
@@ -429,7 +468,7 @@ SERVICE
 # Check if external service is detected
 external_service_detected() {
 	local service_name="$1"
-	om list --external 2>&1 | grep -q "$service_name"
+	assert_command_output 0 "$service_name" "external service $service_name" -- om list --external >/dev/null
 }
 
 # Wait for external service to be detected (with retries)
@@ -455,7 +494,10 @@ wait_for_external_service() {
 service_is_managed() {
 	local instance="$1"
 	# Check that instance appears in list but NOT in external services section
-	om list 2>&1 | grep -v "External Octez Services" | grep -q "$instance"
+	local output
+	output=$(om list 2>/dev/null) || return 1
+	output=$(grep -v "External Octez Services" <<<"$output") || return 1
+	[[ "$output" == *"$instance"* ]]
 }
 
 # Verify external service is disabled
