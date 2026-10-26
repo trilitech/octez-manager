@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QaState",
+  "description": "Canonical shape for briefs/<task>-qa-state.json (schema/qa-state-schema.md documents the full shape). Validated by the hand-rolled interpreter in scripts/lib/review/finding-schema.js (D-4, zero-dep) which supports only: type, enum, required, properties, additionalProperties, items. qa_no_go_round is DELIBERATELY NOT required (V2-2) — an absent value is handled procedurally by the gate (default 0 + warning), not by schema-driven exit 2.",
+  "type": "object",
+  "required": ["status", "round", "cycle", "rounds_audit"],
+  "properties": {
+    "task": { "type": "string" },
+    "date": { "type": "string" },
+    "status": { "type": "string", "enum": ["GO", "NO-GO"] },
+    "round": { "type": "integer" },
+    "cycle": { "type": "integer" },
+    "qa_no_go_round": { "type": "integer" },
+    "max_qa_rounds_at_emission": { "type": "integer" },
+    "escalation": { "type": ["string", "null"], "enum": ["qa-not-converging", null] },
+    "cross_runtime": { "type": "object" },
+    "rounds_audit": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["round", "date", "verdict", "causes", "qualifying"],
+        "properties": {
+          "round": { "type": "integer" },
+          "date": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["GO", "NO-GO"] },
+          "causes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "gate-failure",
+                "environment-failure",
+                "spec-check-failure",
+                "code-intel-violation",
+                "code-intel-malformed",
+                "tui-failure",
+                "cross-runtime-discrepancy"
+              ]
+            }
+          },
+          "qualifying": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}
