@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/mathiasbourgoin/roster",
+  "source_commit": "d099217bd795ed951243d3d0d1b916b1ca5b723c",
+  "bundle_version": "1.10.3",
+  "manifest_sha256": "26be3443304dd2f4b2cee77fd3466e3f61d16fa9ba6d78b78cd533e5901059b2",
+  "qualified_ci": "https://github.com/mathiasbourgoin/roster/actions/runs/40410628612"
+}
