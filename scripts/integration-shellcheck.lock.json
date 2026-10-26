@@ -1,0 +1,6 @@
+{
+  "image": "koalaman/shellcheck@sha256:5dd00cd58babeaa9c2abaa3f454ce75d21d12ae4a36e38c1458e19135fdcc255",
+  "binary_path": "/bin/shellcheck",
+  "version": "v0.11.0-165-g2a525eb",
+  "sha256": "e2df236ba365f0144347c106c5c3915ad5bbd3f1e87c575656b5d541a6d043eb"
+}

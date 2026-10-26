@@ -41,17 +41,22 @@ producer() {
 }
 assert_command_output 0 'stdout original' literal -- producer >/dev/null || fail "success rejected"
 assert_command_output 7 'stdout original' expected-seven -- producer 7 >/dev/null || fail "explicit nonzero rejected"
-if assert_command_output 0 'stdout original' wrong-status -- producer 7 >"$scratch/out" 2>"$scratch/error"; then fail "nonzero with match accepted"; fi
+if assert_command_output 0 'stdout original' wrong-status -- producer 7 >"$scratch/out" 2>"$scratch/error"; then fail "nonzero with match accepted"; else status=$?; fi
+[ "$status" -eq 1 ] || fail "wrong producer status was not assertion1"
 errors=$(cat "$scratch/error")
 [[ "$errors" == *'Actual:   7'* && "$errors" == *'stdout original'* && "$errors" == *'stderr original'* ]] || fail "status/streams lost"
 for text in missing 'stderr original'; do
-	if assert_command_output 0 "$text" missing -- producer >/dev/null 2>&1; then fail "absent stdout accepted"; fi
+	if assert_command_output 0 "$text" missing -- producer >/dev/null 2>&1; then fail "absent stdout accepted"; else status=$?; fi
+	[ "$status" -eq 1 ] || fail "absent literal was not assertion1"
 done
 literal() { printf '%s\n' 'literal.[name]*'; }
 assert_command_output 0 'literal.[name]*' literal -- literal >/dev/null || fail "literal metacharacters changed"
-if assert_command_output 0 'literalXname' literal -- literal >/dev/null 2>&1; then fail "literal interpreted as regex"; fi
+literal_lookalike() { printf '%s\n' 'literalXname'; }
+if assert_command_output 0 'literal.[name]*' literal -- literal_lookalike >/dev/null 2>&1; then fail "literal interpreted as regex"; else status=$?; fi
+[ "$status" -eq 1 ] || fail "literal mismatch was not assertion1"
 # An assertion called under if must propagate its own failure despite disabled errexit.
-if assert_command_output 0 missing conditional -- producer >/dev/null 2>&1; then fail "conditional failure swallowed"; fi
+if assert_command_output 0 missing conditional -- producer >/dev/null 2>&1; then fail "conditional failure swallowed"; else status=$?; fi
+[ "$status" -eq 1 ] || fail "conditional failure was not assertion1"
 status=0
 assert_command_output 0 '' unavailable -- "$scratch/absent" >/dev/null 2>&1 || status=$?
 [ "$status" -ge 2 ] || fail "missing command not infrastructure"
@@ -89,4 +94,7 @@ systemctl() {
 }
 service_exists node fixture 2 >/dev/null || fail "service retry did not recover"
 [ "$(cat "$scratch/systemctl-retry")" = 2 ] || fail "service retry swallowed producer status"
+status=0
+TMPDIR="$scratch/nonexistent" assert_command_output 0 '' capture-setup -- producer >/dev/null 2>&1 || status=$?
+[ "$status" -ge 2 ] || fail "capture setup was not infrastructure"
 echo "Completed command-output selftest passed"
