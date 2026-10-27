@@ -65,8 +65,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-; TUI tests are skipped in CI (headless driver hangs in container)
-; Run locally with: dune exec test/tui_flow_tests.exe
+; Headless TUI tests. Run one with: dune exec test/<name>.exe
 
 ; Shared TUI test helpers library
 
@@ -117,7 +116,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_install_baker_form)
  (libraries
   alcotest
@@ -131,7 +130,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_install_accuser_form)
  (libraries
   alcotest
@@ -145,7 +144,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_install_dal_node_form)
  (libraries
   alcotest
@@ -159,7 +158,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_modal_interactions)
  (libraries
   alcotest
@@ -843,7 +842,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_instance_details)
  (libraries
   alcotest
@@ -858,7 +857,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_log_viewer_page)
  (libraries
   alcotest
@@ -873,7 +872,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_import_wizard)
  (libraries
   alcotest
@@ -1240,7 +1239,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_help_modal_no_duplicates)
  (libraries
   alcotest
@@ -1254,7 +1253,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_help_modal_navigation)
  (libraries
   alcotest
