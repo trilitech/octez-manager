@@ -15,7 +15,7 @@ The UI regression testing framework provides **pixel-perfect screenshot comparis
 - **100% Deterministic**: Fixed time, seeded random, predictable I/O
 - **No Flakiness**: Same inputs always produce identical output
 - **Fast**: Tests complete in ~500ms
-- **CI-Safe**: Unlike other TUI tests, these don't hang in containers
+- **CI-Safe**: Headless; no terminal needed
 - **Coverage Friendly**: Runs as part of `dune runtest` and contributes to coverage
 
 ---
@@ -165,7 +165,9 @@ UPDATE_REGRESSIONS=1 dune exec test/test_ui_regressions_forms_comprehensive.exe
 
 Update mode is refused when `CI=true` or `GITHUB_ACTIONS=true`, and the suite then exits 2. Normal verification never writes: a missing baseline fails the check.
 
-Known-stale baselines are listed in `test/ui_regressions/QUARANTINE` as `name issue-url reason`. A quarantined check passes only while its screen still differs from the baseline; once it matches, the check fails and the entry must be removed.
+Known-stale baselines can be listed in `test/ui_regressions/QUARANTINE`, one per line, as `name issue-url drift-digest reason...`. A quarantined check passes only while the rendered screen is exactly the recorded drift. A screen that matches the baseline fails, and the entry must then be removed. Any other screen also fails, as a new regression. A failing check prints the current screen's digest.
+
+`test_ui_regressions_forms_comprehensive` is not run by `dune runtest`. Its install forms render differently for root and for each local user (service user, root-only rows, column widths), so no committed baseline is portable (#1071). `test/test_inventory.sexp` classifies it as `manual`. Run it on demand with `dune exec test/test_ui_regressions_forms_comprehensive.exe`.
 
 ### Check Coverage
 
@@ -220,7 +222,7 @@ The headless TUI suites (`tui_flow_tests`, the install-form, page and help-modal
   - Validates deterministic random
 
 ### Form Regression Tests
-- `test_ui_regressions_forms_comprehensive.ml` (the older `test_ui_regressions_forms.ml` is no longer built)
+- `test_ui_regressions_forms_comprehensive.ml`, manual, not in `dune runtest` (see above; the older `test_ui_regressions_forms.ml` is no longer built)
   - Install node form: empty state
   - Install node form: name filled
   - Install node form: network field focused

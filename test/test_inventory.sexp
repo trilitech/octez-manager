@@ -125,7 +125,6 @@
 ((name test_systemd_templates) (class deterministic))
 ((name test_teztnets) (class deterministic))
 ((name test_ui_regression_framework_self) (class deterministic))
-((name test_ui_regressions_forms_comprehensive) (class deterministic))
 ((name test_ui_regressions_minimal) (class deterministic))
 ((name test_version_checker) (class deterministic))
 ((name test_version_checker_props) (class deterministic))
@@ -140,6 +139,11 @@
  (class env-gated)
  (gate
   "CI integration shard 2: test/integration/cli-tester/tests/headless/01-golden-path.sh (needs systemd and Octez binaries, CI=true)"))
+
+((name test_ui_regressions_forms_comprehensive)
+ (class manual)
+ (reason
+  "Install-form rendering depends on euid and user (service user, root-only rows, column widths); no portable baseline, see #1071"))
 
 ((name test_help_modal_debug)
  (class manual)
