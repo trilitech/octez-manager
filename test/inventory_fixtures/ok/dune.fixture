@@ -1,0 +1,7 @@
+(test
+ (name t_ok)
+ (modules t_ok))
+
+(executable
+ (name t_gated)
+ (modules t_gated))

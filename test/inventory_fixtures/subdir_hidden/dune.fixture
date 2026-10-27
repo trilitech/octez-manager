@@ -1,0 +1,5 @@
+(subdir
+ inner
+ (test
+  (name t_s)
+  (modules t_s)))

@@ -26,7 +26,7 @@ let test_page_capture () =
   (* For now, just verify the framework can capture screen content *)
   let _content = HD.get_screen_content () in
 
-  (* This will create a baseline on first run *)
+  (* Verified against the committed minimal_screen baseline *)
   URF.assert_ui_regression "minimal_screen"
 
 (** Test that environment is set up *)
@@ -70,5 +70,12 @@ let framework_tests =
     ("fixed_time", `Quick, test_fixed_time);
     ("deterministic_random", `Quick, test_deterministic_random);
   ]
+
+let () =
+  match URF.check_setup () with
+  | Ok () -> ()
+  | Error msg ->
+      prerr_endline ("UI regression setup error: " ^ msg) ;
+      exit 2
 
 let () = Alcotest.run "UI_Regression_Framework" [("framework", framework_tests)]

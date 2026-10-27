@@ -1,0 +1,4 @@
+# Known-stale UI baselines: name issue-url drift-digest reason
+# A quarantined check passes only while the rendered screen is exactly the
+# recorded drift (its digest). A match with the baseline, or any other
+# screen, fails. Remove the line when the baseline is refreshed or fixed.

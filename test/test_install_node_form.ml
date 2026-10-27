@@ -738,7 +738,12 @@ let form_tests =
   [
     ("form loads and renders", `Quick, test_form_loads);
     ("form has intelligent defaults", `Quick, test_form_has_defaults);
-    ("form shows all required fields", `Quick, test_shows_all_required_fields);
+    ( "form shows all required fields",
+      `Quick,
+      Test_quarantine.known_failure
+        ~issue:1073
+        ~expect:"shows Confirm button"
+        test_shows_all_required_fields );
     ( "form shows validation indicators",
       `Quick,
       test_shows_validation_indicators );

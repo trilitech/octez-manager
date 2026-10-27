@@ -1,0 +1,10 @@
+(executable
+ (name t_m)
+ (modules t_m))
+
+(rule
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes
+   (or 0 1)
+   (run %{exe:t_m.exe}))))

@@ -65,8 +65,18 @@
  (instrumentation
   (backend bisect_ppx)))
 
-; TUI tests are skipped in CI (headless driver hangs in container)
-; Run locally with: dune exec test/tui_flow_tests.exe
+; Headless TUI tests. Run one with: dune exec test/<name>.exe
+
+(library
+ (name test_quarantine_lib)
+ (wrapped false)
+ (libraries alcotest str)
+ (modules test_quarantine))
+
+(test
+ (name test_quarantine_self)
+ (libraries alcotest test_quarantine_lib)
+ (modules test_quarantine_self))
 
 ; Shared TUI test helpers library
 
@@ -89,9 +99,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name tui_flow_tests)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -103,9 +114,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_install_node_form)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -117,7 +129,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_install_baker_form)
  (libraries
   alcotest
@@ -131,7 +143,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_install_accuser_form)
  (libraries
   alcotest
@@ -145,7 +157,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_install_dal_node_form)
  (libraries
   alcotest
@@ -159,7 +171,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_modal_interactions)
  (libraries
   alcotest
@@ -173,9 +185,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_instances_page)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -416,8 +429,41 @@
   tui_test_helpers_lib
   ui_regression_framework_lib)
  (modules test_ui_regressions_minimal)
+ (deps
+  (glob_files ui_regressions/*.screen)
+  ui_regressions/QUARANTINE)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_ui_regression_framework_self)
+ (libraries alcotest ui_regression_framework_lib)
+ (modules test_ui_regression_framework_self))
+
+; Negative control: baseline update mode must be refused in CI with the
+; documented setup exit 2 and message
+
+(rule
+ (deps
+  (glob_files ui_regressions/*.screen)
+  ui_regressions/QUARANTINE)
+ (action
+  (with-outputs-to
+   ci_update_refusal.out
+   (setenv
+    CI
+    true
+    (setenv
+     UPDATE_REGRESSIONS
+     1
+     (with-accepted-exit-codes
+      2
+      (run %{exe:test_ui_regressions_minimal.exe})))))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff ci_update_refusal.expected ci_update_refusal.out)))
 
 ; TEMPORARILY DISABLED: Flaky due to table column width differences between environments
 ; Re-enable once rendering is deterministic across CI/local
@@ -436,7 +482,12 @@
 ;  (instrumentation
 ;   (backend bisect_ppx)))
 
-(test
+; Manual: the install forms render differently for root and for each user
+; (service user, root-only rows, column widths), so no committed baseline
+; is portable. Run with: dune exec test/test_ui_regressions_forms_comprehensive.exe
+; (see #1071).
+
+(executable
  (name test_ui_regressions_forms_comprehensive)
  (libraries
   alcotest
@@ -814,7 +865,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_instance_details)
  (libraries
   alcotest
@@ -829,7 +880,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_log_viewer_page)
  (libraries
   alcotest
@@ -844,7 +895,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_import_wizard)
  (libraries
   alcotest
@@ -1155,9 +1206,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_help_modal_baseline)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -1169,9 +1221,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_help_modal_improvements)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -1183,9 +1236,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_help_modal_all_pages)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -1197,9 +1251,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_help_modal_regression)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -1211,7 +1266,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_help_modal_no_duplicates)
  (libraries
   alcotest
@@ -1225,7 +1280,7 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_help_modal_navigation)
  (libraries
   alcotest
@@ -1252,3 +1307,178 @@
  (modules test_help_modal_debug)
  (instrumentation
   (backend bisect_ppx)))
+
+; Test inventory contract (see test_inventory.sexp)
+
+(executable
+ (name check_test_inventory)
+ (libraries str)
+ (modules check_test_inventory))
+
+(rule
+ (alias runtest)
+ (deps
+  test_inventory.sexp
+  dune
+  mocks/dune
+  (glob_files *.ml)
+  (glob_files mocks/*.ml))
+ (action
+  (run
+   %{exe:check_test_inventory.exe}
+   --manifest
+   test_inventory.sexp
+   --dune
+   dune
+   --dune
+   mocks/dune)))
+
+; Negative controls: each fixture has one defect and a documented exit code
+
+(rule
+ (deps
+  (source_tree inventory_fixtures))
+ (action
+  (with-outputs-to
+   inventory_fixtures.out
+   (progn
+    (echo "== ok (expect exit 0)\n")
+    (with-accepted-exit-codes
+     0
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/ok/manifest.sexp
+      --dune
+      inventory_fixtures/ok/dune.fixture))
+    (echo "== unregistered (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/unregistered/manifest.sexp
+      --dune
+      inventory_fixtures/unregistered/dune.fixture))
+    (echo "== unclassified (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/unclassified/manifest.sexp
+      --dune
+      inventory_fixtures/unclassified/dune.fixture))
+    (echo "== dead (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/dead/manifest.sexp
+      --dune
+      inventory_fixtures/dead/dune.fixture))
+    (echo "== orphan (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/orphan/manifest.sexp
+      --dune
+      inventory_fixtures/orphan/dune.fixture))
+    (echo "== parse_error (expect exit 2)\n")
+    (with-accepted-exit-codes
+     2
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/parse_error/manifest.sexp
+      --dune
+      inventory_fixtures/parse_error/dune.fixture))
+    (echo "== masked_rule (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/masked_rule/manifest.sexp
+      --dune
+      inventory_fixtures/masked_rule/dune.fixture))
+    (echo "== conditional (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/conditional/manifest.sexp
+      --dune
+      inventory_fixtures/conditional/dune.fixture))
+    (echo "== gated_test (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/gated_test/manifest.sexp
+      --dune
+      inventory_fixtures/gated_test/dune.fixture))
+    (echo "== obsolete_stanza (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/obsolete_stanza/manifest.sexp
+      --dune
+      inventory_fixtures/obsolete_stanza/dune.fixture))
+    (echo "== unclassified_test (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/unclassified_test/manifest.sexp
+      --dune
+      inventory_fixtures/unclassified_test/dune.fixture))
+    (echo "== block_string (expect exit 2)\n")
+    (with-accepted-exit-codes
+     2
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/block_string/manifest.sexp
+      --dune
+      inventory_fixtures/block_string/dune.fixture))
+    (echo "== subdir_hidden (expect exit 2)\n")
+    (with-accepted-exit-codes
+     2
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/subdir_hidden/manifest.sexp
+      --dune
+      inventory_fixtures/subdir_hidden/dune.fixture))
+    (echo "== tool_unreferenced (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/tool_unreferenced/manifest.sexp
+      --dune
+      inventory_fixtures/tool_unreferenced/dune.fixture))
+    (echo "== duplicate_name (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/duplicate_name/manifest.sexp
+      --dune
+      inventory_fixtures/duplicate_name/dune.fixture))))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff inventory_fixtures/expected.out inventory_fixtures.out)))

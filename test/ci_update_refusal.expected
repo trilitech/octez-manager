@@ -1,0 +1,1 @@
+UI regression setup error: baseline update mode is refused when CI=true or GITHUB_ACTIONS=true

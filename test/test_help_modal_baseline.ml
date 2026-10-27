@@ -77,7 +77,17 @@ let () =
     [
       ( "baseline_behavior",
         [
-          ("global shortcuts only", `Quick, test_current_help_modal_global_only);
-          ("wallets custom help", `Quick, test_wallets_custom_help);
+          ( "global shortcuts only",
+            `Quick,
+            Test_quarantine.known_failure
+              ~issue:1074
+              ~expect:"does NOT show 'Page shortcuts:'"
+              test_current_help_modal_global_only );
+          ( "wallets custom help",
+            `Quick,
+            Test_quarantine.known_failure
+              ~issue:1074
+              ~expect:"wallets shows j/Down"
+              test_wallets_custom_help );
         ] );
     ]

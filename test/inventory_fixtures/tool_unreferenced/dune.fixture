@@ -1,0 +1,3 @@
+(executable
+ (name t_t)
+ (modules t_t))

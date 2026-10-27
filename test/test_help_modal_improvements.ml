@@ -207,7 +207,12 @@ let () =
       ( "new_behavior",
         [
           ("shows both sections", `Quick, test_help_modal_has_both_sections);
-          ("instances page shortcuts", `Quick, test_instances_page_shortcuts);
+          ( "instances page shortcuts",
+            `Quick,
+            Test_quarantine.known_failure
+              ~issue:1074
+              ~expect:"shows 'Group/Role view' help"
+              test_instances_page_shortcuts );
           ("diagnostics page shortcuts", `Quick, test_diagnostics_page_shortcuts);
           ("wallets uses global help", `Quick, test_wallets_uses_global_help);
           ( "main shell shows child keymap",

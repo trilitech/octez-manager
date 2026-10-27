@@ -1,0 +1,7 @@
+(test
+ (name t_d)
+ (modules t_d))
+
+(executable
+ (name t_d)
+ (modules t_d2))
