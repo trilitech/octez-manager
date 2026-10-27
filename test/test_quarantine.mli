@@ -13,7 +13,7 @@
 
 (** [known_failure ~issue ~expect test] runs [test] and inverts its outcome.
     [issue] is a [trilitech/octez-manager] issue number. The case passes only
-    if [test] fails on an Alcotest check whose message contains [expect]. It
+    if [test] fails on an Alcotest check whose message is exactly [expect]. It
     fails if [test] passes, or fails on another check; any other exception (a
     crash, a [failwith], a setup error) propagates. *)
 val known_failure : issue:int -> expect:string -> (unit -> unit) -> unit -> unit

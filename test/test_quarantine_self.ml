@@ -30,6 +30,13 @@ let test_other_assertion_fails () =
   in
   Alcotest.(check bool) "different assertion rejected" true (raised wrapped)
 
+let test_message_prefix_is_not_enough () =
+  let wrapped =
+    Test_quarantine.known_failure ~issue:1 ~expect:"modal opened" (fun () ->
+        Alcotest.fail "modal opened on Enter")
+  in
+  Alcotest.(check bool) "prefix collision rejected" true (raised wrapped)
+
 let test_fixed_case_fails () =
   let wrapped =
     Test_quarantine.known_failure ~issue:1 ~expect:"x" (fun () -> ())
@@ -45,6 +52,9 @@ let () =
           ("still failing case passes", `Quick, test_still_failing_case_passes);
           ("fixed case fails", `Quick, test_fixed_case_fails);
           ("other assertion fails", `Quick, test_other_assertion_fails);
+          ( "message prefix is not enough",
+            `Quick,
+            test_message_prefix_is_not_enough );
           ( "crash is not a known failure",
             `Quick,
             test_crash_is_not_a_known_failure );

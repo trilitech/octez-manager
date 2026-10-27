@@ -12,10 +12,11 @@ let alcotest_assertion = "Alcotest assertion failure"
 
 let strip_ansi s = Str.global_replace (Str.regexp "\027\\[[0-9;]*m") "" s
 
-let contains ~sub s =
-  match Str.search_forward (Str.regexp_string sub) s 0 with
-  | _ -> true
-  | exception Not_found -> false
+(* The failed check's message is printed alone on its "FAIL <message>" line. *)
+let fails_on ~expect printed =
+  String.split_on_char '\n' printed
+  |> List.exists (fun line ->
+      String.equal (String.trim line) ("FAIL " ^ expect))
 
 (* Alcotest does not export its assertion exception; its printer starts with
    [alcotest_assertion] and includes the failed check as "FAIL <message>". *)
@@ -29,7 +30,7 @@ let known_failure ~issue ~expect test () =
   | exception e
     when String.starts_with ~prefix:alcotest_assertion (Printexc.to_string e) ->
       let printed = strip_ansi (Printexc.to_string e) in
-      if contains ~sub:("FAIL " ^ expect) printed then
+      if fails_on ~expect printed then
         Printf.printf "⚠ known failure %S (%s)\n%!" expect (issue_url issue)
       else
         Alcotest.failf
