@@ -100,8 +100,10 @@ def check_annotations(checker, source, temporary):
     # data. SC1107 points at an unknown key only in a real shellcheck comment.
     text = source.read_text(encoding="utf-8")
     probe = temporary / "annotation-probe.sh"
-    for match in re.finditer(r"#[ \t]*shellcheck[ \t]+([^\n]*)", text):
-        position = match.start(1)
+    # Match headers only: consuming a line suffix can hide a later real
+    # annotation behind an earlier candidate that is merely quoted data.
+    for match in re.finditer(r"#[ \t]*shellcheck[ \t]+", text):
+        position = match.end()
         prefix = text[:position]
         line = prefix.count("\n") + 1
         column = len(prefix.rsplit("\n", 1)[-1].expandtabs(8)) + 1
@@ -113,7 +115,7 @@ def check_annotations(checker, source, temporary):
         actual = any(record["code"] == 1107 and record["file"] == str(probe)
                      and record["line"] == line and record.get("column") == column
                      for record in records)
-        if actual and suppresses_2337(match[1]):
+        if actual and suppresses_2337(text[position:].split("\n", 1)[0]):
             raise Refusal("SC2337/all suppression is forbidden: " + str(source))
 
 

@@ -101,6 +101,10 @@ class IntegrationPipefail(unittest.TestCase):
         self.source.write_text("printf '%s\\n' '# shellcheck disable=SC2086'\n")
         self.check(0)
 
+    def test_literal_candidate_cannot_mask_nested_annotation(self):
+        self.source.write_text("echo '# shellcheck disable=SC2086' \"$( # shellcheck disable=SC2337\nprintf x | grep -q x\n)\"\n")
+        self.check(2)
+
     def test_directive_values_are_not_disable_keys(self):
         self.source.write_text('# shellcheck source="disable=SC2337" disable=SC2086\necho ready\n')
         self.check(0)

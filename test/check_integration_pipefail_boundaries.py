@@ -76,6 +76,19 @@ def check(adapter, checker, case):
             ]:
                 source.write_text(text)
                 run(2, "actual annotation remains forbidden")
+        if case in {"all", "mixed"}:
+            literal = "'# shellcheck disable=SC2086' "
+            nested = '\"$( # shellcheck disable=SC2337\nprintf x | grep -q x\n)\"'
+            for label, text, expected in [
+                ("literal before real same-line annotation", "echo " + literal + nested + "\n", 2),
+                ("remove preceding literal", "echo " + nested + "\n", 2),
+                ("remove actual suppression", "echo " + literal + '\"$(\nprintf x | grep -q x\n)\"\n', 1),
+                ("multiple harmless same-line candidates", "echo " + literal + literal + "\n", 0),
+                ("multiple real candidates", "echo " + nested + " " + nested + "\n", 2),
+                ("two literals before real annotation", "echo " + literal + literal + nested + "\n", 2),
+            ]:
+                source.write_text(text)
+                run(expected, label)
         source.write_text(safe)
         if case in {"all", "ancestors"}:
             for component in (root, root / "test", sources):
@@ -94,7 +107,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--adapter", type=Path, required=True)
     parser.add_argument("--shellcheck", type=Path, required=True)
-    parser.add_argument("--case", choices=("all", "ranges", "ancestors", "comments"), default="all")
+    parser.add_argument("--case", choices=("all", "ranges", "ancestors", "comments", "mixed"), default="all")
     options = parser.parse_args()
     try:
         if not options.adapter.is_file() or not options.shellcheck.is_file():

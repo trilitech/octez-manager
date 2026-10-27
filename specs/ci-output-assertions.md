@@ -58,3 +58,11 @@ retains refusal2 for actual directives, covering ranges/all and nested command
 substitutions. The identical driver against the6f adapter returns assertion1 for
 the known false refusals after successful tool preflight; missing tools or adapter
 still return2. Both original false-refusal examples also have dedicated unit tests.
+
+
+Every textual annotation header is independently enumerated, including multiple
+candidates on one physical line. A preceding quoted literal must not consume or
+hide a later actual annotation. `--case mixed` on the boundary driver requires
+literal-plus-real2, real-only2, unsuppressed unsafe1, multiple literal-only0 and
+multiple real directives2; it returns assertion1 against the bc87420 adapter and
+passes0 with the header-only enumeration fix. Setup controls remain2.
