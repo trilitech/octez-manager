@@ -17,9 +17,26 @@ class Refusal(Exception):
     """Input/tool failure; never assertion-backed red evidence."""
 
 
+def suppresses_2337(directive):
+    for token in shlex.split(directive):
+        key, separator, value = token.partition("=")
+        if key != "disable" or not separator:
+            continue
+        for code in value.lower().split(","):
+            if code == "all":
+                return True
+            match = re.fullmatch(r"(?:sc)?(\d+)(?:-(?:sc)?(\d+))?", code)
+            if match:
+                lower = int(match[1])
+                upper = int(match[2]) if match[2] else lower
+                if lower <= 2337 <= upper:
+                    return True
+    return False
+
+
 def inventory(root):
     directory = root / "test/integration"
-    if root.is_symlink() or directory.is_symlink() or not directory.is_dir():
+    if any(path.is_symlink() for path in (root, root / "test", directory)) or not directory.is_dir():
         raise Refusal("integration source directory unavailable or symlinked")
     files = []
     def failed(error):
@@ -36,9 +53,8 @@ def inventory(root):
             if not stat.S_ISREG(mode) or not mode & 0o444:
                 raise Refusal("source must be a readable regular file: " + str(source))
             text = source.read_text(encoding="utf-8")
-            for directive in re.findall(r"#\s*shellcheck\s+disable\s*=([^\n]*)", text):
-                codes = re.split(r"[\s,]+", directive.lower())
-                if any(code in {"2337", "sc2337", "all"} for code in codes):
+            for directive in re.findall(r"#\s*shellcheck\s+([^\n]*)", text):
+                if suppresses_2337(directive):
                     raise Refusal("SC2337/all suppression is forbidden: " + str(source))
             files.append(source)
     if not files:

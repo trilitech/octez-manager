@@ -83,6 +83,16 @@ class IntegrationPipefail(unittest.TestCase):
         self.source.write_text("# shellcheck disable=SC2086\necho $unquoted\n")
         self.check(0)
 
+    def test_review_boundary_ratchet(self):
+        result = subprocess.run([sys.executable, str(ROOT / "test/check_integration_pipefail_boundaries.py"),
+                                 "--adapter", str(ADAPTER), "--shellcheck", str(CHECKER)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_directive_values_are_not_disable_keys(self):
+        self.source.write_text('# shellcheck source="disable=SC2337" disable=SC2086\necho ready\n')
+        self.check(0)
+
     def test_empty(self):
         self.source.unlink()
         self.assertIn("empty", self.check(2).stderr)

@@ -7,6 +7,7 @@ on:
       - 'scripts/check-integration-pipefail.py'
       - 'scripts/integration-shellcheck.lock.json'
       - 'test/test_integration_pipefail.py'
+      - 'test/check_integration_pipefail_boundaries.py'
       - '.github/workflows/integration-output-assertions.yml'
   push:
     branches: [main]
@@ -15,6 +16,7 @@ on:
       - 'scripts/check-integration-pipefail.py'
       - 'scripts/integration-shellcheck.lock.json'
       - 'test/test_integration_pipefail.py'
+      - 'test/check_integration_pipefail_boundaries.py'
       - '.github/workflows/integration-output-assertions.yml'
   workflow_dispatch:
 
