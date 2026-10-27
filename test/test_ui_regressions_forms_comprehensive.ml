@@ -516,6 +516,13 @@ let dal_form_tests =
   ]
 
 let () =
+  match URF.check_setup () with
+  | Ok () -> ()
+  | Error msg ->
+      prerr_endline ("UI regression setup error: " ^ msg) ;
+      exit 2
+
+let () =
   Alcotest.run
     "UI_Regressions_Forms_Comprehensive"
     [

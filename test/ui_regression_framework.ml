@@ -6,15 +6,9 @@
 (******************************************************************************)
 
 (** UI Regression Testing Framework
-    
-    Provides infrastructure for capturing and comparing UI screenshots
-    to detect visual regressions. Uses headless driver to render UI
-    and compares rendered output pixel-perfect.
-    
-    Usage:
-      - Run with --update-regressions to capture baseline screenshots
-      - Normal runs compare against baseline and fail on differences
-*)
+
+    Captures rendered screens and compares them with committed baselines.
+    See the interface for the verification contract. *)
 
 module HD = Lib_miaou_internal.Headless_driver
 
@@ -22,21 +16,58 @@ module HD = Lib_miaou_internal.Headless_driver
 (* Configuration *)
 (* ============================================================ *)
 
-let regression_dir = "test/ui_regressions"
+let regression_dir_env = "OM_UI_REGRESSION_DIR"
+
+let quarantine_file = "QUARANTINE"
+
+let issue_url_prefix = "https://github.com/trilitech/octez-manager/issues/"
 
 let update_mode = ref false
 
 let () =
-  (* Check if UPDATE_REGRESSIONS env var is set, or --update-regressions flag *)
   (match Sys.getenv_opt "UPDATE_REGRESSIONS" with
   | Some "1" | Some "true" -> update_mode := true
   | _ -> ()) ;
+  if Array.exists (String.equal "--update-regressions") Sys.argv then
+    update_mode := true
 
-  (* Also check command line for backward compatibility *)
-  if Array.length Sys.argv > 1 then
-    for i = 1 to Array.length Sys.argv - 1 do
-      if Sys.argv.(i) = "--update-regressions" then update_mode := true
-    done
+let is_ci () =
+  let set name =
+    match Sys.getenv_opt name with Some "true" -> true | _ -> false
+  in
+  set "CI" || set "GITHUB_ACTIONS"
+
+exception Setup_error of string
+
+let setup_error fmt = Printf.ksprintf (fun msg -> raise (Setup_error msg)) fmt
+
+let is_dir path = Sys.file_exists path && Sys.is_directory path
+
+(** Baseline directory lookup. Under [dune runtest] the cwd is
+    [_build/default/test] and the baselines are copied there as declared
+    dependencies; under [dune exec] from the repository root they live in
+    [test/ui_regressions]. A missing directory is a setup error, never an
+    empty baseline set. *)
+let resolve_regression_dir () =
+  match Sys.getenv_opt regression_dir_env with
+  | Some dir when is_dir dir -> Ok dir
+  | Some dir ->
+      Error (Printf.sprintf "%s=%s is not a directory" regression_dir_env dir)
+  | None -> (
+      match List.find_opt is_dir ["ui_regressions"; "test/ui_regressions"] with
+      | Some dir -> Ok dir
+      | None ->
+          Error
+            (Printf.sprintf
+               "no baseline directory: neither ui_regressions nor \
+                test/ui_regressions exists under %s (set %s)"
+               (Sys.getcwd ())
+               regression_dir_env))
+
+let regression_dir () =
+  match resolve_regression_dir () with
+  | Ok dir -> dir
+  | Error msg -> setup_error "%s" msg
 
 (* ============================================================ *)
 (* Filesystem Utilities *)
@@ -53,13 +84,16 @@ let ensure_dir path =
   ensure_parent path
 
 let read_file path =
-  try
-    let ic = open_in path in
-    let len = in_channel_length ic in
-    let content = really_input_string ic len in
-    close_in ic ;
-    Some content
-  with _ -> None
+  match open_in_bin path with
+  | exception Sys_error msg -> Error msg
+  | ic ->
+      Fun.protect
+        ~finally:(fun () -> close_in_noerr ic)
+        (fun () ->
+          match really_input_string ic (in_channel_length ic) with
+          | content -> Ok content
+          | exception (Sys_error msg | Failure msg) -> Error msg
+          | exception End_of_file -> Error "unexpected end of file")
 
 let write_file path content =
   let oc = open_out path in
@@ -95,8 +129,7 @@ let capture_screen_with_metadata () =
 (* ============================================================ *)
 
 (** Generate regression file path for a test *)
-let regression_path test_name =
-  Filename.concat regression_dir (test_name ^ ".screen")
+let regression_path ~dir test_name = Filename.concat dir (test_name ^ ".screen")
 
 (** Normalize ephemeral URL date suffixes so baselines stay stable.
     e.g. weeklynet-2026-01-28 → weeklynet-YYYY-MM-DD *)
@@ -106,26 +139,66 @@ let normalize_ephemeral_urls s =
 
 (** Save screen capture as baseline *)
 let save_baseline test_name =
-  ensure_dir regression_dir ;
-  let path = regression_path test_name in
+  let dir = regression_dir () in
+  let path = regression_path ~dir test_name in
   let width, height, content = capture_screen_with_metadata () in
   let metadata = Printf.sprintf "SIZE:%dx%d\n" width height in
   write_file path (metadata ^ normalize_ephemeral_urls content) ;
   Printf.printf "✓ Saved baseline for %s\n%!" test_name
 
-(** Load baseline screen capture *)
-let load_baseline test_name =
-  let path = regression_path test_name in
-  match read_file path with
-  | None -> None
-  | Some content -> (
-      (* Parse metadata *)
-      let lines = String.split_on_char '\n' content in
-      match lines with
-      | meta :: rest ->
-          let screen_content = String.concat "\n" rest in
-          Some (meta, screen_content)
-      | [] -> None)
+(** Load a baseline. [Ok None] means the file does not exist; a file that
+    exists but cannot be read is an [Error]. *)
+let load_baseline ~dir test_name =
+  let path = regression_path ~dir test_name in
+  if not (Sys.file_exists path) then Ok None
+  else
+    match read_file path with
+    | Error msg -> Error (Printf.sprintf "cannot read baseline %s: %s" path msg)
+    | Ok content -> (
+        match String.index_opt content '\n' with
+        | Some i ->
+            Ok
+              (Some (String.sub content (i + 1) (String.length content - i - 1)))
+        | None -> Error (Printf.sprintf "baseline %s has no SIZE header" path))
+
+(* ============================================================ *)
+(* Quarantine *)
+(* ============================================================ *)
+
+(** Parse one non-comment quarantine line: [name issue-url reason...]. *)
+let parse_quarantine_line ~dir line =
+  let words = String.split_on_char ' ' line |> List.filter (fun w -> w <> "") in
+  match words with
+  | name :: issue :: _ :: _ ->
+      if not (String.starts_with ~prefix:issue_url_prefix issue) then
+        Error
+          (Printf.sprintf "%s: issue must start with %s" name issue_url_prefix)
+      else if not (Sys.file_exists (regression_path ~dir name)) then
+        Error (Printf.sprintf "%s: quarantined baseline does not exist" name)
+      else Ok (name, issue)
+  | _ ->
+      Error (Printf.sprintf "malformed line (name issue-url reason): %s" line)
+
+let load_quarantine ~dir =
+  let path = Filename.concat dir quarantine_file in
+  if not (Sys.file_exists path) then Ok []
+  else
+    match read_file path with
+    | Error msg -> Error (Printf.sprintf "cannot read %s: %s" path msg)
+    | Ok content ->
+        String.split_on_char '\n' content
+        |> List.map String.trim
+        |> List.filter (fun l -> l <> "" && l.[0] <> '#')
+        |> List.fold_left
+             (fun acc line ->
+               match (acc, parse_quarantine_line ~dir line) with
+               | Error _, _ -> acc
+               | Ok _, Error msg -> Error (path ^ ": " ^ msg)
+               | Ok entries, Ok (name, issue) ->
+                   if List.mem_assoc name entries then
+                     Error (Printf.sprintf "%s: duplicate entry %s" path name)
+                   else Ok ((name, issue) :: entries))
+             (Ok [])
 
 (* ============================================================ *)
 (* Comparison *)
@@ -188,15 +261,7 @@ let format_diff test_name differences =
 (** Generate diff report with full screenshot display for CI *)
 let format_diff_with_screenshot test_name differences actual_content =
   let diff_text = format_diff test_name differences in
-  let is_ci =
-    match Sys.getenv_opt "CI" with
-    | Some "true" -> true
-    | _ -> (
-        match Sys.getenv_opt "GITHUB_ACTIONS" with
-        | Some "true" -> true
-        | _ -> false)
-  in
-  if is_ci then
+  if is_ci () then
     diff_text ^ "\n\n"
     ^ "╔════════════════════════════════════════════════════════════════╗\n"
     ^ "║                    ACTUAL SCREENSHOT                           ║\n"
@@ -209,29 +274,74 @@ let format_diff_with_screenshot test_name differences actual_content =
 (* Test API *)
 (* ============================================================ *)
 
+type verdict =
+  | Match
+  | Mismatch of (int * string * string) list
+  | Missing of string
+  | Known_drift of string
+  | Unexpected_pass of string
+
+let verify ~dir ~quarantine ~name ~current =
+  match load_baseline ~dir name with
+  | Error msg -> setup_error "%s" msg
+  | Ok None -> Missing (regression_path ~dir name)
+  | Ok (Some baseline) -> (
+      let differences = compare_screens baseline current in
+      match (List.assoc_opt name quarantine, differences) with
+      | None, [] -> Match
+      | None, diffs -> Mismatch diffs
+      | Some issue, [] -> Unexpected_pass issue
+      | Some issue, _ -> Known_drift issue)
+
+let check_setup () =
+  if !update_mode && is_ci () then
+    Error "baseline update mode is refused when CI=true or GITHUB_ACTIONS=true"
+  else
+    Result.bind (resolve_regression_dir ()) (fun dir ->
+        Result.map ignore (load_quarantine ~dir))
+
+let report name current = function
+  | Match ->
+      Printf.printf "✓ %s: UI matches baseline\n%!" name ;
+      true
+  | Mismatch diffs ->
+      Printf.printf "%s" (format_diff_with_screenshot name diffs current) ;
+      false
+  | Missing path ->
+      Printf.printf
+        "❌ Missing baseline %s for %s. Create it explicitly with \
+         UPDATE_REGRESSIONS=1 dune exec <test>.exe from the repository root.\n\
+         %!"
+        path
+        name ;
+      false
+  | Known_drift issue ->
+      Printf.printf "⚠ %s: quarantined known drift (%s)\n%!" name issue ;
+      true
+  | Unexpected_pass issue ->
+      Printf.printf
+        "❌ %s matches its baseline but is quarantined (%s): remove it from %s\n\
+         %!"
+        name
+        issue
+        quarantine_file ;
+      false
+
 (** Main regression test function *)
 let check_regression test_name =
   let _width, _height, current = capture_screen_with_metadata () in
-
+  (match check_setup () with Ok () -> () | Error msg -> setup_error "%s" msg) ;
   if !update_mode then (
     save_baseline test_name ;
     true)
   else
-    match load_baseline test_name with
-    | None ->
-        Printf.printf "⚠ No baseline for %s, creating...\n%!" test_name ;
-        save_baseline test_name ;
-        true
-    | Some (_meta, baseline) ->
-        let differences = compare_screens baseline current in
-        if differences = [] then (
-          Printf.printf "✓ %s: UI matches baseline\n%!" test_name ;
-          true)
-        else (
-          Printf.printf
-            "%s"
-            (format_diff_with_screenshot test_name differences current) ;
-          false)
+    let dir = regression_dir () in
+    let quarantine =
+      match load_quarantine ~dir with
+      | Ok q -> q
+      | Error msg -> setup_error "%s" msg
+    in
+    report test_name current (verify ~dir ~quarantine ~name:test_name ~current)
 
 (** Assert that current screen matches baseline *)
 let assert_ui_regression test_name =
@@ -240,15 +350,7 @@ let assert_ui_regression test_name =
 
 (** Display screenshot in terminal (for CI logs) *)
 let display_screenshot content =
-  let is_ci =
-    match Sys.getenv_opt "CI" with
-    | Some "true" -> true
-    | _ -> (
-        match Sys.getenv_opt "GITHUB_ACTIONS" with
-        | Some "true" -> true
-        | _ -> false)
-  in
-  if is_ci then (
+  if is_ci () then (
     Printf.printf
       "\n╔════════════════════════════════════════════════════════════════╗\n" ;
     Printf.printf
@@ -260,9 +362,15 @@ let display_screenshot content =
       "╚════════════════════════════════════════════════════════════════╝\n\n%!")
 
 (** Capture named screenshot for debugging *)
+let debug_dir () =
+  match Sys.getenv_opt "OM_UI_DEBUG_DIR" with
+  | Some dir -> dir
+  | None -> Filename.concat (Filename.get_temp_dir_name ()) "om-ui-debug"
+
 let capture_debug_screenshot name =
-  let path = Filename.concat regression_dir (name ^ ".debug.screen") in
-  ensure_dir regression_dir ;
+  let dir = debug_dir () in
+  let path = Filename.concat dir (name ^ ".debug.screen") in
+  ensure_dir dir ;
   let content = capture_screen () in
   write_file path content ;
   Printf.printf "📸 Debug screenshot saved: %s\n%!" path ;

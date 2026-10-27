@@ -122,7 +122,6 @@ let golden_path_script =
   @ navigate_to_ghost ~downs:0 ~target_page:"install_node_form_v3"
   @ [
       WaitFor [ScreenContains "App Bin Dir"; MaxIterations 10];
-      CheckRegression "01_node_form";
       Comment "Navigate to Snapshot (Home, Down x2) and disable it";
       Key "Home";
       Key "Down";

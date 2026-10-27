@@ -416,8 +416,34 @@
   tui_test_helpers_lib
   ui_regression_framework_lib)
  (modules test_ui_regressions_minimal)
+ (deps
+  (glob_files ui_regressions/*.screen)
+  ui_regressions/QUARANTINE)
  (instrumentation
   (backend bisect_ppx)))
+
+(test
+ (name test_ui_regression_framework_self)
+ (libraries alcotest ui_regression_framework_lib)
+ (modules test_ui_regression_framework_self))
+
+; Negative control: baseline update mode must be refused in CI (setup exit 2)
+
+(rule
+ (alias runtest)
+ (deps
+  (glob_files ui_regressions/*.screen)
+  ui_regressions/QUARANTINE)
+ (action
+  (setenv
+   CI
+   true
+   (setenv
+    UPDATE_REGRESSIONS
+    1
+    (with-accepted-exit-codes
+     2
+     (run %{exe:test_ui_regressions_minimal.exe}))))))
 
 ; TEMPORARILY DISABLED: Flaky due to table column width differences between environments
 ; Re-enable once rendering is deterministic across CI/local
@@ -448,6 +474,9 @@
   tui_test_helpers_lib
   ui_regression_framework_lib)
  (modules test_ui_regressions_forms_comprehensive)
+ (deps
+  (glob_files ui_regressions/*.screen)
+  ui_regressions/QUARANTINE)
  (instrumentation
   (backend bisect_ppx)))
 

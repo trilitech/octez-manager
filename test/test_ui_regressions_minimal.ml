@@ -71,4 +71,11 @@ let framework_tests =
     ("deterministic_random", `Quick, test_deterministic_random);
   ]
 
+let () =
+  match URF.check_setup () with
+  | Ok () -> ()
+  | Error msg ->
+      prerr_endline ("UI regression setup error: " ^ msg) ;
+      exit 2
+
 let () = Alcotest.run "UI_Regression_Framework" [("framework", framework_tests)]

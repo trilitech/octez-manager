@@ -157,17 +157,15 @@ This runs all tests including UI regression tests.
 
 ### Update Baselines
 
-When UI intentionally changes:
+When the UI changes intentionally, rewrite the baselines from the repository root, so that the source tree is written rather than the `dune runtest` sandbox:
 
 ```bash
-UPDATE_REGRESSIONS=1 dune runtest
+UPDATE_REGRESSIONS=1 dune exec test/test_ui_regressions_forms_comprehensive.exe
 ```
 
-Or for a specific test:
+Update mode is refused when `CI=true` or `GITHUB_ACTIONS=true`, and the suite then exits 2. Normal verification never writes: a missing baseline fails the check.
 
-```bash
-UPDATE_REGRESSIONS=1 dune exec test/test_ui_regressions_forms.exe
-```
+Known-stale baselines are listed in `test/ui_regressions/QUARANTINE` as `name issue-url reason`. A quarantined check passes only while its screen still differs from the baseline; once it matches, the check fails and the entry must be removed.
 
 ### Check Coverage
 
@@ -378,8 +376,8 @@ val mock_system_metrics : unit -> system_metrics
 
 ### Baselines Don't Exist
 
-**Cause:** First run or baselines deleted  
-**Solution:** Run with `UPDATE_REGRESSIONS=1` to create them
+**Cause:** The baseline was never committed, or it was deleted. Verification fails rather than creating it.
+**Solution:** Create it explicitly with `UPDATE_REGRESSIONS=1 dune exec <test>.exe` from the repository root, review it, and commit it.
 
 ### Tests Hang
 
