@@ -20,9 +20,11 @@
       that the source tree is written. It is refused under [CI=true] or
       [GITHUB_ACTIONS=true].
     - [ui_regressions/QUARANTINE] lists known-stale baselines, one per line:
-      [name issue-url reason...]. A quarantined check passes only while the
-      screen still differs from its baseline; a match fails so that the entry
-      gets removed. Entries need a [trilitech/octez-manager] issue URL and an
+      [name issue-url drift-digest reason...]. A quarantined check passes only
+      while the screen is exactly the recorded drift (MD5 of the rendered
+      screen, printed by a failing check): a match with the baseline fails so
+      that the entry gets removed, and any other screen fails as a new
+      regression. Entries need a [trilitech/octez-manager] issue URL and an
       existing baseline file.
 
     Exit contract for golden suites: assertion failures exit 1 (Alcotest).
@@ -33,32 +35,9 @@
     It is distinct from an assertion failure. *)
 exception Setup_error of string
 
-(** Outcome of comparing one screen with its baseline. *)
-type verdict =
-  | Match
-  | Mismatch of (int * string * string) list
-      (** [(line, expected, actual)] differences *)
-  | Missing of string  (** Path of the absent baseline *)
-  | Known_drift of string  (** Quarantined and still different; issue URL *)
-  | Unexpected_pass of string  (** Quarantined but now matching; issue URL *)
-
 (** [check_setup ()] validates the baseline directory, the quarantine file and
     the update-mode policy. *)
 val check_setup : unit -> (unit, string) result
-
-(** [load_quarantine ~dir] parses [dir/QUARANTINE] into [(name, issue)] pairs.
-    An absent file is an empty quarantine. *)
-val load_quarantine : dir:string -> ((string * string) list, string) result
-
-(** [verify ~dir ~quarantine ~name ~current] compares [current] with the
-    baseline [name] in [dir]. Never writes.
-    @raise Setup_error if the baseline exists but cannot be read. *)
-val verify :
-  dir:string ->
-  quarantine:(string * string) list ->
-  name:string ->
-  current:string ->
-  verdict
 
 (** Capture the current headless screen without ANSI escapes. *)
 val capture_screen : unit -> string
@@ -83,3 +62,39 @@ val test_scenario : string -> (string * (unit -> unit)) list -> unit
 
 (** Run [setup_fn] then assert regression [name]. *)
 val test_ui_state : string -> (unit -> unit) -> unit
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** Outcome of comparing one screen with its baseline. *)
+  type verdict =
+    | Match
+    | Mismatch of (int * string * string) list
+        (** [(line, expected, actual)] differences *)
+    | Missing of string  (** Path of the absent baseline *)
+    | Known_drift of string  (** Quarantined, screen is the recorded drift *)
+    | Unknown_drift of string * string * (int * string * string) list
+        (** Quarantined but a different screen: issue URL, digest, diffs *)
+    | Unexpected_pass of string  (** Quarantined but now matching; issue URL *)
+
+  (** A quarantine line: tracking issue URL and digest of the accepted drift. *)
+  type quarantine_entry = {issue : string; drift : string}
+
+  (** MD5 hex of a rendered screen, after ephemeral-URL normalization. *)
+  val screen_digest : string -> string
+
+  (** [load_quarantine ~dir] parses [dir/QUARANTINE] into [(name, entry)]
+      pairs. An absent file is an empty quarantine. *)
+  val load_quarantine :
+    dir:string -> ((string * quarantine_entry) list, string) result
+
+  (** [verify ~dir ~quarantine ~name ~current] compares [current] with the
+      baseline [name] in [dir]. Never writes.
+      @raise Setup_error if the baseline exists but cannot be read. *)
+  val verify :
+    dir:string ->
+    quarantine:(string * quarantine_entry) list ->
+    name:string ->
+    current:string ->
+    verdict
+end

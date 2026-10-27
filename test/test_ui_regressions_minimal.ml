@@ -26,7 +26,7 @@ let test_page_capture () =
   (* For now, just verify the framework can capture screen content *)
   let _content = HD.get_screen_content () in
 
-  (* This will create a baseline on first run *)
+  (* Verified against the committed minimal_screen baseline *)
   URF.assert_ui_regression "minimal_screen"
 
 (** Test that environment is set up *)

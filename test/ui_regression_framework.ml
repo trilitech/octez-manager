@@ -75,11 +75,12 @@ let regression_dir () =
 
 let ensure_dir path =
   let rec ensure_parent p =
-    if p = "." || p = "/" || p = "" then ()
+    if List.exists (String.equal p) ["."; "/"; ""] then ()
     else
       let parent = Filename.dirname p in
       if parent <> p then ensure_parent parent ;
-      if not (Sys.file_exists p) then Unix.mkdir p 0o755
+      if not (Sys.file_exists p) then
+        try Unix.mkdir p 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()
   in
   ensure_parent path
 
@@ -165,19 +166,38 @@ let load_baseline ~dir test_name =
 (* Quarantine *)
 (* ============================================================ *)
 
-(** Parse one non-comment quarantine line: [name issue-url reason...]. *)
+type quarantine_entry = {issue : string; drift : string}
+
+(** Digest identifying one exact rendered screen. *)
+let screen_digest screen =
+  Digest.to_hex (Digest.string (normalize_ephemeral_urls screen))
+
+let is_digest d =
+  String.length d = 32
+  && String.for_all (function '0' .. '9' | 'a' .. 'f' -> true | _ -> false) d
+
+(** Parse one non-comment quarantine line:
+    [name issue-url drift-digest reason...]. *)
 let parse_quarantine_line ~dir line =
-  let words = String.split_on_char ' ' line |> List.filter (fun w -> w <> "") in
+  let words =
+    String.split_on_char ' ' line
+    |> List.filter (fun w -> not (String.equal w ""))
+  in
   match words with
-  | name :: issue :: _ :: _ ->
+  | name :: issue :: drift :: _ :: _ ->
       if not (String.starts_with ~prefix:issue_url_prefix issue) then
         Error
           (Printf.sprintf "%s: issue must start with %s" name issue_url_prefix)
+      else if not (is_digest drift) then
+        Error (Printf.sprintf "%s: drift must be a 32-hex screen digest" name)
       else if not (Sys.file_exists (regression_path ~dir name)) then
         Error (Printf.sprintf "%s: quarantined baseline does not exist" name)
-      else Ok (name, issue)
+      else Ok (name, {issue; drift})
   | _ ->
-      Error (Printf.sprintf "malformed line (name issue-url reason): %s" line)
+      Error
+        (Printf.sprintf
+           "malformed line (name issue-url drift-digest reason): %s"
+           line)
 
 let load_quarantine ~dir =
   let path = Filename.concat dir quarantine_file in
@@ -188,16 +208,18 @@ let load_quarantine ~dir =
     | Ok content ->
         String.split_on_char '\n' content
         |> List.map String.trim
-        |> List.filter (fun l -> l <> "" && l.[0] <> '#')
+        |> List.filter (fun l ->
+            (not (String.equal l "")) && not (Char.equal l.[0] '#'))
         |> List.fold_left
              (fun acc line ->
                match (acc, parse_quarantine_line ~dir line) with
                | Error _, _ -> acc
                | Ok _, Error msg -> Error (path ^ ": " ^ msg)
-               | Ok entries, Ok (name, issue) ->
-                   if List.mem_assoc name entries then
+               | Ok entries, Ok (name, entry) ->
+                   if List.exists (fun (n, _) -> String.equal n name) entries
+                   then
                      Error (Printf.sprintf "%s: duplicate entry %s" path name)
-                   else Ok ((name, issue) :: entries))
+                   else Ok ((name, entry) :: entries))
              (Ok [])
 
 (* ============================================================ *)
@@ -279,6 +301,7 @@ type verdict =
   | Mismatch of (int * string * string) list
   | Missing of string
   | Known_drift of string
+  | Unknown_drift of string * string * (int * string * string) list
   | Unexpected_pass of string
 
 let verify ~dir ~quarantine ~name ~current =
@@ -287,11 +310,19 @@ let verify ~dir ~quarantine ~name ~current =
   | Ok None -> Missing (regression_path ~dir name)
   | Ok (Some baseline) -> (
       let differences = compare_screens baseline current in
-      match (List.assoc_opt name quarantine, differences) with
+      let entry =
+        List.find_map
+          (fun (n, e) -> if String.equal n name then Some e else None)
+          quarantine
+      in
+      match (entry, differences) with
       | None, [] -> Match
       | None, diffs -> Mismatch diffs
-      | Some issue, [] -> Unexpected_pass issue
-      | Some issue, _ -> Known_drift issue)
+      | Some {issue; _}, [] -> Unexpected_pass issue
+      | Some {issue; drift}, _ ->
+          let digest = screen_digest current in
+          if String.equal digest drift then Known_drift issue
+          else Unknown_drift (issue, digest, differences))
 
 let check_setup () =
   if !update_mode && is_ci () then
@@ -318,6 +349,16 @@ let report name current = function
   | Known_drift issue ->
       Printf.printf "⚠ %s: quarantined known drift (%s)\n%!" name issue ;
       true
+  | Unknown_drift (issue, digest, diffs) ->
+      Printf.printf
+        "%s❌ %s: quarantined (%s) but the screen differs from the recorded \
+         drift; current digest %s\n\
+         %!"
+        (format_diff_with_screenshot name diffs current)
+        name
+        issue
+        digest ;
+      false
   | Unexpected_pass issue ->
       Printf.printf
         "❌ %s matches its baseline but is quarantined (%s): remove it from %s\n\
@@ -367,14 +408,22 @@ let debug_dir () =
   | Some dir -> dir
   | None -> Filename.concat (Filename.get_temp_dir_name ()) "om-ui-debug"
 
+(** Best effort: a failing debug capture must never replace the test failure
+    that triggered it. *)
 let capture_debug_screenshot name =
   let dir = debug_dir () in
   let path = Filename.concat dir (name ^ ".debug.screen") in
-  ensure_dir dir ;
-  let content = capture_screen () in
-  write_file path content ;
-  Printf.printf "📸 Debug screenshot saved: %s\n%!" path ;
-  display_screenshot content
+  match
+    ensure_dir dir ;
+    let content = capture_screen () in
+    write_file path content ;
+    content
+  with
+  | content ->
+      Printf.printf "📸 Debug screenshot saved: %s\n%!" path ;
+      display_screenshot content
+  | exception (Sys_error msg | Unix.Unix_error (_, _, msg)) ->
+      Printf.printf "⚠ Debug screenshot %s not saved: %s\n%!" path msg
 
 (* ============================================================ *)
 (* Test Suite Helpers *)
@@ -393,3 +442,24 @@ let test_scenario name steps =
 let test_ui_state name setup_fn =
   setup_fn () ;
   assert_ui_regression name
+
+module Internal_for_tests = struct
+  type nonrec verdict = verdict =
+    | Match
+    | Mismatch of (int * string * string) list
+    | Missing of string
+    | Known_drift of string
+    | Unknown_drift of string * string * (int * string * string) list
+    | Unexpected_pass of string
+
+  type nonrec quarantine_entry = quarantine_entry = {
+    issue : string;
+    drift : string;
+  }
+
+  let screen_digest = screen_digest
+
+  let load_quarantine = load_quarantine
+
+  let verify = verify
+end

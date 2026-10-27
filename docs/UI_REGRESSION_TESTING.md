@@ -137,7 +137,7 @@ let test_form_flow () =
       ])
 ```
 
-This creates baselines:
+Update mode writes these baselines; commit them after review:
 - `install_node_complete_step0_empty.screen`
 - `install_node_complete_step1_name_filled.screen`
 - `install_node_complete_step2_network_selected.screen`
@@ -181,39 +181,32 @@ bisect-ppx-report summary --coverage-path=_build/default
 
 ```
 test/
-├── ui_regression_framework.ml      # Core framework
-├── deterministic_mocks.ml          # Deterministic environment setup
-├── test_ui_regressions_minimal.ml  # Framework validation tests
-├── test_ui_regressions_forms.ml    # Form regression tests
-├── ui_regressions/                 # Baseline screenshots (gitignored)
+├── ui_regression_framework.ml(i)          # Core framework and its contract
+├── deterministic_mocks.ml                 # Deterministic environment setup
+├── test_ui_regressions_minimal.ml         # Framework validation tests
+├── test_ui_regressions_forms_comprehensive.ml  # Install form regression tests
+├── test_ui_regression_framework_self.ml   # Contract self-tests
+├── ui_regressions/                        # Committed baselines
+│   ├── QUARANTINE                         # Known-stale baselines
 │   ├── install_node_empty.screen
-│   ├── install_node_name_filled.screen
 │   └── ...
-└── dune                            # Test configuration
+└── dune                                   # Test configuration
 ```
 
-**Important:** `test/ui_regressions/*.screen` files are **gitignored** because:
-- Baselines may differ across machines (fonts, terminal capabilities)
-- They're large (2-3KB per file)
-- Each developer should generate their own baselines locally
-
-However, **in CI**, baselines should be committed to ensure consistent regression detection.
+Baselines and `QUARANTINE` are committed and are declared dependencies of the golden suites. Verification only reads them: a missing baseline fails the suite.
 
 ---
 
 ## Why These Don't Hang in CI
 
-Unlike the existing TUI tests (`test/tui_flow_tests.exe`, etc.), the regression tests:
+The regression tests:
 
 1. **Use deterministic mocks** that don't access real system resources
 2. **Complete quickly** without waiting for user input or system events
 3. **Don't require PTY/TTY** because all I/O is mocked
 4. **Have strict timeouts** via headless driver limits
 
-The existing TUI tests hang because they:
-- Use `lambda-term` which tries to access real terminals
-- Perform actual file I/O and system calls
-- Wait for events that never arrive in containers
+The headless TUI suites (`tui_flow_tests`, the install-form, page and help-modal suites) also run under `dune runtest`. They drive pages through the headless driver and need no terminal. `test/test_inventory.sexp` records which test executables run there and why the others do not.
 
 ---
 
@@ -226,8 +219,8 @@ The existing TUI tests hang because they:
   - Validates deterministic time
   - Validates deterministic random
 
-### Form Regression Tests (8 tests)
-- `test_ui_regressions_forms.ml`
+### Form Regression Tests
+- `test_ui_regressions_forms_comprehensive.ml` (the older `test_ui_regressions_forms.ml` is no longer built)
   - Install node form: empty state
   - Install node form: name filled
   - Install node form: network field focused
@@ -402,7 +395,7 @@ When adding new UI regression tests:
 2. ✅ **DO** use `TH.with_test_env()` for proper cleanup
 3. ✅ **DO** give descriptive names to baselines
 4. ✅ **DO** test edge cases and error states
-5. ❌ **DON'T** commit baseline files (they're gitignored)
+5. ✅ **DO** commit new baselines, created explicitly with update mode and reviewed
 6. ❌ **DON'T** use real system calls or file I/O
 7. ❌ **DON'T** rely on timing or external state
 

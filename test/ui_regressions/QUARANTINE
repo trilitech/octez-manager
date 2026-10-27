@@ -1,45 +1,46 @@
-# Known-stale UI baselines: name issue-url reason
-# A quarantined check passes only while the screen still differs from its
-# baseline. Remove the line when the baseline is refreshed or fixed.
-accuser_empty https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-accuser_enable_service_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-accuser_instance_name_filled https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-accuser_node_instance_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-accuser_protocol_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-accuser_service_user_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-baker_dal_node_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-baker_delegate_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-baker_empty https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-baker_enable_service_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-baker_instance_name_filled https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-baker_liquidity_toggle_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-baker_node_instance_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-baker_protocol_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-baker_service_user_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-dal_empty https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-dal_enable_service_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-dal_instance_name_filled https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-dal_network_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-dal_node_instance_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-dal_profile_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-dal_rpc_addr_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-dal_service_user_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_bootstrap_threshold_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_complete_navigation https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_data_dir_custom https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_data_dir_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_enable_service_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_history_mode_archive https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_history_mode_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_history_mode_full https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_instance_name_long https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_instance_name_numbers https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_instance_name_short https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_network_mainnet https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_network_shadownet https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_p2p_addr_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_rpc_addr_custom https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_rpc_addr_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_service_user_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_snapshot_disabled https://github.com/trilitech/octez-manager/issues/1071 stale baseline
-node_snapshot_focus https://github.com/trilitech/octez-manager/issues/1071 stale baseline
+# Known-stale UI baselines: name issue-url drift-digest reason
+# A quarantined check passes only while the rendered screen is exactly the
+# recorded drift (its digest). A match with the baseline, or any other
+# screen, fails. Remove the line when the baseline is refreshed or fixed.
+accuser_empty https://github.com/trilitech/octez-manager/issues/1071 14e726ba0fd038f9d187fa239f0042d1 stale baseline
+accuser_enable_service_focus https://github.com/trilitech/octez-manager/issues/1071 0b9a562dccd3d0d107b0825e175ff962 stale baseline
+accuser_instance_name_filled https://github.com/trilitech/octez-manager/issues/1071 14e726ba0fd038f9d187fa239f0042d1 stale baseline
+accuser_node_instance_focus https://github.com/trilitech/octez-manager/issues/1071 da7e9243845109ef3f2c9488850b0f98 stale baseline
+accuser_protocol_focus https://github.com/trilitech/octez-manager/issues/1071 8e1ad60e9afc100c82fd70c4b6508e4c stale baseline
+accuser_service_user_focus https://github.com/trilitech/octez-manager/issues/1071 314dd2b3c829e6b8a6ef3c2f8564d1df stale baseline
+baker_dal_node_focus https://github.com/trilitech/octez-manager/issues/1071 d70db940be942382a42080c7c3005b43 stale baseline
+baker_delegate_focus https://github.com/trilitech/octez-manager/issues/1071 d70db940be942382a42080c7c3005b43 stale baseline
+baker_empty https://github.com/trilitech/octez-manager/issues/1071 d70db940be942382a42080c7c3005b43 stale baseline
+baker_enable_service_focus https://github.com/trilitech/octez-manager/issues/1071 d70db940be942382a42080c7c3005b43 stale baseline
+baker_instance_name_filled https://github.com/trilitech/octez-manager/issues/1071 d70db940be942382a42080c7c3005b43 stale baseline
+baker_liquidity_toggle_focus https://github.com/trilitech/octez-manager/issues/1071 d70db940be942382a42080c7c3005b43 stale baseline
+baker_node_instance_focus https://github.com/trilitech/octez-manager/issues/1071 d70db940be942382a42080c7c3005b43 stale baseline
+baker_protocol_focus https://github.com/trilitech/octez-manager/issues/1071 a99a1b16aec70f376f6f1b5744ea23c2 stale baseline
+baker_service_user_focus https://github.com/trilitech/octez-manager/issues/1071 d70db940be942382a42080c7c3005b43 stale baseline
+dal_empty https://github.com/trilitech/octez-manager/issues/1071 406ba1da423692cb53cb5af560b4101c stale baseline
+dal_enable_service_focus https://github.com/trilitech/octez-manager/issues/1071 da17b95e1ec495beba3207dfb8e8142a stale baseline
+dal_instance_name_filled https://github.com/trilitech/octez-manager/issues/1071 406ba1da423692cb53cb5af560b4101c stale baseline
+dal_network_focus https://github.com/trilitech/octez-manager/issues/1071 aa5dd42b5ce1b2c474922f9d53c358b9 stale baseline
+dal_node_instance_focus https://github.com/trilitech/octez-manager/issues/1071 a8a8428702256295d4ba2be420263e7e stale baseline
+dal_profile_focus https://github.com/trilitech/octez-manager/issues/1071 aa5dd42b5ce1b2c474922f9d53c358b9 stale baseline
+dal_rpc_addr_focus https://github.com/trilitech/octez-manager/issues/1071 aa5dd42b5ce1b2c474922f9d53c358b9 stale baseline
+dal_service_user_focus https://github.com/trilitech/octez-manager/issues/1071 cc6c7cbd5e05d2a1231a31af8c931d60 stale baseline
+node_bootstrap_threshold_focus https://github.com/trilitech/octez-manager/issues/1071 4a6bc2c822e9ac3208cb0aae2a6f7fb9 stale baseline
+node_complete_navigation https://github.com/trilitech/octez-manager/issues/1071 a35a76786898bc7775129d3fd4a111df stale baseline
+node_data_dir_custom https://github.com/trilitech/octez-manager/issues/1071 06a4b2c528ddab3098327e46782475a3 stale baseline
+node_data_dir_focus https://github.com/trilitech/octez-manager/issues/1071 06a4b2c528ddab3098327e46782475a3 stale baseline
+node_enable_service_focus https://github.com/trilitech/octez-manager/issues/1071 54c8d7372c7b1a4112b84120c0a89bff stale baseline
+node_history_mode_archive https://github.com/trilitech/octez-manager/issues/1071 5250c0c6f3c0927191858934086c3951 stale baseline
+node_history_mode_focus https://github.com/trilitech/octez-manager/issues/1071 d79ce0f7e91f50427c467012c25a743c stale baseline
+node_history_mode_full https://github.com/trilitech/octez-manager/issues/1071 d79ce0f7e91f50427c467012c25a743c stale baseline
+node_instance_name_long https://github.com/trilitech/octez-manager/issues/1071 29075181633b8393e81b5b6b9460bc9f stale baseline
+node_instance_name_numbers https://github.com/trilitech/octez-manager/issues/1071 29075181633b8393e81b5b6b9460bc9f stale baseline
+node_instance_name_short https://github.com/trilitech/octez-manager/issues/1071 29075181633b8393e81b5b6b9460bc9f stale baseline
+node_network_mainnet https://github.com/trilitech/octez-manager/issues/1071 e0cc165b251fe2aa07e42129ef6889cd stale baseline
+node_network_shadownet https://github.com/trilitech/octez-manager/issues/1071 9972852917889cfc097ca246897aec95 stale baseline
+node_p2p_addr_focus https://github.com/trilitech/octez-manager/issues/1071 02306cc4f3dd67da45eb772a230e2190 stale baseline
+node_rpc_addr_custom https://github.com/trilitech/octez-manager/issues/1071 04053fceb6ccd30cb3b7c86b5c616c6d stale baseline
+node_rpc_addr_focus https://github.com/trilitech/octez-manager/issues/1071 04053fceb6ccd30cb3b7c86b5c616c6d stale baseline
+node_service_user_focus https://github.com/trilitech/octez-manager/issues/1071 65f55e5a3f6e6be27ec357d5e4b1628a stale baseline
+node_snapshot_disabled https://github.com/trilitech/octez-manager/issues/1071 dd95511dcbb0ddf24f8b298679b69a9d stale baseline
+node_snapshot_focus https://github.com/trilitech/octez-manager/issues/1071 387ddb96ea8e7c5f8c14a8db820b50c0 stale baseline

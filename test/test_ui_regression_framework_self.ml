@@ -8,6 +8,7 @@
 (** Negative controls for the UI regression verification contract. *)
 
 module URF = Ui_regression_framework_lib.Ui_regression_framework
+module I = URF.Internal_for_tests
 
 let issue = "https://github.com/trilitech/octez-manager/issues/1071"
 
@@ -26,10 +27,11 @@ let baseline dir name screen =
 let entries dir = Sys.readdir dir |> Array.to_list |> List.sort String.compare
 
 let verdict_name = function
-  | URF.Match -> "match"
+  | I.Match -> "match"
   | Mismatch _ -> "mismatch"
   | Missing _ -> "missing"
   | Known_drift _ -> "known-drift"
+  | Unknown_drift _ -> "unknown-drift"
   | Unexpected_pass _ -> "unexpected-pass"
 
 let check_verdict expected actual =
@@ -39,7 +41,7 @@ let test_missing_baseline_fails_without_writing () =
   let dir = fresh_dir () in
   check_verdict
     "missing"
-    (URF.verify ~dir ~quarantine:[] ~name:"absent" ~current:"hello") ;
+    (I.verify ~dir ~quarantine:[] ~name:"absent" ~current:"hello") ;
   Alcotest.(check (list string)) "no file created" [] (entries dir)
 
 let test_mismatch_and_match () =
@@ -47,33 +49,41 @@ let test_mismatch_and_match () =
   baseline dir "screen" "hello" ;
   check_verdict
     "match"
-    (URF.verify ~dir ~quarantine:[] ~name:"screen" ~current:"hello") ;
+    (I.verify ~dir ~quarantine:[] ~name:"screen" ~current:"hello") ;
   check_verdict
     "mismatch"
-    (URF.verify ~dir ~quarantine:[] ~name:"screen" ~current:"world")
+    (I.verify ~dir ~quarantine:[] ~name:"screen" ~current:"world")
 
 let test_quarantine_is_inverted () =
   let dir = fresh_dir () in
   baseline dir "screen" "hello" ;
-  let quarantine = [("screen", issue)] in
+  let drift = I.screen_digest "world" in
+  let quarantine = [("screen", {I.issue; drift})] in
   check_verdict
     "known-drift"
-    (URF.verify ~dir ~quarantine ~name:"screen" ~current:"world") ;
+    (I.verify ~dir ~quarantine ~name:"screen" ~current:"world") ;
+  check_verdict
+    "unknown-drift"
+    (I.verify ~dir ~quarantine ~name:"screen" ~current:"other") ;
   check_verdict
     "unexpected-pass"
-    (URF.verify ~dir ~quarantine ~name:"screen" ~current:"hello")
+    (I.verify ~dir ~quarantine ~name:"screen" ~current:"hello")
 
 let quarantine_result dir content =
   write (Filename.concat dir "QUARANTINE") content ;
-  URF.load_quarantine ~dir
+  I.load_quarantine ~dir
 
 let test_quarantine_parsing () =
   let dir = fresh_dir () in
   baseline dir "screen" "hello" ;
+  let d = I.screen_digest "world" in
+  let line name rest = String.concat " " ([name; issue] @ rest) ^ "\n" in
   (match
-     quarantine_result dir ("# comment\n\nscreen " ^ issue ^ " stale\n")
+     quarantine_result dir ("# comment\n\n" ^ line "screen" [d; "stale"])
    with
-  | Ok [("screen", i)] -> Alcotest.(check string) "issue" issue i
+  | Ok [("screen", {I.issue = i; drift})] ->
+      Alcotest.(check string) "issue" issue i ;
+      Alcotest.(check string) "drift" d drift
   | _ -> Alcotest.fail "valid quarantine rejected") ;
   let rejected content =
     Alcotest.(check bool)
@@ -81,15 +91,16 @@ let test_quarantine_parsing () =
       true
       (Result.is_error (quarantine_result dir content))
   in
-  rejected ("dead " ^ issue ^ " no baseline file\n") ;
-  rejected "screen https://example.com/1 wrong tracker\n" ;
-  rejected ("screen " ^ issue ^ "\n") ;
-  rejected ("screen " ^ issue ^ " a\nscreen " ^ issue ^ " b\n")
+  rejected (line "dead" [d; "no baseline file"]) ;
+  rejected ("screen https://example.com/1 " ^ d ^ " wrong tracker\n") ;
+  rejected (line "screen" ["not-a-digest"; "stale"]) ;
+  rejected (line "screen" [d]) ;
+  rejected (line "screen" [d; "a"] ^ line "screen" [d; "b"])
 
 let test_unreadable_baseline_is_setup_error () =
   let dir = fresh_dir () in
   Sys.mkdir (Filename.concat dir "screen.screen") 0o755 ;
-  match URF.verify ~dir ~quarantine:[] ~name:"screen" ~current:"x" with
+  match I.verify ~dir ~quarantine:[] ~name:"screen" ~current:"x" with
   | exception URF.Setup_error _ -> ()
   | v -> Alcotest.failf "expected setup error, got %s" (verdict_name v)
 
