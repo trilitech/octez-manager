@@ -1,0 +1,12 @@
+== ok (expect exit 0)
+test inventory: OK
+== unregistered (expect exit 1)
+deterministic test not run by runtest: t_a
+== unclassified (expect exit 1)
+unclassified executable stanza: t_b
+== dead (expect exit 1)
+dead entry, no stanza: gone
+== orphan (expect exit 1)
+source not attached to any stanza: inventory_fixtures/orphan/t_e.ml
+== parse_error (expect exit 2)
+setup error: inventory_fixtures/parse_error/manifest.sexp: unbalanced parenthesis

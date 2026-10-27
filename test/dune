@@ -1298,3 +1298,97 @@
  (modules test_help_modal_debug)
  (instrumentation
   (backend bisect_ppx)))
+
+; Test inventory contract (see test_inventory.sexp)
+
+(executable
+ (name check_test_inventory)
+ (libraries str)
+ (modules check_test_inventory))
+
+(rule
+ (alias runtest)
+ (deps
+  test_inventory.sexp
+  dune
+  mocks/dune
+  (glob_files *.ml)
+  (glob_files mocks/*.ml))
+ (action
+  (run
+   %{exe:check_test_inventory.exe}
+   --manifest
+   test_inventory.sexp
+   --dune
+   dune
+   --dune
+   mocks/dune)))
+
+; Negative controls: each fixture has one defect and a documented exit code
+
+(rule
+ (deps
+  (source_tree inventory_fixtures))
+ (action
+  (with-outputs-to
+   inventory_fixtures.out
+   (progn
+    (echo "== ok (expect exit 0)\n")
+    (with-accepted-exit-codes
+     0
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/ok/manifest.sexp
+      --dune
+      inventory_fixtures/ok/dune.fixture))
+    (echo "== unregistered (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/unregistered/manifest.sexp
+      --dune
+      inventory_fixtures/unregistered/dune.fixture))
+    (echo "== unclassified (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/unclassified/manifest.sexp
+      --dune
+      inventory_fixtures/unclassified/dune.fixture))
+    (echo "== dead (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/dead/manifest.sexp
+      --dune
+      inventory_fixtures/dead/dune.fixture))
+    (echo "== orphan (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/orphan/manifest.sexp
+      --dune
+      inventory_fixtures/orphan/dune.fixture))
+    (echo "== parse_error (expect exit 2)\n")
+    (with-accepted-exit-codes
+     2
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/parse_error/manifest.sexp
+      --dune
+      inventory_fixtures/parse_error/dune.fixture))))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff inventory_fixtures/expected.out inventory_fixtures.out)))

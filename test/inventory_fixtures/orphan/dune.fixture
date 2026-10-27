@@ -1,0 +1,3 @@
+(test
+ (name t_d)
+ (modules t_d))
