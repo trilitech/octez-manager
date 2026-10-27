@@ -22,14 +22,11 @@ let quarantine_file = "QUARANTINE"
 
 let issue_url_prefix = "https://github.com/trilitech/octez-manager/issues/"
 
-let update_mode = ref false
-
-let () =
+let update_mode =
   (match Sys.getenv_opt "UPDATE_REGRESSIONS" with
-  | Some "1" | Some "true" -> update_mode := true
-  | _ -> ()) ;
-  if Array.exists (String.equal "--update-regressions") Sys.argv then
-    update_mode := true
+    | Some ("1" | "true") -> true
+    | _ -> false)
+  || Array.exists (String.equal "--update-regressions") Sys.argv
 
 let is_ci () =
   let set name =
@@ -325,7 +322,7 @@ let verify ~dir ~quarantine ~name ~current =
           else Unknown_drift (issue, digest, differences))
 
 let check_setup () =
-  if !update_mode && is_ci () then
+  if update_mode && is_ci () then
     Error "baseline update mode is refused when CI=true or GITHUB_ACTIONS=true"
   else
     Result.bind (resolve_regression_dir ()) (fun dir ->
@@ -372,7 +369,7 @@ let report name current = function
 let check_regression test_name =
   let _width, _height, current = capture_screen_with_metadata () in
   (match check_setup () with Ok () -> () | Error msg -> setup_error "%s" msg) ;
-  if !update_mode then (
+  if update_mode then (
     save_baseline test_name ;
     true)
   else
