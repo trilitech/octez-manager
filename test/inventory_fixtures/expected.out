@@ -22,3 +22,9 @@ obsolete entry still has a stanza: t_o
 unclassified test stanza: t_u
 == block_string (expect exit 2)
 setup error: inventory_fixtures/block_string/dune.fixture: dune block strings are not supported
+== subdir_hidden (expect exit 2)
+setup error: inventory_fixtures/subdir_hidden/dune.fixture: (subdir ...) is not supported by the inventory
+== tool_unreferenced (expect exit 1)
+tool not referenced by any rule: t_t
+== duplicate_name (expect exit 1)
+deterministic test not run by runtest: t_d

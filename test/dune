@@ -1312,6 +1312,7 @@
 
 (executable
  (name check_test_inventory)
+ (libraries str)
  (modules check_test_inventory))
 
 (rule
@@ -1448,7 +1449,34 @@
       --manifest
       inventory_fixtures/block_string/manifest.sexp
       --dune
-      inventory_fixtures/block_string/dune.fixture))))))
+      inventory_fixtures/block_string/dune.fixture))
+    (echo "== subdir_hidden (expect exit 2)\n")
+    (with-accepted-exit-codes
+     2
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/subdir_hidden/manifest.sexp
+      --dune
+      inventory_fixtures/subdir_hidden/dune.fixture))
+    (echo "== tool_unreferenced (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/tool_unreferenced/manifest.sexp
+      --dune
+      inventory_fixtures/tool_unreferenced/dune.fixture))
+    (echo "== duplicate_name (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/duplicate_name/manifest.sexp
+      --dune
+      inventory_fixtures/duplicate_name/dune.fixture))))))
 
 (rule
  (alias runtest)

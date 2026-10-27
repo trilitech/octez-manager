@@ -176,23 +176,41 @@ let stanza_of kind fields =
   in
   {kind; names; modules; conditional}
 
-type dune_file = {stanzas : stanza list; src_dir : string}
+type dune_file = {
+  stanzas : stanza list;
+  rule_exes : string list;  (** Executables named [%{exe:NAME.exe}] in rules *)
+  src_dir : string;
+}
+
+let exe_reference = Str.regexp "%{exe:\\([A-Za-z0-9_]+\\)\\.exe}"
+
+let exe_references sexp =
+  List.concat_map
+    (fun atom ->
+      let rec scan from acc =
+        match Str.search_forward exe_reference atom from with
+        | i -> scan (i + 1) (Str.matched_group 1 atom :: acc)
+        | exception Not_found -> acc
+      in
+      scan 0 [])
+    (all_atoms sexp)
 
 let load_dune path =
   let sexps = parse_string ~file:path (read_file path) in
-  let stanzas =
-    List.filter_map
-      (function
-        | List
-            (Atom
-               (("executable" | "executables" | "test" | "tests" | "library") as
-                kind)
-            :: fields) ->
-            Some (stanza_of kind fields)
-        | _ -> None)
-      sexps
+  let classify (stanzas, exes) = function
+    | List
+        (Atom
+           (("executable" | "executables" | "test" | "tests" | "library") as
+            kind)
+        :: fields) ->
+        (stanza_of kind fields :: stanzas, exes)
+    | List (Atom "rule" :: _) as rule -> (stanzas, exe_references rule @ exes)
+    | List (Atom (("subdir" | "include" | "dynamic_include") as kind) :: _) ->
+        parse_error "%s: (%s ...) is not supported by the inventory" path kind
+    | _ -> (stanzas, exes)
   in
-  {stanzas; src_dir = Filename.dirname path}
+  let stanzas, rule_exes = List.fold_left classify ([], []) sexps in
+  {stanzas = List.rev stanzas; rule_exes; src_dir = Filename.dirname path}
 
 (* ============================================================ *)
 (* Manifest *)
@@ -282,26 +300,32 @@ let unclassified_violations ~manifest stanzas =
       if Option.is_some (lookup manifest n) then None
       else Some (Printf.sprintf "unclassified %s stanza: %s" s.kind n))
 
-let entry_violation stanzas e =
-  let stanza = List.find_opt (fun s -> mem e.name s.names) stanzas in
+let stanza_violation ~rule_exes e s =
   let fail fmt = Printf.ksprintf Option.some fmt in
-  match (e.klass, stanza) with
-  | Obsolete, None -> None
-  | Obsolete, Some _ -> fail "obsolete entry still has a stanza: %s" e.name
-  | _, None -> fail "dead entry, no stanza: %s" e.name
-  | Deterministic, Some s when not (is_test s) ->
+  match e.klass with
+  | Obsolete -> fail "obsolete entry still has a stanza: %s" e.name
+  | Deterministic when not (is_test s) ->
       fail "deterministic test not run by runtest: %s" e.name
-  | Deterministic, Some s when s.conditional ->
+  | Deterministic when s.conditional ->
       fail
         "deterministic test is conditional (enabled_if/build_if/action): %s"
         e.name
-  | Deterministic, Some _ -> None
-  | (Env_gated | Manual | Tool), Some s when is_test s ->
+  | Deterministic -> None
+  | (Env_gated | Manual | Tool) when is_test s ->
       fail
         "%s target registered as a runtest test: %s"
         (class_name e.klass)
         e.name
-  | (Env_gated | Manual | Tool), Some _ -> None
+  | Tool when not (mem e.name rule_exes) ->
+      fail "tool not referenced by any rule: %s" e.name
+  | Env_gated | Manual | Tool -> None
+
+(** Every stanza carrying the entry's name must satisfy its class. *)
+let entry_violation ~rule_exes stanzas e =
+  match (e.klass, List.filter (fun s -> mem e.name s.names) stanzas) with
+  | Obsolete, [] -> None
+  | _, [] -> Some (Printf.sprintf "dead entry, no stanza: %s" e.name)
+  | _, named -> List.find_map (stanza_violation ~rule_exes e) named
 
 let orphan_violations ~manifest dune =
   if List.exists (fun s -> Option.is_none s.modules) dune.stanzas then []
@@ -323,8 +347,9 @@ let orphan_violations ~manifest dune =
 (** Violations of the contract, one message each. *)
 let violations ~manifest dunes =
   let stanzas = List.concat_map (fun d -> d.stanzas) dunes in
+  let rule_exes = List.concat_map (fun d -> d.rule_exes) dunes in
   unclassified_violations ~manifest stanzas
-  @ List.filter_map (entry_violation stanzas) manifest
+  @ List.filter_map (entry_violation ~rule_exes stanzas) manifest
   @ List.concat_map (orphan_violations ~manifest) dunes
 
 (* ============================================================ *)
