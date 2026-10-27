@@ -89,6 +89,18 @@ class IntegrationPipefail(unittest.TestCase):
                                 capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_quoted_heredoc_directive_is_data(self):
+        self.source.write_text("cat <<'EOF'\n# shellcheck disable=SC2337\nEOF\n")
+        self.check(0)
+
+    def test_quoted_heredoc_delimiter_is_data(self):
+        self.source.write_text("cat <<'# shellcheck disable=SC2337'\nhello\n# shellcheck disable=SC2337\n")
+        self.check(0)
+
+    def test_printf_literal_directive_is_data(self):
+        self.source.write_text("printf '%s\\n' '# shellcheck disable=SC2086'\n")
+        self.check(0)
+
     def test_directive_values_are_not_disable_keys(self):
         self.source.write_text('# shellcheck source="disable=SC2337" disable=SC2086\necho ready\n')
         self.check(0)
@@ -137,6 +149,15 @@ class IntegrationPipefail(unittest.TestCase):
         checker = self.fake("print('[]')\nraise SystemExit(1)\n")
         self.assertIn("inconsistent", self.check(2, checker=checker, lock=self.lock_for(checker)).stderr)
 
+    def test_missing_annotation_capability_is_refused(self):
+        checker = self.fake("""import json, pathlib, sys
+text = pathlib.Path(sys.argv[-1]).read_text()
+records = [dict(code=2337,line=1,file='unsafe.sh',message='early reader',level='warning')] if 'unsafe.sh' in text else []
+print(json.dumps(records))
+raise SystemExit(int(bool(records)))
+""")
+        self.assertIn("annotation", self.check(2, checker=checker, lock=self.lock_for(checker)).stderr)
+
     def test_selected_source_not_followed_is_infrastructure(self):
         checker = self.fake("""import json, pathlib, sys
 path = pathlib.Path(sys.argv[-1])
@@ -145,6 +166,9 @@ if 'unsafe.sh' in text:
     records = [dict(code=2337,line=1,file='unsafe.sh',message='early reader',level='warning')]
 elif 'safe.sh' in text:
     records = []
+elif 'annotation-capability.sh' in text:
+    source = pathlib.Path(text.split('source ', 1)[1].strip())
+    records = [dict(code=1107,line=1,column=14,file=str(source),message='unknown key',level='warning')] if source.read_text().startswith('#') else []
 else:
     records = [dict(code=1091,line=2,file=str(path),message='source unavailable',level='info')]
 print(json.dumps(records))

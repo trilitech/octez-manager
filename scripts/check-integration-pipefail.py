@@ -52,17 +52,14 @@ def inventory(root):
             mode = source.lstat().st_mode
             if not stat.S_ISREG(mode) or not mode & 0o444:
                 raise Refusal("source must be a readable regular file: " + str(source))
-            text = source.read_text(encoding="utf-8")
-            for directive in re.findall(r"#\s*shellcheck\s+([^\n]*)", text):
-                if suppresses_2337(directive):
-                    raise Refusal("SC2337/all suppression is forbidden: " + str(source))
+            source.read_text(encoding="utf-8")
             files.append(source)
     if not files:
         raise Refusal("empty integration shell inventory")
     return sorted(files)
 
 
-def analyze(checker, source, temporary):
+def analyze(checker, source, temporary, annotation_probe=False):
     # Source the actual file with explicit pipefail context, preserving its path/lines.
     driver = temporary / "driver.sh"
     driver.write_text("set -o pipefail\nsource " + shlex.quote(str(source)) + "\n")
@@ -90,11 +87,34 @@ def analyze(checker, source, temporary):
         raise Refusal("inconsistent ShellCheck exit/diagnostics")
     # Sourced parse failures are downgraded by ShellCheck to warning SC1094.
     # They still mean the selected source was skipped and must refuse.
-    if any(record["level"] == "error" or record["code"] == 1094
+    if not annotation_probe and any(record["level"] == "error" or record["code"] == 1094
            or (record["code"] in {1090, 1091} and record["file"] == str(driver))
            for record in records):
         raise Refusal("ShellCheck could not analyze " + str(source) + ": " + result.stdout)
     return records
+
+
+def check_annotations(checker, source, temporary):
+    # Ask ShellCheck's parser which textual candidates are actual annotations.
+    # The marker adds no quoting/metacharacters, so strings and heredoc data stay
+    # data. SC1107 points at an unknown key only in a real shellcheck comment.
+    text = source.read_text(encoding="utf-8")
+    probe = temporary / "annotation-probe.sh"
+    for match in re.finditer(r"#[ \t]*shellcheck[ \t]+([^\n]*)", text):
+        position = match.start(1)
+        prefix = text[:position]
+        line = prefix.count("\n") + 1
+        column = len(prefix.rsplit("\n", 1)[-1].expandtabs(8)) + 1
+        probe.write_text(prefix + "omannotationprobe=1 " + text[position:])
+        # Changing a heredoc delimiter that contains candidate text can make
+        # this copy unparsable. Original input was already fully analyzed; only
+        # a positioned SC1107 proves an annotation, never a probe parse error.
+        records = analyze(checker, probe, temporary, annotation_probe=True)
+        actual = any(record["code"] == 1107 and record["file"] == str(probe)
+                     and record["line"] == line and record.get("column") == column
+                     for record in records)
+        if actual and suppresses_2337(match[1]):
+            raise Refusal("SC2337/all suppression is forbidden: " + str(source))
 
 
 def qualify(checker, lock, temporary):
@@ -109,6 +129,16 @@ def qualify(checker, lock, temporary):
     safe.write_text("output=$(printf 'early\\n')\n[[ \"$output\" == early ]]\n")
     if analyze(checker, safe, temporary):
         raise Refusal("safe capability control was not clean")
+    annotation = temporary / "annotation-capability.sh"
+    annotation.write_text("# shellcheck omannotationprobe=1\necho ready\n")
+    records = analyze(checker, annotation, temporary)
+    if not any(record["code"] == 1107 and record["file"] == str(annotation)
+               and record["line"] == 1 and record.get("column") == 14
+               for record in records):
+        raise Refusal("checker lacks positioned annotation diagnostic")
+    annotation.write_text("printf '%s\\n' '# shellcheck omannotationprobe=1'\n")
+    if analyze(checker, annotation, temporary):
+        raise Refusal("annotation literal capability control was not clean")
 
 
 def run(root, checker, lock):
@@ -118,7 +148,11 @@ def run(root, checker, lock):
         qualify(checker, lock, temporary)
         findings = []
         for source in files:
-            records = analyze(checker, source, temporary)
+            try:
+                records = analyze(checker, source, temporary)
+            except Refusal as error:
+                raise Refusal("source/suppression analysis failed: " + str(error)) from error
+            check_annotations(checker, source, temporary)
             findings.extend({**record, "source": str(source.relative_to(root))}
                             for record in records if record["code"] == 2337)
     print(json.dumps({"files": len(files), "findings": findings}, indent=2))

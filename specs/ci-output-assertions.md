@@ -38,3 +38,23 @@ No host-stable fallback or moving Docker tag is used. Adapter tests use explicit
 For authentic CHECK-1 RED, copy baseline `test/integration/cli-tester/tests/lib.sh` with `git show 739d49d4:test/integration/cli-tester/tests/lib.sh` into an owned temporary file, then pass that file to the same selftest driver. Its first assertion exercises unchanged-name `external_service_detected`; the old early reader yields assertion1 rather than a missing-new-API setup failure. Current source must yield0, and missing library/tools must refuse2. The historical CI producer status was not logged; the controlled producer/reader experiment establishes the mechanism without proving that exact historical run's status.
 
 Review-boundary ratchet: `python3 test/check_integration_pipefail_boundaries.py --adapter scripts/check-integration-pipefail.py --shellcheck <qualified-checker>`. It returns0 for the candidate,1 for a reproduced policy assertion, and2 for missing/unusable setup. `--case ranges` and `--case ancestors` independently demonstrate both old failures against the reviewed adapter; noncovering ranges and restored ordinary directories are positive controls. The existing adapter suite invokes this standalone check too.
+
+
+Only actual ShellCheck annotations are suppression policy inputs; quoted strings,
+escaped hashes, and heredoc bodies remain data. The adapter uses the pinned
+ShellCheck parser to classify each textual candidate: an analysis-only copy gets
+an unknown directive key, and its positioned SC1107 diagnostic identifies an
+actual annotation. No Bash lexer or parser dependency is added, and source files
+are never rewritten. Both the annotation marker and its quoted-literal negative
+control are qualified on every invocation. Full, unfiltered analysis of the
+original source runs first; parse/setup failures refuse2. Probe-only parse errors
+(such as an instrumented heredoc delimiter) cannot prove an annotation and do
+not override that original analysis. Tool/JSON/diagnostic failures still refuse.
+
+`python3 test/check_integration_pipefail_boundaries.py --adapter scripts/check-integration-pipefail.py --shellcheck <qualified-checker> --case comments`
+checks literal data (single/double/ANSI/locale quotes, escaped hashes, multiline
+quotes, quoted/unquoted/tab-indented heredocs and command substitutions), and
+retains refusal2 for actual directives, covering ranges/all and nested command
+substitutions. The identical driver against the6f adapter returns assertion1 for
+the known false refusals after successful tool preflight; missing tools or adapter
+still return2. Both original false-refusal examples also have dedicated unit tests.
