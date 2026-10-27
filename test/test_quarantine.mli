@@ -11,9 +11,9 @@
     raises, and fails once the wrapped test passes, so that the wrapper gets
     removed together with the fix. Every wrapper cites the tracking issue. *)
 
-(** [known_failure ~issue test] runs [test] and inverts its outcome. [issue] is
-    a [trilitech/octez-manager] issue number. Any exception other than
-    [Stack_overflow] or [Out_of_memory] counts as the known failure: Alcotest
-    does not expose its assertion exception, so a crash cannot be told apart
-    from an assertion here. *)
-val known_failure : issue:int -> (unit -> unit) -> unit -> unit
+(** [known_failure ~issue ~expect test] runs [test] and inverts its outcome.
+    [issue] is a [trilitech/octez-manager] issue number. The case passes only
+    if [test] fails on an Alcotest check whose message contains [expect]. It
+    fails if [test] passes, or fails on another check; any other exception (a
+    crash, a [failwith], a setup error) propagates. *)
+val known_failure : issue:int -> expect:string -> (unit -> unit) -> unit -> unit

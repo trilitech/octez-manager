@@ -402,7 +402,10 @@ let page_tests =
     ("fold/unfold toggles", `Quick, test_fold_unfold);
     ( "select Node from create menu",
       `Quick,
-      Test_quarantine.known_failure ~issue:1072 test_select_node_from_menu );
+      Test_quarantine.known_failure
+        ~issue:1072
+        ~expect:"create menu opened"
+        test_select_node_from_menu );
     ("help modal opens with '?' key", `Quick, test_help_modal_opens);
     ( "cascade-start includes stopped index dependency",
       `Quick,

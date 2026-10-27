@@ -536,7 +536,10 @@ let () =
           ("diagnostics", `Quick, test_diagnostics);
           ( "topology",
             `Quick,
-            Test_quarantine.known_failure ~issue:1074 test_topology );
+            Test_quarantine.known_failure
+              ~issue:1074
+              ~expect:"[Topology] has page shortcuts section"
+              test_topology );
           ("sandbox", `Quick, test_sandbox);
         ] );
       ( "broken_main_pages",
@@ -545,13 +548,22 @@ let () =
         [
           ( "log_viewer",
             `Quick,
-            Test_quarantine.known_failure ~issue:1074 test_log_viewer );
+            Test_quarantine.known_failure
+              ~issue:1074
+              ~expect:"[Log Viewer] has page shortcuts section"
+              test_log_viewer );
           ( "instance_details",
             `Quick,
-            Test_quarantine.known_failure ~issue:1074 test_instance_details );
+            Test_quarantine.known_failure
+              ~issue:1074
+              ~expect:"[Instance Details] has page shortcuts section"
+              test_instance_details );
           ( "snapshots",
             `Quick,
-            Test_quarantine.known_failure ~issue:1074 test_snapshots );
+            Test_quarantine.known_failure
+              ~issue:1074
+              ~expect:"[Snapshots] has page shortcuts section"
+              test_snapshots );
           ("import_wizard", `Quick, test_import_wizard);
           ("sandbox_key_alloc", `Quick, test_sandbox_key_alloc);
         ] );

@@ -70,7 +70,7 @@
 (library
  (name test_quarantine_lib)
  (wrapped false)
- (libraries alcotest)
+ (libraries alcotest str)
  (modules test_quarantine))
 
 (test
