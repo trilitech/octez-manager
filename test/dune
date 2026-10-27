@@ -1303,7 +1303,6 @@
 
 (executable
  (name check_test_inventory)
- (libraries str)
  (modules check_test_inventory))
 
 (rule
@@ -1386,7 +1385,61 @@
       --manifest
       inventory_fixtures/parse_error/manifest.sexp
       --dune
-      inventory_fixtures/parse_error/dune.fixture))))))
+      inventory_fixtures/parse_error/dune.fixture))
+    (echo "== masked_rule (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/masked_rule/manifest.sexp
+      --dune
+      inventory_fixtures/masked_rule/dune.fixture))
+    (echo "== conditional (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/conditional/manifest.sexp
+      --dune
+      inventory_fixtures/conditional/dune.fixture))
+    (echo "== gated_test (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/gated_test/manifest.sexp
+      --dune
+      inventory_fixtures/gated_test/dune.fixture))
+    (echo "== obsolete_stanza (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/obsolete_stanza/manifest.sexp
+      --dune
+      inventory_fixtures/obsolete_stanza/dune.fixture))
+    (echo "== unclassified_test (expect exit 1)\n")
+    (with-accepted-exit-codes
+     1
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/unclassified_test/manifest.sexp
+      --dune
+      inventory_fixtures/unclassified_test/dune.fixture))
+    (echo "== block_string (expect exit 2)\n")
+    (with-accepted-exit-codes
+     2
+     (run
+      %{exe:check_test_inventory.exe}
+      --manifest
+      inventory_fixtures/block_string/manifest.sexp
+      --dune
+      inventory_fixtures/block_string/dune.fixture))))))
 
 (rule
  (alias runtest)

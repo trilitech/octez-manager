@@ -10,3 +10,15 @@ dead entry, no stanza: gone
 source not attached to any stanza: inventory_fixtures/orphan/t_e.ml
 == parse_error (expect exit 2)
 setup error: inventory_fixtures/parse_error/manifest.sexp: unbalanced parenthesis
+== masked_rule (expect exit 1)
+deterministic test not run by runtest: t_m
+== conditional (expect exit 1)
+deterministic test is conditional (enabled_if/build_if/action): t_k
+== gated_test (expect exit 1)
+env-gated target registered as a runtest test: t_g
+== obsolete_stanza (expect exit 1)
+obsolete entry still has a stanza: t_o
+== unclassified_test (expect exit 1)
+unclassified test stanza: t_u
+== block_string (expect exit 2)
+setup error: inventory_fixtures/block_string/dune.fixture: dune block strings are not supported

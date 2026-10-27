@@ -1,1 +1,1 @@
-; empty manifest
+((name t_d) (class deterministic))

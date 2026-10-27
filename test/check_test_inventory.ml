@@ -9,10 +9,12 @@
 
     Usage: [check_test_inventory --manifest FILE --dune FILE [--dune FILE]...]
 
-    Every [executable]/[executables] stanza in the given dune files must be
-    classified in the manifest, every source module must belong to a stanza
-    (unless the manifest marks it obsolete), and the manifest must agree with
-    what [dune runtest] actually runs.
+    Every [test]/[tests]/[executable]/[executables] stanza in the given dune
+    files must be classified in the manifest. A [deterministic] entry must be
+    an unconditional [test]/[tests] stanza: only those make [dune runtest]
+    run the suite and fail on its exit code; a rule merely referencing an
+    executable proves nothing about its outcome. Every source module must
+    belong to a stanza unless the manifest marks it [obsolete].
 
     Exit codes: 0 contract holds, 1 violations (listed on stdout), 2 setup
     error (unreadable file, parse error, malformed manifest, bad usage). *)
@@ -27,89 +29,102 @@ exception Parse_error of string
 
 let parse_error fmt = Printf.ksprintf (fun m -> raise (Parse_error m)) fmt
 
-let parse_string ~file text =
-  let len = String.length text in
-  let pos = ref 0 in
-  let peek () = if !pos < len then Some text.[!pos] else None in
-  let advance () = incr pos in
-  let rec skip_blank () =
-    match peek () with
-    | Some (' ' | '\t' | '\n' | '\r') ->
-        advance () ;
-        skip_blank ()
-    | Some ';' ->
-        while match peek () with Some '\n' | None -> false | _ -> true do
-          advance ()
-        done ;
-        skip_blank ()
-    | Some '#' when !pos + 1 < len && text.[!pos + 1] = '|' ->
-        pos := !pos + 2 ;
-        while
-          !pos + 1 < len && not (text.[!pos] = '|' && text.[!pos + 1] = '#')
-        do
-          advance ()
-        done ;
-        if !pos + 1 >= len then
-          parse_error "%s: unterminated block comment" file ;
-        pos := !pos + 2 ;
-        skip_blank ()
-    | Some '#' when !pos + 1 < len && text.[!pos + 1] = ';' ->
-        pos := !pos + 2 ;
-        ignore (read_sexp ()) ;
-        skip_blank ()
-    | _ -> ()
-  and read_string () =
-    let buf = Buffer.create 16 in
-    advance () ;
-    let rec loop () =
-      match peek () with
-      | None -> parse_error "%s: unterminated string" file
-      | Some '"' -> advance ()
-      | Some '\\' when !pos + 1 < len ->
-          Buffer.add_char buf text.[!pos + 1] ;
-          pos := !pos + 2 ;
-          loop ()
-      | Some c ->
-          Buffer.add_char buf c ;
-          advance () ;
-          loop ()
-    in
-    loop () ;
-    Atom (Buffer.contents buf)
-  and read_atom () =
-    let start = !pos in
-    while
-      match peek () with
-      | None | Some (' ' | '\t' | '\n' | '\r' | '(' | ')' | ';' | '"') -> false
-      | _ -> true
-    do
-      advance ()
-    done ;
-    Atom (String.sub text start (!pos - start))
-  and read_list () =
-    advance () ;
-    let rec loop acc =
-      skip_blank () ;
-      match peek () with
-      | None -> parse_error "%s: unbalanced parenthesis" file
-      | Some ')' ->
-          advance () ;
-          List (List.rev acc)
-      | Some _ -> loop (read_sexp () :: acc)
-    in
-    loop []
-  and read_sexp () =
-    skip_blank () ;
-    match peek () with
-    | None -> parse_error "%s: unexpected end of input" file
-    | Some '(' -> read_list ()
-    | Some ')' -> parse_error "%s: unexpected ')' at offset %d" file !pos
-    | Some '"' -> read_string ()
-    | Some _ -> read_atom ()
+type cursor = {file : string; text : string; mutable pos : int}
+
+let peek c = if c.pos < String.length c.text then Some c.text.[c.pos] else None
+
+let next_is c s =
+  let n = String.length s in
+  c.pos + n <= String.length c.text
+  && String.equal (String.sub c.text c.pos n) s
+
+let skip_while c pred =
+  while match peek c with Some ch -> pred ch | None -> false do
+    c.pos <- c.pos + 1
+  done
+
+let skip_block_comment c =
+  c.pos <- c.pos + 2 ;
+  while c.pos + 1 < String.length c.text && not (next_is c "|#") do
+    c.pos <- c.pos + 1
+  done ;
+  if not (next_is c "|#") then
+    parse_error "%s: unterminated block comment" c.file ;
+  c.pos <- c.pos + 2
+
+let read_string c =
+  if next_is c "\"\\|" || next_is c "\"\\>" then
+    parse_error "%s: dune block strings are not supported" c.file ;
+  let buf = Buffer.create 16 in
+  c.pos <- c.pos + 1 ;
+  let rec loop () =
+    match peek c with
+    | None -> parse_error "%s: unterminated string" c.file
+    | Some '"' -> c.pos <- c.pos + 1
+    | Some '\\' when c.pos + 1 < String.length c.text ->
+        Buffer.add_char buf c.text.[c.pos + 1] ;
+        c.pos <- c.pos + 2 ;
+        loop ()
+    | Some ch ->
+        Buffer.add_char buf ch ;
+        c.pos <- c.pos + 1 ;
+        loop ()
   in
+  loop () ;
+  Atom (Buffer.contents buf)
+
+let read_atom c =
+  let start = c.pos in
+  skip_while c (function
+    | ' ' | '\t' | '\n' | '\r' | '(' | ')' | ';' | '"' -> false
+    | _ -> true) ;
+  Atom (String.sub c.text start (c.pos - start))
+
+let rec skip_blank c =
+  match peek c with
+  | Some (' ' | '\t' | '\n' | '\r') ->
+      c.pos <- c.pos + 1 ;
+      skip_blank c
+  | Some ';' ->
+      skip_while c (fun ch -> ch <> '\n') ;
+      skip_blank c
+  | Some '#' when next_is c "#|" ->
+      skip_block_comment c ;
+      skip_blank c
+  | Some '#' when next_is c "#;" ->
+      c.pos <- c.pos + 2 ;
+      ignore (read_sexp c) ;
+      skip_blank c
+  | _ -> ()
+
+and read_list c =
+  c.pos <- c.pos + 1 ;
+  let rec loop acc =
+    skip_blank c ;
+    match peek c with
+    | None -> parse_error "%s: unbalanced parenthesis" c.file
+    | Some ')' ->
+        c.pos <- c.pos + 1 ;
+        List (List.rev acc)
+    | Some _ -> loop (read_sexp c :: acc)
+  in
+  loop []
+
+and read_sexp c =
+  skip_blank c ;
+  match peek c with
+  | None -> parse_error "%s: unexpected end of input" c.file
+  | Some '(' -> read_list c
+  | Some ')' -> parse_error "%s: unexpected ')' at offset %d" c.file c.pos
+  | Some '"' -> read_string c
+  | Some _ -> read_atom c
+
+let parse_string ~file text =
+  let c = {file; text; pos = 0} in
   let rec all acc =
-    skip_blank () ;
-    if !pos >= len then List.rev acc else all (read_sexp () :: acc)
+    skip_blank c ;
+    if c.pos >= String.length text then List.rev acc
+    else all (read_sexp c :: acc)
   in
   all []
 
@@ -121,7 +136,13 @@ let read_file path =
 (* Dune stanza model *)
 (* ============================================================ *)
 
-type stanza = {kind : string; names : string list; modules : string list option}
+type stanza = {
+  kind : string;
+  names : string list;
+  modules : string list option;
+  conditional : bool;
+      (** Has [enabled_if], [build_if] or an [action] override. *)
+}
 
 let field name fields =
   List.find_map
@@ -137,71 +158,56 @@ let rec all_atoms = function
   | Atom a -> [a]
   | List l -> List.concat_map all_atoms l
 
-(** Executable names referenced as [%{exe:NAME.exe}] or [%{dep:NAME.exe}]. *)
-let referenced_exes sexp =
-  let re = Str.regexp "%{\\(exe\\|dep\\):\\([A-Za-z0-9_]+\\)\\.exe}" in
-  all_atoms sexp
-  |> List.concat_map (fun atom ->
-      let rec scan from acc =
-        match Str.search_forward re atom from with
-        | i -> scan (i + 1) (Str.matched_group 2 atom :: acc)
-        | exception Not_found -> acc
-      in
-      scan 0 [])
+let stanza_of kind fields =
+  let names =
+    match (field "name" fields, field "names" fields) with
+    | Some n, _ | None, Some n -> atoms n
+    | None, None -> []
+  in
+  let modules =
+    Option.map
+      (fun m -> List.map String.lowercase_ascii (atoms m))
+      (field "modules" fields)
+  in
+  let conditional =
+    List.exists
+      (fun f -> Option.is_some (field f fields))
+      ["enabled_if"; "build_if"; "action"]
+  in
+  {kind; names; modules; conditional}
 
-let is_runtest_rule fields =
-  match field "alias" fields with Some [Atom "runtest"] -> true | _ -> false
-
-type dune_file = {
-  stanzas : stanza list;
-  runtest_rule_exes : string list;
-  src_dir : string;
-}
+type dune_file = {stanzas : stanza list; src_dir : string}
 
 let load_dune path =
   let sexps = parse_string ~file:path (read_file path) in
-  let stanza kind fields =
-    let names =
-      match (field "name" fields, field "names" fields) with
-      | Some n, _ | None, Some n -> atoms n
-      | None, None -> []
-    in
-    let modules =
-      Option.map
-        (fun m -> List.map String.lowercase_ascii (atoms m))
-        (field "modules" fields)
-    in
-    {kind; names; modules}
-  in
-  let stanzas, rule_exes =
-    List.fold_left
-      (fun (stanzas, exes) sexp ->
-        match sexp with
+  let stanzas =
+    List.filter_map
+      (function
         | List
             (Atom
                (("executable" | "executables" | "test" | "tests" | "library") as
                 kind)
             :: fields) ->
-            (stanza kind fields :: stanzas, exes)
-        | List (Atom "rule" :: fields) when is_runtest_rule fields ->
-            (stanzas, referenced_exes sexp @ exes)
-        | _ -> (stanzas, exes))
-      ([], [])
+            Some (stanza_of kind fields)
+        | _ -> None)
       sexps
   in
-  {
-    stanzas = List.rev stanzas;
-    runtest_rule_exes = rule_exes;
-    src_dir = Filename.dirname path;
-  }
+  {stanzas; src_dir = Filename.dirname path}
 
 (* ============================================================ *)
 (* Manifest *)
 (* ============================================================ *)
 
-type klass = Deterministic | Env_gated | Manual | Obsolete
+type klass = Deterministic | Env_gated | Manual | Tool | Obsolete
 
 type entry = {name : string; klass : klass}
+
+let class_name = function
+  | Deterministic -> "deterministic"
+  | Env_gated -> "env-gated"
+  | Manual -> "manual"
+  | Tool -> "tool"
+  | Obsolete -> "obsolete"
 
 let parse_entry file = function
   | List fields as sexp -> (
@@ -210,20 +216,19 @@ let parse_entry file = function
       in
       let require key =
         match one key with
-        | Some v when String.trim v <> "" -> ()
+        | Some v when not (String.equal (String.trim v) "") -> ()
         | _ -> parse_error "%s: entry needs a non-empty (%s ...)" file key
+      in
+      let with_field key name klass =
+        require key ;
+        {name; klass}
       in
       match (one "name", one "class") with
       | Some name, Some "deterministic" -> {name; klass = Deterministic}
-      | Some name, Some "env-gated" ->
-          require "gate" ;
-          {name; klass = Env_gated}
-      | Some name, Some "manual" ->
-          require "reason" ;
-          {name; klass = Manual}
-      | Some name, Some "obsolete" ->
-          require "reason" ;
-          {name; klass = Obsolete}
+      | Some name, Some "env-gated" -> with_field "gate" name Env_gated
+      | Some name, Some "manual" -> with_field "reason" name Manual
+      | Some name, Some "tool" -> with_field "reason" name Tool
+      | Some name, Some "obsolete" -> with_field "reason" name Obsolete
       | _ ->
           parse_error
             "%s: malformed entry %s"
@@ -235,104 +240,92 @@ let load_manifest path =
   let entries =
     List.map (parse_entry path) (parse_string ~file:path (read_file path))
   in
-  List.iter
-    (fun e ->
-      if
-        List.length
-          (List.filter (fun e' -> String.equal e'.name e.name) entries)
-        > 1
-      then parse_error "%s: duplicate entry %s" path e.name)
-    entries ;
+  let names = List.map (fun e -> e.name) entries in
+  let sorted = List.sort_uniq String.compare names in
+  if List.compare_lengths sorted names <> 0 then
+    parse_error "%s: duplicate entries" path ;
   entries
 
 (* ============================================================ *)
 (* Contract *)
 (* ============================================================ *)
 
-let class_name = function
-  | Deterministic -> "deterministic"
-  | Env_gated -> "env-gated"
-  | Manual -> "manual"
-  | Obsolete -> "obsolete"
-
 let mem name names = List.exists (String.equal name) names
+
+let is_test s = mem s.kind ["test"; "tests"]
+
+let is_executable s = mem s.kind ["executable"; "executables"]
+
+(** OCaml compilation-unit names only: excludes generated files such as the
+    [*.pp.ml] that instrumented builds leave next to the sources. *)
+let is_module_name m =
+  String.length m > 0
+  && String.for_all
+       (function
+         | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '\'' -> true
+         | _ -> false)
+       m
 
 let source_modules dir =
   Sys.readdir dir |> Array.to_list
-  |> List.filter (fun f -> Filename.check_suffix f ".ml")
-  |> List.map (fun f -> String.lowercase_ascii (Filename.chop_suffix f ".ml"))
-  |> List.sort String.compare
+  |> List.filter_map (fun f -> Filename.chop_suffix_opt ~suffix:".ml" f)
+  |> List.map String.lowercase_ascii
+  |> List.filter is_module_name |> List.sort String.compare
+
+let lookup manifest n = List.find_opt (fun e -> String.equal e.name n) manifest
+
+let unclassified_violations ~manifest stanzas =
+  stanzas
+  |> List.filter (fun s -> is_test s || is_executable s)
+  |> List.concat_map (fun s -> List.map (fun n -> (s, n)) s.names)
+  |> List.filter_map (fun (s, n) ->
+      if Option.is_some (lookup manifest n) then None
+      else Some (Printf.sprintf "unclassified %s stanza: %s" s.kind n))
+
+let entry_violation stanzas e =
+  let stanza = List.find_opt (fun s -> mem e.name s.names) stanzas in
+  let fail fmt = Printf.ksprintf Option.some fmt in
+  match (e.klass, stanza) with
+  | Obsolete, None -> None
+  | Obsolete, Some _ -> fail "obsolete entry still has a stanza: %s" e.name
+  | _, None -> fail "dead entry, no stanza: %s" e.name
+  | Deterministic, Some s when not (is_test s) ->
+      fail "deterministic test not run by runtest: %s" e.name
+  | Deterministic, Some s when s.conditional ->
+      fail
+        "deterministic test is conditional (enabled_if/build_if/action): %s"
+        e.name
+  | Deterministic, Some _ -> None
+  | (Env_gated | Manual | Tool), Some s when is_test s ->
+      fail
+        "%s target registered as a runtest test: %s"
+        (class_name e.klass)
+        e.name
+  | (Env_gated | Manual | Tool), Some _ -> None
+
+let orphan_violations ~manifest dune =
+  if List.exists (fun s -> Option.is_none s.modules) dune.stanzas then []
+  else
+    let owned =
+      List.concat_map (fun s -> Option.value ~default:[] s.modules) dune.stanzas
+    in
+    source_modules dune.src_dir
+    |> List.filter_map (fun m ->
+        match lookup manifest m with
+        | Some {klass = Obsolete; _} -> None
+        | _ when mem m owned -> None
+        | _ ->
+            Some
+              (Printf.sprintf
+                 "source not attached to any stanza: %s.ml"
+                 (Filename.concat dune.src_dir m)))
 
 (** Violations of the contract, one message each. *)
 let violations ~manifest dunes =
   let stanzas = List.concat_map (fun d -> d.stanzas) dunes in
-  let names_of kinds =
-    List.concat_map (fun s -> if mem s.kind kinds then s.names else []) stanzas
-  in
-  let tests = names_of ["test"; "tests"] in
-  let executables = names_of ["executable"; "executables"] in
-  let rule_exes = List.concat_map (fun d -> d.runtest_rule_exes) dunes in
-  let runs n = mem n tests || mem n rule_exes in
-  let declared n = mem n tests || mem n executables in
-  let entry n = List.find_opt (fun e -> String.equal e.name n) manifest in
-  let unclassified =
-    List.filter_map
-      (fun n ->
-        if Option.is_none (entry n) && not (mem n rule_exes) then
-          Some (Printf.sprintf "unclassified executable stanza: %s" n)
-        else None)
-      executables
-  in
-  let per_entry =
-    List.filter_map
-      (fun e ->
-        match e.klass with
-        | Deterministic when not (declared e.name) ->
-            Some (Printf.sprintf "dead entry, no stanza: %s" e.name)
-        | Deterministic when not (runs e.name) ->
-            Some
-              (Printf.sprintf
-                 "deterministic test not run by runtest: %s"
-                 e.name)
-        | (Env_gated | Manual) when not (declared e.name) ->
-            Some (Printf.sprintf "dead entry, no stanza: %s" e.name)
-        | (Env_gated | Manual | Obsolete) when runs e.name ->
-            Some
-              (Printf.sprintf
-                 "%s target attached to runtest: %s"
-                 (class_name e.klass)
-                 e.name)
-        | Obsolete when declared e.name ->
-            Some (Printf.sprintf "obsolete entry still has a stanza: %s" e.name)
-        | _ -> None)
-      manifest
-  in
-  let orphans =
-    List.concat_map
-      (fun d ->
-        if List.exists (fun s -> Option.is_none s.modules) d.stanzas then []
-        else
-          let owned =
-            List.concat_map
-              (fun s -> Option.value ~default:[] s.modules)
-              d.stanzas
-          in
-          source_modules d.src_dir
-          |> List.filter_map (fun m ->
-              let obsolete =
-                match entry m with
-                | Some {klass = Obsolete; _} -> true
-                | _ -> false
-              in
-              if mem m owned || obsolete then None
-              else
-                Some
-                  (Printf.sprintf
-                     "source not attached to any stanza: %s.ml"
-                     (Filename.concat d.src_dir m))))
-      dunes
-  in
-  unclassified @ per_entry @ orphans
+  unclassified_violations ~manifest stanzas
+  @ List.filter_map (entry_violation stanzas) manifest
+  @ List.concat_map (orphan_violations ~manifest) dunes
 
 (* ============================================================ *)
 (* Entry point *)
@@ -340,7 +333,11 @@ let violations ~manifest dunes =
 
 let usage = "check_test_inventory --manifest FILE --dune FILE [--dune FILE]..."
 
-let () =
+let bad_usage msg =
+  prerr_endline (msg ^ "\n" ^ usage) ;
+  exit 2
+
+let parse_args () =
   let manifest = ref None and dunes = ref [] in
   let spec =
     [
@@ -348,24 +345,23 @@ let () =
       ("--dune", Arg.String (fun f -> dunes := f :: !dunes), "FILE dune file");
     ]
   in
-  let bad_usage msg =
-    prerr_endline (msg ^ "\n" ^ usage) ;
-    exit 2
-  in
   (try
      Arg.parse_argv Sys.argv spec (fun a -> bad_usage ("unexpected " ^ a)) usage
    with Arg.Bad msg | Arg.Help msg -> bad_usage msg) ;
   match (!manifest, List.rev !dunes) with
   | None, _ | _, [] ->
       bad_usage "--manifest and at least one --dune are required"
-  | Some manifest_path, dune_paths -> (
-      match (load_manifest manifest_path, List.map load_dune dune_paths) with
-      | exception (Parse_error msg | Sys_error msg) ->
-          prerr_endline ("setup error: " ^ msg) ;
-          exit 2
-      | manifest, dunes -> (
-          match violations ~manifest dunes with
-          | [] -> print_endline "test inventory: OK"
-          | vs ->
-              List.iter print_endline vs ;
-              exit 1))
+  | Some manifest, dunes -> (manifest, dunes)
+
+let () =
+  let manifest_path, dune_paths = parse_args () in
+  match (load_manifest manifest_path, List.map load_dune dune_paths) with
+  | exception (Parse_error msg | Sys_error msg) ->
+      prerr_endline ("setup error: " ^ msg) ;
+      exit 2
+  | manifest, dunes -> (
+      match violations ~manifest dunes with
+      | [] -> print_endline "test inventory: OK"
+      | vs ->
+          List.iter print_endline vs ;
+          exit 1)
