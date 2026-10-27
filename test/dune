@@ -67,6 +67,17 @@
 
 ; Headless TUI tests. Run one with: dune exec test/<name>.exe
 
+(library
+ (name test_quarantine_lib)
+ (wrapped false)
+ (libraries alcotest)
+ (modules test_quarantine))
+
+(test
+ (name test_quarantine_self)
+ (libraries alcotest test_quarantine_lib)
+ (modules test_quarantine_self))
+
 ; Shared TUI test helpers library
 
 (library
@@ -88,9 +99,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name tui_flow_tests)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -102,9 +114,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_install_node_form)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -172,9 +185,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_instances_page)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -1183,9 +1197,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_help_modal_baseline)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -1197,9 +1212,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_help_modal_improvements)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -1211,9 +1227,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_help_modal_all_pages)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui
@@ -1225,9 +1242,10 @@
  (instrumentation
   (backend bisect_ppx)))
 
-(executable
+(test
  (name test_help_modal_regression)
  (libraries
+  test_quarantine_lib
   alcotest
   octez_manager_lib
   octez-manager.ui

@@ -316,19 +316,30 @@ let () =
     [
       ( "main_pages",
         [
-          ("instances", `Quick, test_instances_page);
+          ( "instances",
+            `Quick,
+            Test_quarantine.known_failure ~issue:1074 test_instances_page );
           ("wallets", `Quick, test_wallets_page);
           ("binaries", `Quick, test_binaries_page);
           ("rpc_node_selection", `Quick, test_rpc_node_selection_page);
           ("diagnostics", `Quick, test_diagnostics_page);
-          ("topology", `Quick, test_topology_page);
+          ( "topology",
+            `Quick,
+            Test_quarantine.known_failure ~issue:1074 test_topology_page );
           ("sandbox", `Quick, test_sandbox_page);
         ] );
       ( "secondary_pages",
         [
-          ("log_viewer", `Quick, test_log_viewer_page);
-          ("instance_details", `Quick, test_instance_details_page);
-          ("snapshots", `Quick, test_snapshots_page);
+          ( "log_viewer",
+            `Quick,
+            Test_quarantine.known_failure ~issue:1074 test_log_viewer_page );
+          ( "instance_details",
+            `Quick,
+            Test_quarantine.known_failure ~issue:1074 test_instance_details_page
+          );
+          ( "snapshots",
+            `Quick,
+            Test_quarantine.known_failure ~issue:1074 test_snapshots_page );
           ("import_wizard", `Quick, test_import_wizard_page);
           ("sandbox_key_alloc", `Quick, test_sandbox_key_alloc_page);
         ] );

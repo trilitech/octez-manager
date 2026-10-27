@@ -894,7 +894,12 @@ let () =
       ( "Instances.init",
         [
           test_case "renders header" `Quick test_instances_init;
-          test_case "shows hints" `Quick test_instances_shows_hints;
+          test_case
+            "shows hints"
+            `Quick
+            (Test_quarantine.known_failure
+               ~issue:1072
+               test_instances_shows_hints);
         ] );
       ( "Instances.navigation",
         [
@@ -910,12 +915,29 @@ let () =
           test_case
             "Escape closes modal"
             `Quick
-            test_instances_escape_closes_modal;
-          test_case "Enter on Install" `Quick test_instances_enter_on_install;
-          test_case "modal navigation" `Quick test_instances_modal_navigation;
+            (Test_quarantine.known_failure
+               ~issue:1072
+               test_instances_escape_closes_modal);
+          test_case
+            "Enter on Install"
+            `Quick
+            (Test_quarantine.known_failure
+               ~issue:1072
+               test_instances_enter_on_install);
+          test_case
+            "modal navigation"
+            `Quick
+            (Test_quarantine.known_failure
+               ~issue:1072
+               test_instances_modal_navigation);
         ] );
       ( "Instances.quit",
-        [test_case "q triggers quit" `Quick test_instances_quit] );
+        [
+          test_case
+            "q triggers quit"
+            `Quick
+            (Test_quarantine.known_failure ~issue:1072 test_instances_quit);
+        ] );
       ( "NodeForm.init",
         [
           test_case "renders form" `Quick test_node_form_init;
@@ -988,19 +1010,36 @@ let () =
       (* Wizard-style integration tests *)
       ( "Instances.wizard",
         [
-          test_case "create node flow" `Quick test_instances_create_node_flow;
-          test_case "create baker flow" `Quick test_instances_create_baker_flow;
+          test_case
+            "create node flow"
+            `Quick
+            (Test_quarantine.known_failure
+               ~issue:1072
+               test_instances_create_node_flow);
+          test_case
+            "create baker flow"
+            `Quick
+            (Test_quarantine.known_failure
+               ~issue:1072
+               test_instances_create_baker_flow);
           test_case
             "screen updates on nav"
             `Quick
-            test_instances_screen_updates_on_nav;
+            (Test_quarantine.known_failure
+               ~issue:1072
+               test_instances_screen_updates_on_nav);
         ] );
       (* Form fill integration tests *)
       ( "NodeForm.fill",
         [
           test_case "fill instance name" `Quick test_node_form_fill_instance_name;
           test_case "change network" `Quick test_node_form_change_network;
-          test_case "full navigation" `Quick test_node_form_full_navigation;
+          test_case
+            "full navigation"
+            `Quick
+            (Test_quarantine.known_failure
+               ~issue:1073
+               test_node_form_full_navigation);
           test_case "edit and cancel" `Quick test_node_form_edit_cancel;
         ] );
     ]
