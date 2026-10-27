@@ -84,7 +84,8 @@ fi
 echo "Systemd service exists"
 
 # Verify dependency on node is set
-if ! systemctl cat "octez-index@$INDEX_INSTANCE.service" 2>/dev/null | grep -q "BindsTo=octez-node@$NODE_INSTANCE.service"; then
+UNIT_OUTPUT=$(assert_command_output 0 "" "read index unit" -- systemctl cat "octez-index@$INDEX_INSTANCE.service") || exit $?
+if ! [[ "$UNIT_OUTPUT" == *"BindsTo=octez-node@$NODE_INSTANCE.service"* ]]; then
 	echo "WARN: BindsTo dependency on node not found (may be in drop-in)"
 fi
 

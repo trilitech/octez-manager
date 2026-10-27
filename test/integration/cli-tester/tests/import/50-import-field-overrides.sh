@@ -42,7 +42,14 @@ if ! service_is_managed "$CUSTOM_INSTANCE"; then
 fi
 
 # Verify original name is not in managed instances
-if om list 2>&1 | grep -v "external" | grep -q "$EXTERNAL_INSTANCE"; then
+LIST_OUTPUT=$(assert_command_output 0 "" "read managed instances" -- om list) || exit $?
+if MANAGED_OUTPUT=$(grep -v "external" <<<"$LIST_OUTPUT"); then
+	: # Selected managed rows.
+else
+	FILTER_STATUS=$?
+	[ "$FILTER_STATUS" -eq 1 ] || exit "$FILTER_STATUS" # No selected rows is valid.
+fi
+if [[ "$MANAGED_OUTPUT" == *"$EXTERNAL_INSTANCE"* ]]; then
 	echo "WARNING: Original name found in managed instances"
 fi
 

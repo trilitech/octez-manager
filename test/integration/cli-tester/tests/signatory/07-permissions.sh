@@ -49,7 +49,11 @@ if ! grep -q "attestation:" "$CONFIG_FILE_1"; then
 	exit 1
 fi
 
-if grep -A10 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "$CONFIG_FILE_1" | grep -q "generic:"; then
+MATCHED_OUTPUT=$(grep -A10 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "$CONFIG_FILE_1") || {
+	echo "Expected file selection failed" >&2
+	exit 1
+}
+if grep -q "generic:" <<<"$MATCHED_OUTPUT"; then
 	echo "ERROR: Should not have 'generic' permission (consensus-only key)"
 	cat "$CONFIG_FILE_1"
 	exit 1
@@ -74,13 +78,21 @@ if [ "$(id -u)" -eq 0 ]; then
 fi
 CONFIG_FILE_2="$DATA_DIR_2/signatory.yaml"
 
-if ! grep -A5 "tz2LBtbMMvvguWQupgEmtfjtXy77cHgdr5TE" "$CONFIG_FILE_2" | grep -q "generic:"; then
+MATCHED_OUTPUT=$(grep -A5 "tz2LBtbMMvvguWQupgEmtfjtXy77cHgdr5TE" "$CONFIG_FILE_2") || {
+	echo "Expected file selection failed" >&2
+	exit 1
+}
+if ! grep -q "generic:" <<<"$MATCHED_OUTPUT"; then
 	echo "ERROR: Missing 'generic' permission"
 	cat "$CONFIG_FILE_2"
 	exit 1
 fi
 
-if grep -A5 "tz2LBtbMMvvguWQupgEmtfjtXy77cHgdr5TE" "$CONFIG_FILE_2" | grep -q "block:"; then
+MATCHED_OUTPUT=$(grep -A5 "tz2LBtbMMvvguWQupgEmtfjtXy77cHgdr5TE" "$CONFIG_FILE_2") || {
+	echo "Expected file selection failed" >&2
+	exit 1
+}
+if grep -q "block:" <<<"$MATCHED_OUTPUT"; then
 	echo "ERROR: Should not have 'block' permission (manager-only key)"
 	cat "$CONFIG_FILE_2"
 	exit 1
@@ -106,27 +118,43 @@ fi
 CONFIG_FILE_3="$DATA_DIR_3/signatory.yaml"
 
 # Verify first key has block and attestation
-if ! grep -A5 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "$CONFIG_FILE_3" | grep -q "block:"; then
+MATCHED_OUTPUT=$(grep -A5 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "$CONFIG_FILE_3") || {
+	echo "Expected file selection failed" >&2
+	exit 1
+}
+if ! grep -q "block:" <<<"$MATCHED_OUTPUT"; then
 	echo "ERROR: First key missing 'block' permission"
 	cat "$CONFIG_FILE_3"
 	exit 1
 fi
 
-if ! grep -A5 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "$CONFIG_FILE_3" | grep -q "attestation:"; then
+MATCHED_OUTPUT=$(grep -A5 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "$CONFIG_FILE_3") || {
+	echo "Expected file selection failed" >&2
+	exit 1
+}
+if ! grep -q "attestation:" <<<"$MATCHED_OUTPUT"; then
 	echo "ERROR: First key missing 'attestation' permission"
 	cat "$CONFIG_FILE_3"
 	exit 1
 fi
 
 # Verify second key has generic
-if ! grep -A5 "tz2LBtbMMvvguWQupgEmtfjtXy77cHgdr5TE" "$CONFIG_FILE_3" | grep -q "generic:"; then
+MATCHED_OUTPUT=$(grep -A5 "tz2LBtbMMvvguWQupgEmtfjtXy77cHgdr5TE" "$CONFIG_FILE_3") || {
+	echo "Expected file selection failed" >&2
+	exit 1
+}
+if ! grep -q "generic:" <<<"$MATCHED_OUTPUT"; then
 	echo "ERROR: Second key missing 'generic' permission"
 	cat "$CONFIG_FILE_3"
 	exit 1
 fi
 
 # Verify second key doesn't have block
-if grep -A5 "tz2LBtbMMvvguWQupgEmtfjtXy77cHgdr5TE" "$CONFIG_FILE_3" | grep -q "block:"; then
+MATCHED_OUTPUT=$(grep -A5 "tz2LBtbMMvvguWQupgEmtfjtXy77cHgdr5TE" "$CONFIG_FILE_3") || {
+	echo "Expected file selection failed" >&2
+	exit 1
+}
+if grep -q "block:" <<<"$MATCHED_OUTPUT"; then
 	echo "ERROR: Second key should not have 'block' permission"
 	cat "$CONFIG_FILE_3"
 	exit 1
@@ -157,7 +185,11 @@ CONFIG_FILE_4="$DATA_DIR_4/signatory.yaml"
 
 # Verify all permissions are present (default behavior)
 for perm in "block:" "attestation:" "preattestation:" "attestation_with_dal:" "generic:"; do
-	if ! grep -A10 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "$CONFIG_FILE_4" | grep -q "$perm"; then
+	MATCHED_OUTPUT=$(grep -A10 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" "$CONFIG_FILE_4") || {
+		echo "Expected file selection failed" >&2
+		exit 1
+	}
+	if ! grep -q "$perm" <<<"$MATCHED_OUTPUT"; then
 		echo "ERROR: Default permissions missing '$perm'"
 		cat "$CONFIG_FILE_4"
 		exit 1

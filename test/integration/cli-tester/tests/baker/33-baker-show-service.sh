@@ -36,10 +36,10 @@ om install-baker \
 
 # Test show-service command
 echo "Testing show-service command..."
-OUTPUT=$(om instance "$BAKER_INSTANCE" show-service 2>&1)
+OUTPUT=$(assert_command_output 0 "" "capture output" -- om instance "$BAKER_INSTANCE" show-service)
 
 # Verify output contains expected service name
-if ! echo "$OUTPUT" | grep -q "octez-baker@${BAKER_INSTANCE}"; then
+if ! [[ "$OUTPUT" == *"octez-baker@${BAKER_INSTANCE}"* ]]; then
 	echo "ERROR: show-service output doesn't contain service name"
 	echo "$OUTPUT"
 	exit 1
@@ -47,7 +47,7 @@ fi
 echo "Service name in output"
 
 # Verify output contains loaded status
-if ! echo "$OUTPUT" | grep -qi "loaded"; then
+if ! grep -qi "loaded" <<<"$OUTPUT"; then
 	echo "ERROR: show-service output doesn't show loaded status"
 	echo "$OUTPUT"
 	exit 1
@@ -56,10 +56,10 @@ echo "Loaded status in output"
 
 # Test show command
 echo "Testing show command..."
-SHOW_OUTPUT=$(om instance "$BAKER_INSTANCE" show 2>&1)
+SHOW_OUTPUT=$(assert_command_output 0 "" "capture show_output" -- om instance "$BAKER_INSTANCE" show)
 
 # Verify show output contains instance info
-if ! echo "$SHOW_OUTPUT" | grep -q "$BAKER_INSTANCE"; then
+if ! [[ "$SHOW_OUTPUT" == *"$BAKER_INSTANCE"* ]]; then
 	echo "ERROR: show output doesn't contain instance name"
 	echo "$SHOW_OUTPUT"
 	exit 1
@@ -67,7 +67,7 @@ fi
 echo "Instance name in show output"
 
 # Verify show output contains role
-if ! echo "$SHOW_OUTPUT" | grep -qi "baker"; then
+if ! grep -qi "baker" <<<"$SHOW_OUTPUT"; then
 	echo "ERROR: show output doesn't contain role"
 	echo "$SHOW_OUTPUT"
 	exit 1

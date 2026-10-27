@@ -31,9 +31,8 @@ fi
 echo "External service detected correctly"
 
 # Verify it shows up with 'external' marker when using --all or --external
-if ! om list --external 2>&1 | grep -q "$INSTANCE"; then
+if ! assert_command_output 0 "$INSTANCE" "import: expected command output" -- om list --external; then
 	echo "ERROR: External service not marked as external"
-	om list --external 2>&1
 	exit 1
 fi
 

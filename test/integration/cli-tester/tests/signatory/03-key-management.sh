@@ -126,7 +126,11 @@ if ! grep -q "$SIGNATORY_INSTANCE" /tmp/list-output.txt; then
 fi
 
 # Verify it's listed as signatory role
-if ! grep "$SIGNATORY_INSTANCE" /tmp/list-output.txt | grep -q "signatory"; then
+MATCHED_OUTPUT=$(grep -F "$SIGNATORY_INSTANCE" /tmp/list-output.txt) || {
+	echo "Expected file selection failed" >&2
+	exit 1
+}
+if ! grep -q "signatory" <<<"$MATCHED_OUTPUT"; then
 	echo "ERROR: Instance not listed as signatory role"
 	grep "$SIGNATORY_INSTANCE" /tmp/list-output.txt
 	exit 1

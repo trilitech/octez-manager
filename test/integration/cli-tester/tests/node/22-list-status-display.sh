@@ -27,7 +27,7 @@ om install-node \
 LIST_OUTPUT=$(om list)
 echo "om list output:"
 echo "$LIST_OUTPUT"
-if echo "$LIST_OUTPUT" | grep -q "$NODE_INSTANCE"; then
+if [[ "$LIST_OUTPUT" == *"$NODE_INSTANCE"* ]]; then
 	echo "Instance appears in list"
 else
 	echo "ERROR: Instance not in list"
@@ -35,14 +35,22 @@ else
 fi
 
 # Verify role and network in output
-if echo "$LIST_OUTPUT" | grep "$NODE_INSTANCE" | grep -q "node"; then
+MATCHED_OUTPUT=$(grep -F "$NODE_INSTANCE" <<<"$LIST_OUTPUT") || {
+	echo "Expected row selection failed" >&2
+	exit 1
+}
+if grep -q "node" <<<"$MATCHED_OUTPUT"; then
 	echo "Role appears correctly"
 else
 	echo "ERROR: Role not in output"
 	exit 1
 fi
 
-if echo "$LIST_OUTPUT" | grep "$NODE_INSTANCE" | grep -q "shadownet"; then
+MATCHED_OUTPUT=$(grep -F "$NODE_INSTANCE" <<<"$LIST_OUTPUT") || {
+	echo "Expected row selection failed" >&2
+	exit 1
+}
+if grep -q "shadownet" <<<"$MATCHED_OUTPUT"; then
 	echo "Network appears correctly"
 else
 	echo "ERROR: Network not in output"

@@ -76,7 +76,11 @@ fi
 echo "Instance registered successfully"
 
 # Verify instance shows as signatory role
-if ! grep "$TEST_INSTANCE" /tmp/signatory-install-list.txt | grep -q "signatory"; then
+MATCHED_OUTPUT=$(grep -F "$TEST_INSTANCE" /tmp/signatory-install-list.txt) || {
+	echo "Expected file selection failed" >&2
+	exit 1
+}
+if ! grep -q "signatory" <<<"$MATCHED_OUTPUT"; then
 	echo "ERROR: Instance not registered as signatory"
 	cat /tmp/signatory-install-list.txt
 	exit 1

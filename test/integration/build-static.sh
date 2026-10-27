@@ -44,9 +44,15 @@ cp "$PROJECT_ROOT/_build/default/src/main.exe" "$OUTPUT_PATH"
 chmod +x "$OUTPUT_PATH"
 
 # Verify it's statically linked
-if ldd "$OUTPUT_PATH" 2>&1 | grep -q "not a dynamic executable"; then
+if LDD_OUTPUT=$(ldd "$OUTPUT_PATH" 2>&1); then LDD_STATUS=0; else LDD_STATUS=$?; fi
+# ldd exits 1 for a static executable; other failures are infrastructure errors.
+[ "$LDD_STATUS" -le 1 ] || {
+    printf '%s\n' "$LDD_OUTPUT" >&2
+    exit "$LDD_STATUS"
+}
+if [ "$LDD_STATUS" -eq 1 ] && [[ "$LDD_OUTPUT" == *"not a dynamic executable"* ]]; then
     echo "SUCCESS: Static binary built at $OUTPUT_PATH"
 else
     echo "WARNING: Binary may be dynamically linked"
-    ldd "$OUTPUT_PATH" || true
+    printf '%s\n' "$LDD_OUTPUT"
 fi

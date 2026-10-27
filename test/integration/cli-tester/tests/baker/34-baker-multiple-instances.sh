@@ -59,15 +59,15 @@ fi
 echo "Second baker instance registered"
 
 # Verify both appear in list
-LIST_OUTPUT=$(om list 2>&1)
+LIST_OUTPUT=$(assert_command_output 0 "" "capture list_output" -- om list)
 
-if ! echo "$LIST_OUTPUT" | grep -q "$BAKER_INSTANCE_1"; then
+if ! [[ "$LIST_OUTPUT" == *"$BAKER_INSTANCE_1"* ]]; then
 	echo "ERROR: First baker instance not in list"
 	echo "$LIST_OUTPUT"
 	exit 1
 fi
 
-if ! echo "$LIST_OUTPUT" | grep -q "$BAKER_INSTANCE_2"; then
+if ! [[ "$LIST_OUTPUT" == *"$BAKER_INSTANCE_2"* ]]; then
 	echo "ERROR: Second baker instance not in list"
 	echo "$LIST_OUTPUT"
 	exit 1

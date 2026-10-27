@@ -1,0 +1,59 @@
+name: Integration Output Assertions
+
+on:
+  pull_request:
+    paths:
+      - 'test/integration/**'
+      - 'scripts/check-integration-pipefail.py'
+      - 'scripts/integration-shellcheck.lock.json'
+      - 'test/test_integration_pipefail.py'
+      - 'test/check_integration_pipefail_boundaries.py'
+      - '.github/workflows/integration-output-assertions.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'test/integration/**'
+      - 'scripts/check-integration-pipefail.py'
+      - 'scripts/integration-shellcheck.lock.json'
+      - 'test/test_integration_pipefail.py'
+      - 'test/check_integration_pipefail_boundaries.py'
+      - '.github/workflows/integration-output-assertions.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration-output-assertions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Completed-command regression and shard registration
+        run: |
+          bash test/integration/cli-tester/selftest-command-output.sh test/integration/cli-tester/tests/lib.sh
+          bash test/integration/cli-tester/selftest-shard-registration.sh
+      - name: Extract and verify immutable qualified ShellCheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=$(python3 -c 'import json; print(json.load(open("scripts/integration-shellcheck.lock.json"))["image"])')
+          binary=$(python3 -c 'import json; print(json.load(open("scripts/integration-shellcheck.lock.json"))["binary_path"])')
+          container=$(docker create "$image")
+          trap 'docker rm "$container" >/dev/null' EXIT
+          docker cp "$container:$binary" "$RUNNER_TEMP/shellcheck"
+          chmod +x "$RUNNER_TEMP/shellcheck"
+          python3 - "$RUNNER_TEMP/shellcheck" <<'PYTHON'
+          import hashlib, json, pathlib, sys
+          expected = json.load(open("scripts/integration-shellcheck.lock.json"))["sha256"]
+          actual = hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest()
+          if actual != expected:
+              raise SystemExit("qualified ShellCheck SHA256 mismatch")
+          PYTHON
+      - name: Adapter controls and complete integration inventory
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          export SHELLCHECK_BINARY="$RUNNER_TEMP/shellcheck"
+          python3 test/test_integration_pipefail.py
+          python3 scripts/check-integration-pipefail.py --shellcheck "$SHELLCHECK_BINARY"

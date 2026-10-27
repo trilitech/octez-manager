@@ -69,7 +69,7 @@ if [ -z "$NETWORK" ] || [ "$NETWORK" = "null" ]; then
 	exit 1
 fi
 # Accept both short names and full URLs (e.g. "shadownet" or "https://teztnets.com/shadownet")
-if echo "$NETWORK" | grep -qi "shadownet"; then
+if grep -qi "shadownet" <<<"$NETWORK"; then
 	echo "✓ config.json has correct network: $NETWORK"
 else
 	echo "ERROR: config.json has unexpected network: $NETWORK (expected shadownet)"

@@ -60,6 +60,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.has-source == 'true' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container:
       image: ghcr.io/${{ github.repository }}-ci-debian:latest
       credentials:
@@ -202,7 +203,7 @@ jobs:
 
       - name: Download baseline metrics (PRs only)
         if: github.event_name == 'pull_request'
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@eab87c9830c39eff17e5a6eadb20bfb4bc880477 # v27
         with:
           workflow: ci.yml
           branch: main

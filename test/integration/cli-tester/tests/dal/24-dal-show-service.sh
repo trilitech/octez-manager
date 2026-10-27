@@ -41,10 +41,10 @@ om install-dal-node \
 
 # Test show-service command
 echo "Testing show-service command..."
-OUTPUT=$(om instance "$DAL_INSTANCE" show-service 2>&1)
+OUTPUT=$(assert_command_output 0 "" "capture output" -- om instance "$DAL_INSTANCE" show-service)
 
 # Verify output contains expected service name
-if ! echo "$OUTPUT" | grep -q "octez-dal-node@${DAL_INSTANCE}"; then
+if ! [[ "$OUTPUT" == *"octez-dal-node@${DAL_INSTANCE}"* ]]; then
 	echo "ERROR: show-service output doesn't contain service name"
 	echo "$OUTPUT"
 	exit 1
@@ -52,7 +52,7 @@ fi
 echo "Service name in output"
 
 # Verify output contains loaded status
-if ! echo "$OUTPUT" | grep -qi "loaded"; then
+if ! grep -qi "loaded" <<<"$OUTPUT"; then
 	echo "ERROR: show-service output doesn't show loaded status"
 	echo "$OUTPUT"
 	exit 1
@@ -61,10 +61,10 @@ echo "Loaded status in output"
 
 # Test show command (different from show-service)
 echo "Testing show command..."
-SHOW_OUTPUT=$(om instance "$DAL_INSTANCE" show 2>&1)
+SHOW_OUTPUT=$(assert_command_output 0 "" "capture show_output" -- om instance "$DAL_INSTANCE" show)
 
 # Verify show output contains instance info
-if ! echo "$SHOW_OUTPUT" | grep -q "$DAL_INSTANCE"; then
+if ! [[ "$SHOW_OUTPUT" == *"$DAL_INSTANCE"* ]]; then
 	echo "ERROR: show output doesn't contain instance name"
 	echo "$SHOW_OUTPUT"
 	exit 1
@@ -72,7 +72,7 @@ fi
 echo "Instance name in show output"
 
 # Verify show output contains role
-if ! echo "$SHOW_OUTPUT" | grep -qi "dal"; then
+if ! grep -qi "dal" <<<"$SHOW_OUTPUT"; then
 	echo "ERROR: show output doesn't contain role"
 	echo "$SHOW_OUTPUT"
 	exit 1
